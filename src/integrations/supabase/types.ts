@@ -573,6 +573,7 @@ export type Database = {
         Row: {
           capa_plan_id: string
           created_at: string
+          deadline: string | null
           description: string | null
           id: string
           root_cause: string | null
@@ -583,6 +584,7 @@ export type Database = {
         Insert: {
           capa_plan_id: string
           created_at?: string
+          deadline?: string | null
           description?: string | null
           id?: string
           root_cause?: string | null
@@ -593,6 +595,7 @@ export type Database = {
         Update: {
           capa_plan_id?: string
           created_at?: string
+          deadline?: string | null
           description?: string | null
           id?: string
           root_cause?: string | null

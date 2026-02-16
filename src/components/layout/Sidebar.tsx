@@ -106,15 +106,6 @@ export function Sidebar({ activeModule, onModuleChange, collapsed = false, onTog
         ))}
       </div>
 
-      {/* Subscription Badge */}
-      {!collapsed && (
-        <div className="px-4 py-4 border-t border-sidebar-border">
-          <div className="bg-sidebar-accent rounded-lg px-3 py-2.5">
-            <p className="text-xs text-sidebar-foreground/70">Plan Actual</p>
-            <p className="text-sm font-semibold text-accent">Professional</p>
-          </div>
-        </div>
-      )}
     </aside>
   );
 }
