@@ -21,6 +21,7 @@ interface SidebarProps {
   onModuleChange: (module: string) => void;
   collapsed?: boolean;
   onToggle?: () => void;
+  enabledFeatures?: Set<string>;
 }
 
 const navigationItems = [
@@ -40,7 +41,11 @@ const bottomItems = [
   { id: "settings", label: "Configuración", icon: Settings },
 ];
 
-export function Sidebar({ activeModule, onModuleChange, collapsed = false, onToggle }: SidebarProps) {
+export function Sidebar({ activeModule, onModuleChange, collapsed = false, onToggle, enabledFeatures }: SidebarProps) {
+  const visibleNavItems = enabledFeatures
+    ? navigationItems.filter((item) => item.id === "dashboard" || enabledFeatures.has(item.id))
+    : navigationItems;
+
   return (
     <aside 
       className={cn(
@@ -72,7 +77,7 @@ export function Sidebar({ activeModule, onModuleChange, collapsed = false, onTog
 
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navigationItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onModuleChange(item.id)}

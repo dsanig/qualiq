@@ -1,114 +1,24 @@
 import { 
-  Shield, 
-  FileText, 
-  AlertTriangle, 
-  BarChart3, 
-  MessageSquare,
-  CheckCircle,
-  ArrowRight,
-  Building2,
-  Lock,
-  Zap
+  Shield, FileText, AlertTriangle, BarChart3, MessageSquare,
+  Lock, ArrowRight, Building2, Zap, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 interface LandingPageProps {
   onGetStarted: () => void;
+  onViewDemo: () => void;
 }
 
 const features = [
-  {
-    icon: FileText,
-    title: "Gestión de SOPs/PNTs",
-    description: "Redacción asistida por IA, control de versiones, flujos de aprobación y trazabilidad completa.",
-  },
-  {
-    icon: AlertTriangle,
-    title: "No Conformidades & CAPAs",
-    description: "Registro, análisis de causa raíz, acciones correctivas y seguimiento hasta cierre.",
-  },
-  {
-    icon: Shield,
-    title: "Control de Cambios",
-    description: "Gestión controlada de cambios con impacto automático en documentación relacionada.",
-  },
-  {
-    icon: BarChart3,
-    title: "Analítica de Cumplimiento",
-    description: "KPIs en tiempo real, tendencias y scoring de preparación para auditorías.",
-  },
-  {
-    icon: MessageSquare,
-    title: "Asistente IA",
-    description: "Respuestas basadas en su documentación y normativa española/europea aplicable.",
-  },
-  {
-    icon: Lock,
-    title: "Seguridad & RGPD",
-    description: "Datos encriptados, control de acceso por roles y logs de auditoría completos.",
-  },
+  { icon: FileText, title: "Gestión de SOPs/PNTs", description: "Redacción asistida por IA, control de versiones, flujos de aprobación y trazabilidad completa." },
+  { icon: AlertTriangle, title: "No Conformidades & CAPAs", description: "Registro, análisis de causa raíz, acciones correctivas y seguimiento hasta cierre." },
+  { icon: Shield, title: "Control de Cambios", description: "Gestión controlada de cambios con impacto automático en documentación relacionada." },
+  { icon: BarChart3, title: "Analítica de Cumplimiento", description: "KPIs en tiempo real, tendencias y scoring de preparación para auditorías." },
+  { icon: MessageSquare, title: "Asistente IA", description: "Respuestas basadas en su documentación y normativa española/europea aplicable." },
+  { icon: Lock, title: "Seguridad & RGPD", description: "Datos encriptados, control de acceso por roles y logs de auditoría completos." },
 ];
 
-const tiers = [
-  {
-    name: "Free",
-    subtitle: "Descubrimiento",
-    price: "0€",
-    period: "/mes",
-    description: "Para conocer la plataforma",
-    features: [
-      "Onboarding limitado",
-      "Hasta 5 documentos",
-      "Vista previa de SOPs",
-      "5 consultas IA/mes",
-      "Sin analíticas",
-    ],
-    cta: "Comenzar Gratis",
-    variant: "outline" as const,
-  },
-  {
-    name: "Professional",
-    subtitle: "Para equipos de calidad",
-    price: "49,99€",
-    period: "/mes",
-    description: "Gestión completa de cumplimiento",
-    features: [
-      "Documentos ilimitados",
-      "Gestión completa SOPs",
-      "No conformidades & CAPAs",
-      "Control de cambios",
-      "100 consultas IA/mes",
-      "Dashboards estándar",
-      "Onboarding Dinámico con IA",
-      "Exámenes de comprensión auto-generados",
-    ],
-    cta: "Solicitar Demo",
-    variant: "accent" as const,
-    popular: true,
-  },
-  {
-    name: "Excellence",
-    subtitle: "Para empresas reguladas",
-    price: "149,99€",
-    period: "/mes",
-    description: "IA avanzada y preparación para auditorías",
-    features: [
-      "Todo en Professional",
-      "Consultas IA ilimitadas",
-      "Simulador de Auditorías IA",
-      "Alertas de hallazgos FDA/EMA",
-      "Análisis Predictivo de CAPAs",
-      "Detección de patrones operativos",
-      "Scoring de preparación auditoría",
-      "Soporte dedicado",
-    ],
-    cta: "Contactar Ventas",
-    variant: "default" as const,
-  },
-];
-
-export function LandingPage({ onGetStarted }: LandingPageProps) {
+export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -120,21 +30,12 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             </div>
             <span className="font-bold text-xl tracking-tight text-foreground">QualiQ</span>
           </div>
-          <nav className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Funcionalidades
-            </a>
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Precios
-            </a>
-            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Documentación
-            </a>
-          </nav>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onGetStarted}>Iniciar Sesión</Button>
+            <Button variant="ghost" size="sm" onClick={onViewDemo}>
+              <Eye className="w-4 h-4 mr-1" /> Ver Demo
+            </Button>
             <Button variant="accent" size="sm" onClick={onGetStarted}>
-              Empezar Ahora
+              Acceso al Sistema
             </Button>
           </div>
         </div>
@@ -158,11 +59,12 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button variant="hero" size="xl" onClick={onGetStarted}>
-              Solicitar Demo
+              Acceso al Sistema
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
-            <Button variant="hero-outline" size="xl">
-              Ver Plataforma
+            <Button variant="hero-outline" size="xl" onClick={onViewDemo}>
+              <Eye className="w-5 h-5 mr-2" />
+              Ver Demo
             </Button>
           </div>
           <p className="mt-6 text-sm text-muted-foreground">
@@ -189,7 +91,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       {/* Features */}
-      <section id="features" className="py-20 px-4">
+      <section className="py-20 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
@@ -202,68 +104,12 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="bg-card rounded-xl border border-border p-6 hover:shadow-lg transition-shadow"
-              >
+              <div key={feature.title} className="bg-card rounded-xl border border-border p-6 hover:shadow-lg transition-shadow">
                 <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center mb-4">
                   <feature.icon className="w-6 h-6 text-accent" />
                 </div>
                 <h3 className="text-lg font-semibold text-foreground mb-2">{feature.title}</h3>
                 <p className="text-muted-foreground">{feature.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section id="pricing" className="py-20 px-4 bg-secondary/30">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Planes adaptados a su empresa
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Desde descubrimiento hasta gestión completa de cumplimiento para empresas reguladas.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {tiers.map((tier) => (
-              <div
-                key={tier.name}
-                className={cn(
-                  "bg-card rounded-xl border p-6 relative",
-                  tier.popular ? "border-accent shadow-lg" : "border-border"
-                )}
-              >
-                {tier.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="bg-accent text-accent-foreground text-xs font-semibold px-3 py-1 rounded-full">
-                      Más Popular
-                    </span>
-                  </div>
-                )}
-                <div className="mb-6">
-                  <h3 className="text-xl font-bold text-foreground">{tier.name}</h3>
-                  <p className="text-sm text-muted-foreground">{tier.subtitle}</p>
-                </div>
-                <div className="mb-4">
-                  <span className="text-4xl font-bold text-foreground">{tier.price}</span>
-                  <span className="text-muted-foreground">{tier.period}</span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-6">{tier.description}</p>
-                <ul className="space-y-3 mb-6">
-                  {tier.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm">
-                      <CheckCircle className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
-                      <span className="text-foreground">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button variant={tier.variant} className="w-full" onClick={onGetStarted}>
-                  {tier.cta}
-                </Button>
               </div>
             ))}
           </div>
@@ -281,15 +127,16 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               Únase a las empresas del sector salud español que ya confían en QualiQ
               para su gestión de calidad y cumplimiento normativo.
             </p>
-            <Button 
-              variant="accent" 
-              size="xl" 
-              onClick={onGetStarted}
-              className="bg-accent hover:bg-accent/90"
-            >
-              Solicitar Demo Gratuita
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Button variant="accent" size="xl" onClick={onGetStarted} className="bg-accent hover:bg-accent/90">
+                Acceso al Sistema
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+              <Button variant="outline" size="xl" onClick={onViewDemo} className="text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/10">
+                <Eye className="w-5 h-5 mr-2" />
+                Ver Demo
+              </Button>
+            </div>
           </div>
         </div>
       </section>
@@ -305,7 +152,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               <span className="font-bold text-foreground">QualiQ</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 QualiQ. Todos los derechos reservados. Conforme a RGPD.
+              © 2026 QualiQ. Todos los derechos reservados. Conforme a RGPD.
             </p>
           </div>
         </div>

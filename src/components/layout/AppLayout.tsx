@@ -11,6 +11,7 @@ interface AppLayoutProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
+  enabledFeatures?: Set<string>;
 }
 
 export function AppLayout({
@@ -22,6 +23,7 @@ export function AppLayout({
   searchQuery,
   onSearchChange,
   searchPlaceholder,
+  enabledFeatures,
 }: AppLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -32,6 +34,7 @@ export function AppLayout({
         onModuleChange={onModuleChange}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        enabledFeatures={enabledFeatures}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header

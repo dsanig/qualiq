@@ -9,6 +9,7 @@ import { ChatbotView } from "@/components/chatbot/ChatbotView";
 import { useAuth } from "@/hooks/useAuth";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { FilterModal, type FiltersState } from "@/components/filters/FilterModal";
+import { useCompanyFeatures } from "@/hooks/useCompanyFeatures";
 import { PendingActionsView } from "@/components/dashboard/PendingActionsView";
 import { CompanyView } from "@/components/company/CompanyView";
 import { SettingsView } from "@/components/settings/SettingsView";
@@ -50,6 +51,7 @@ const Index = () => {
   const [isNewIncidentOpen, setIsNewIncidentOpen] = useState(false);
   const [incidentTypeSeed, setIncidentTypeSeed] = useState<IncidentType | undefined>(undefined);
   const { user, isLoading } = useAuth();
+  const { enabledFeatures } = useCompanyFeatures();
   const navigate = useNavigate();
   
   // Auto-logout after 10 minutes of inactivity
@@ -57,6 +59,10 @@ const Index = () => {
 
   const handleGetStarted = () => {
     navigate("/auth");
+  };
+
+  const handleViewDemo = () => {
+    navigate("/demo");
   };
 
   if (isLoading) {
@@ -68,7 +74,7 @@ const Index = () => {
   }
 
   if (!user) {
-    return <LandingPage onGetStarted={handleGetStarted} />;
+    return <LandingPage onGetStarted={handleGetStarted} onViewDemo={handleViewDemo} />;
   }
 
   const currentModule = moduleConfig[activeModule] || moduleConfig.dashboard;
@@ -199,6 +205,7 @@ const Index = () => {
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder={searchPlaceholder}
+      enabledFeatures={enabledFeatures}
     >
       {renderModule()}
       <FilterModal

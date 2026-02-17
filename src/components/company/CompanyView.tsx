@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { Building2, Mail, Plus, FileText, CreditCard } from "lucide-react";
+import { Building2, Mail, Plus, ToggleLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +18,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FeatureToggles } from "./FeatureToggles";
+import { useAuth } from "@/hooks/useAuth";
 
 const mockCompany = {
   name: "QualiQ Labs",
@@ -45,14 +48,10 @@ type UserDirectoryEntry = {
   created_at: string;
 };
 
-const mockInvoices = [
-  { id: "INV-2024-001", amount: "€1.200", status: "Pagada", date: "2024-01-01" },
-  { id: "INV-2023-012", amount: "€1.200", status: "Pagada", date: "2023-12-01" },
-  { id: "INV-2023-011", amount: "€1.200", status: "Pendiente", date: "2023-11-01" },
-];
 
 export function CompanyView() {
-  const { canManageCompany, canManagePasswords, refreshPermissions } = usePermissions();
+  const { canManageCompany, canManagePasswords, isSuperadmin, refreshPermissions } = usePermissions();
+  const { profile } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("perfil");
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
@@ -238,10 +237,10 @@ export function CompanyView() {
   return (
     <div className="space-y-6 animate-fade-in">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 max-w-lg">
+        <TabsList className={cn("grid max-w-lg", isSuperadmin ? "grid-cols-3" : "grid-cols-2")}>
           <TabsTrigger value="perfil">Perfil empresa</TabsTrigger>
           <TabsTrigger value="usuarios" data-testid="company-users-tab">Usuarios</TabsTrigger>
-          <TabsTrigger value="facturacion">Facturación</TabsTrigger>
+          {isSuperadmin && <TabsTrigger value="modulos">Módulos</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="perfil" className="mt-6">
@@ -398,81 +397,11 @@ export function CompanyView() {
           </div>
         </TabsContent>
 
-        <TabsContent value="facturacion" className="mt-6">
-          <div className="bg-card rounded-lg border border-border p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <CreditCard className="w-5 h-5 text-accent" />
-              <div>
-                <h3 className="font-semibold text-foreground">Facturación</h3>
-                <p className="text-sm text-muted-foreground">Estado de pagos y cobertura de licencias.</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-secondary/30 border border-border rounded-lg p-4">
-                <p className="text-xs text-muted-foreground">Estado de pago</p>
-                <p className="text-lg font-semibold text-foreground mt-1">Activo</p>
-              </div>
-              <div className="bg-secondary/30 border border-border rounded-lg p-4">
-                <p className="text-xs text-muted-foreground">Licencias asignadas</p>
-                <p className="text-lg font-semibold text-foreground mt-1">38 / 50</p>
-              </div>
-              <div className="bg-secondary/30 border border-border rounded-lg p-4">
-                <p className="text-xs text-muted-foreground">Coste mensual actual</p>
-                <p className="text-lg font-semibold text-foreground mt-1">€1.200</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-secondary/30 border border-border rounded-lg p-4">
-                <p className="text-xs text-muted-foreground">Estado de pago</p>
-                <p className="text-lg font-semibold text-foreground mt-1">Al día</p>
-              </div>
-              <div className="bg-secondary/30 border border-border rounded-lg p-4">
-                <p className="text-xs text-muted-foreground">Cobertura actual</p>
-                <p className="text-lg font-semibold text-foreground mt-1">Profesional</p>
-              </div>
-              <div className="bg-secondary/30 border border-border rounded-lg p-4">
-                <p className="text-xs text-muted-foreground">Próxima facturación</p>
-                <p className="text-lg font-semibold text-foreground mt-1">01/02/2024</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <FileText className="w-4 h-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Genera facturas en formato español con datos fiscales completos.</p>
-            </div>
-
-            <div className="rounded-lg border border-border p-4 space-y-3">
-              <p className="text-sm font-medium text-foreground">Histórico de facturas</p>
-              <div className="space-y-2">
-                {mockInvoices.map((invoice) => (
-                  <div key={invoice.id} className="flex items-center justify-between text-sm text-muted-foreground">
-                    <div>
-                      <p className="font-medium text-foreground">{invoice.id}</p>
-                      <p>{invoice.date}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-foreground">{invoice.amount}</p>
-                      <p>{invoice.status}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Button
-              variant="accent"
-              onClick={() =>
-                toast({
-                  title: "Factura generada",
-                  description: "La factura en formato ES se ha generado correctamente.",
-                })
-              }
-            >
-              Generar factura (ES)
-            </Button>
-          </div>
-        </TabsContent>
+        {isSuperadmin && (
+          <TabsContent value="modulos" className="mt-6">
+            <FeatureToggles companyId={profile?.company_id || ""} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>

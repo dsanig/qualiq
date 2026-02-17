@@ -287,30 +287,56 @@ export type Database = {
           created_at: string
           id: string
           name: string
-          stripe_customer_id: string | null
-          stripe_subscription_id: string | null
-          subscription_tier: Database["public"]["Enums"]["subscription_tier"]
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
         }
         Relationships: []
+      }
+      company_features: {
+        Row: {
+          company_id: string
+          created_at: string
+          enabled: boolean
+          feature_key: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          enabled?: boolean
+          feature_key: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          enabled?: boolean
+          feature_key?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_features_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       demo_codes: {
         Row: {
@@ -987,7 +1013,6 @@ export type Database = {
         | "Editor"
         | "Espectador"
       document_status: "draft" | "review" | "approved" | "obsolete" | "archived"
-      subscription_tier: "free" | "professional" | "excellence"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1126,7 +1151,6 @@ export const Constants = {
         "Espectador",
       ],
       document_status: ["draft", "review", "approved", "obsolete", "archived"],
-      subscription_tier: ["free", "professional", "excellence"],
     },
   },
 } as const
