@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 
 type Audit = { id: string; title: string; description: string | null; audit_date: string | null; auditor_id: string | null };
-type CapaPlan = { id: string; audit_id: string; description: string | null };
+type CapaPlan = { id: string; audit_id: string; title: string | null; description: string | null; responsible_id: string | null };
 type NonConformity = { id: string; capa_plan_id: string; title: string; description: string | null; severity: string | null; root_cause: string | null; status: string; deadline: string | null };
 type ActionItem = { id: string; non_conformity_id: string; action_type: "corrective" | "preventive" | "immediate"; description: string; responsible_id: string | null; due_date: string | null; status: string };
 type Profile = { id: string; full_name: string | null; email: string | null };
@@ -31,10 +31,12 @@ export function AuditManagementView() {
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
+  const [selectedCapaPlanId, setSelectedCapaPlanId] = useState<string | null>(null);
   const { canEditContent } = usePermissions();
 
   // Dialog states
   const [newAuditOpen, setNewAuditOpen] = useState(false);
+  const [newCapaOpen, setNewCapaOpen] = useState(false);
   const [newNcOpen, setNewNcOpen] = useState(false);
   const [newActionOpen, setNewActionOpen] = useState(false);
   const [editCapaOpen, setEditCapaOpen] = useState(false);
@@ -43,24 +45,35 @@ export function AuditManagementView() {
 
   // Forms
   const [auditForm, setAuditForm] = useState({ title: "", description: "", audit_date: "" });
+  const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "" });
   const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "" });
   const [actionForm, setActionForm] = useState({
     non_conformity_id: "", action_type: "corrective" as "corrective" | "preventive" | "immediate",
     description: "", responsible_id: "", due_date: "", status: "open", file: null as File | null,
   });
-  const [capaForm, setCapaForm] = useState({ description: "" });
   const [editingNc, setEditingNc] = useState<NonConformity | null>(null);
   const [editingAction, setEditingAction] = useState<ActionItem | null>(null);
+  const [editingCapa, setEditingCapa] = useState<CapaPlan | null>(null);
 
   const { toast } = useToast();
 
-  const selectedCapaPlan = useMemo(() => capaPlans.find((p) => p.audit_id === selectedAuditId) ?? null, [capaPlans, selectedAuditId]);
-  const filteredNcs = useMemo(() => nonConformities.filter((nc) => nc.capa_plan_id === selectedCapaPlan?.id), [nonConformities, selectedCapaPlan]);
+  const auditCapaPlans = useMemo(() => capaPlans.filter((p) => p.audit_id === selectedAuditId), [capaPlans, selectedAuditId]);
+  const selectedCapaPlan = useMemo(() => capaPlans.find((p) => p.id === selectedCapaPlanId) ?? null, [capaPlans, selectedCapaPlanId]);
+  const filteredNcs = useMemo(() => nonConformities.filter((nc) => nc.capa_plan_id === selectedCapaPlanId), [nonConformities, selectedCapaPlanId]);
+
+  // Auto-select first CAPA plan when audit changes
+  useEffect(() => {
+    if (auditCapaPlans.length > 0) {
+      setSelectedCapaPlanId(auditCapaPlans[0].id);
+    } else {
+      setSelectedCapaPlanId(null);
+    }
+  }, [selectedAuditId, auditCapaPlans.length]);
 
   const loadData = async () => {
     const [{ data: auditsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }] = await Promise.all([
       (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id").order("created_at", { ascending: false }),
-      (supabase as any).from("capa_plans").select("id,audit_id,description"),
+      (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
       (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline"),
       (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
       (supabase as any).from("profiles").select("id,full_name,email"),
@@ -97,12 +110,41 @@ export function AuditManagementView() {
     await loadData();
   };
 
+  const createCapaPlan = async () => {
+    if (!selectedAuditId) return;
+    const { error } = await (supabase as any).from("capa_plans").insert({
+      audit_id: selectedAuditId,
+      title: capaForm.title || null,
+      description: capaForm.description || null,
+      responsible_id: capaForm.responsible_id || null,
+    });
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Plan CAPA creado" });
+    setNewCapaOpen(false);
+    setCapaForm({ title: "", description: "", responsible_id: "" });
+    await loadData();
+  };
+
+  const updateCapaPlan = async () => {
+    if (!editingCapa) return;
+    const { error } = await (supabase as any).from("capa_plans").update({
+      title: capaForm.title || null,
+      description: capaForm.description || null,
+      responsible_id: capaForm.responsible_id || null,
+    }).eq("id", editingCapa.id);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Plan CAPA actualizado" });
+    setEditCapaOpen(false);
+    setEditingCapa(null);
+    await loadData();
+  };
+
   const createNonConformity = async () => {
-    if (!selectedCapaPlan || !ncForm.deadline) {
+    if (!selectedCapaPlanId || !ncForm.deadline) {
       toast({ title: "Error", description: "La fecha límite es obligatoria.", variant: "destructive" }); return;
     }
     const { data, error } = await (supabase as any).from("non_conformities").insert({
-      capa_plan_id: selectedCapaPlan.id, title: ncForm.title, description: ncForm.description || null,
+      capa_plan_id: selectedCapaPlanId, title: ncForm.title, description: ncForm.description || null,
       severity: ncForm.severity || null, root_cause: ncForm.root_cause || null, status: ncForm.status, deadline: ncForm.deadline,
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
@@ -160,15 +202,6 @@ export function AuditManagementView() {
     await loadData();
   };
 
-  const updateCapaPlan = async () => {
-    if (!selectedCapaPlan) return;
-    const { error } = await (supabase as any).from("capa_plans").update({ description: capaForm.description || null }).eq("id", selectedCapaPlan.id);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Plan CAPA actualizado" });
-    setEditCapaOpen(false);
-    await loadData();
-  };
-
   const openEditNc = (nc: NonConformity) => {
     setEditingNc(nc);
     setNcForm({ title: nc.title, description: nc.description ?? "", severity: nc.severity ?? "", root_cause: nc.root_cause ?? "", status: nc.status, deadline: nc.deadline ?? "" });
@@ -185,9 +218,9 @@ export function AuditManagementView() {
     setEditActionOpen(true);
   };
 
-  const openEditCapa = () => {
-    if (!selectedCapaPlan) return;
-    setCapaForm({ description: selectedCapaPlan.description ?? "" });
+  const openEditCapa = (capa: CapaPlan) => {
+    setEditingCapa(capa);
+    setCapaForm({ title: capa.title ?? "", description: capa.description ?? "", responsible_id: capa.responsible_id ?? "" });
     setEditCapaOpen(true);
   };
 
@@ -254,6 +287,21 @@ export function AuditManagementView() {
     </div>
   );
 
+  // --- CAPA form fields ---
+  const renderCapaFields = () => (
+    <div className="space-y-3">
+      <div><Label>Nombre del plan</Label><Input value={capaForm.title} onChange={(e) => setCapaForm((p) => ({ ...p, title: e.target.value }))} placeholder="Ej: Plan CAPA principal" /></div>
+      <div><Label>Descripción</Label><Textarea value={capaForm.description} onChange={(e) => setCapaForm((p) => ({ ...p, description: e.target.value }))} rows={4} /></div>
+      <div>
+        <Label>Responsable</Label>
+        <Select value={capaForm.responsible_id} onValueChange={(v) => setCapaForm((p) => ({ ...p, responsible_id: v }))}>
+          <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
+          <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+
   const actionTypeLabel = (t: string) => actionTypes.find((at) => at.value === t)?.label ?? t;
 
   return (
@@ -289,68 +337,91 @@ export function AuditManagementView() {
           </CardContent>
         </Card>
 
-        {/* CAPA Plan */}
+        {/* CAPA Plans */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Plan CAPA</CardTitle>
-            {selectedCapaPlan && canEditContent && (
-              <Button size="sm" variant="outline" onClick={openEditCapa}><Pencil className="mr-1 h-4 w-4" />Editar</Button>
+            <CardTitle>Planes CAPA</CardTitle>
+            {canEditContent && selectedAuditId && (
+              <Button size="sm" onClick={() => { setCapaForm({ title: "", description: "", responsible_id: "" }); setNewCapaOpen(true); }}>
+                <Plus className="mr-1 h-4 w-4" />Nuevo plan
+              </Button>
             )}
           </CardHeader>
-          <CardContent>
-            <p className="text-sm">{selectedCapaPlan?.description ?? "Plan CAPA generado automáticamente para esta auditoría."}</p>
-            {filteredNcs.length > 0 && (
-              <div className="mt-3 text-xs text-muted-foreground">
-                <p>{filteredNcs.length} no conformidad(es) • {actions.filter((a) => filteredNcs.some((nc) => nc.id === a.non_conformity_id)).length} acción(es)</p>
-              </div>
-            )}
+          <CardContent className="space-y-2">
+            {auditCapaPlans.length === 0 && <p className="text-sm text-muted-foreground">No hay planes CAPA para esta auditoría.</p>}
+            {auditCapaPlans.map((capa) => {
+              const ncCount = nonConformities.filter((nc) => nc.capa_plan_id === capa.id).length;
+              const actCount = actions.filter((a) => nonConformities.some((nc) => nc.capa_plan_id === capa.id && nc.id === a.non_conformity_id)).length;
+              return (
+                <div
+                  key={capa.id}
+                  onClick={() => setSelectedCapaPlanId(capa.id)}
+                  className={`rounded border p-3 cursor-pointer ${selectedCapaPlanId === capa.id ? "border-primary bg-primary/5" : "border-border"}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">{capa.title || "Plan CAPA"}</p>
+                    {canEditContent && (
+                      <button onClick={(e) => { e.stopPropagation(); openEditCapa(capa); }} className="text-muted-foreground hover:text-foreground">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {capa.responsible_id && <p className="text-xs text-muted-foreground">Responsable: {getUserName(capa.responsible_id)}</p>}
+                  <p className="text-xs text-muted-foreground mt-1">{ncCount} NC · {actCount} acciones</p>
+                  {capa.description && <p className="text-xs text-muted-foreground mt-1 truncate">{capa.description}</p>}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 
         {/* Non-conformities */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>No conformidades</CardTitle>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "" }); setNewNcOpen(true); }}>Añadir NC</Button>
-              <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open", file: null }); setNewActionOpen(true); }}>Añadir acción</Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {filteredNcs.map((nc) => (
-              <div key={nc.id} className="rounded border p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{nc.title}</p>
-                    {canEditContent && <button onClick={() => openEditNc(nc)} className="text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {nc.deadline && <span>Límite: {nc.deadline}</span>}
-                    <span>{nc.status}</span>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">{nc.description ?? "Sin descripción"}</p>
-                {nc.severity && <p className="text-xs text-muted-foreground mt-1">Severidad: {nc.severity}</p>}
-                <div className="mt-2 space-y-1">
-                  {actions.filter((a) => a.non_conformity_id === nc.id).map((action) => (
-                    <div key={action.id} className="rounded bg-muted/40 p-2 text-sm cursor-pointer hover:bg-muted/60 transition-colors" onClick={() => openEditAction(action)}>
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{actionTypeLabel(action.action_type)}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          {action.due_date && <span>{action.due_date}</span>}
-                          <span>{action.status}</span>
-                          {canEditContent && <Pencil className="h-3 w-3" />}
-                        </div>
-                      </div>
-                      <p>{action.description}</p>
-                      {action.responsible_id && <p className="text-xs text-muted-foreground">Responsable: {getUserName(action.responsible_id) ?? action.responsible_id}</p>}
-                    </div>
-                  ))}
-                </div>
+        {selectedCapaPlanId && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>No conformidades</CardTitle>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "" }); setNewNcOpen(true); }}>Añadir NC</Button>
+                <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open", file: null }); setNewActionOpen(true); }}>Añadir acción</Button>
               </div>
-            ))}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {filteredNcs.map((nc) => (
+                <div key={nc.id} className="rounded border p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{nc.title}</p>
+                      {canEditContent && <button onClick={() => openEditNc(nc)} className="text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {nc.deadline && <span>Límite: {nc.deadline}</span>}
+                      <span>{nc.status}</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{nc.description ?? "Sin descripción"}</p>
+                  {nc.severity && <p className="text-xs text-muted-foreground mt-1">Severidad: {nc.severity}</p>}
+                  <div className="mt-2 space-y-1">
+                    {actions.filter((a) => a.non_conformity_id === nc.id).map((action) => (
+                      <div key={action.id} className="rounded bg-muted/40 p-2 text-sm cursor-pointer hover:bg-muted/60 transition-colors" onClick={() => openEditAction(action)}>
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium">{actionTypeLabel(action.action_type)}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            {action.due_date && <span>{action.due_date}</span>}
+                            <span>{action.status}</span>
+                            {canEditContent && <Pencil className="h-3 w-3" />}
+                          </div>
+                        </div>
+                        <p>{action.description}</p>
+                        {action.responsible_id && <p className="text-xs text-muted-foreground">Responsable: {getUserName(action.responsible_id) ?? action.responsible_id}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {filteredNcs.length === 0 && <p className="text-sm text-muted-foreground">No hay no conformidades en este plan CAPA.</p>}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* New Audit Dialog */}
@@ -363,6 +434,26 @@ export function AuditManagementView() {
             <div><Label>Descripción</Label><Textarea value={auditForm.description} onChange={(e) => setAuditForm((p) => ({ ...p, description: e.target.value }))} /></div>
           </div>
           <DialogFooter><Button onClick={createAudit}>Crear</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New CAPA Plan Dialog */}
+      <Dialog open={newCapaOpen} onOpenChange={setNewCapaOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Nuevo plan CAPA</DialogTitle></DialogHeader>
+          {renderCapaFields()}
+          <DialogFooter><Button onClick={createCapaPlan}>Crear</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit CAPA Dialog */}
+      <Dialog open={editCapaOpen} onOpenChange={(o) => { setEditCapaOpen(o); if (!o) setEditingCapa(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar plan CAPA</DialogTitle></DialogHeader>
+          {renderCapaFields()}
+          <DialogFooter>
+            {canEditContent ? <Button onClick={updateCapaPlan}>Guardar cambios</Button> : <p className="text-sm text-muted-foreground">Solo lectura</p>}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -406,17 +497,6 @@ export function AuditManagementView() {
           <DialogFooter>
             {canEditContent ? <Button onClick={updateAction}>Guardar cambios</Button> : <p className="text-sm text-muted-foreground">Solo lectura</p>}
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit CAPA Dialog */}
-      <Dialog open={editCapaOpen} onOpenChange={setEditCapaOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Editar plan CAPA</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Descripción del plan</Label><Textarea value={capaForm.description} onChange={(e) => setCapaForm({ description: e.target.value })} rows={5} /></div>
-          </div>
-          <DialogFooter><Button onClick={updateCapaPlan}>Guardar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
