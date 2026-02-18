@@ -259,18 +259,24 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          responsible_id: string | null
+          title: string | null
         }
         Insert: {
           audit_id: string
           created_at?: string
           description?: string | null
           id?: string
+          responsible_id?: string | null
+          title?: string | null
         }
         Update: {
           audit_id?: string
           created_at?: string
           description?: string | null
           id?: string
+          responsible_id?: string | null
+          title?: string | null
         }
         Relationships: [
           {

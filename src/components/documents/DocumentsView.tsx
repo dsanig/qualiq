@@ -11,6 +11,8 @@ import {
   FileSpreadsheet,
   File,
   UploadCloud,
+  Download,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +44,7 @@ interface Document {
   category: string;
   categoryId: string;
   version: string;
+  versionNum: number;
   status: "approved" | "draft" | "review" | "obsolete";
   lastUpdated: string;
   owner: string;
@@ -51,6 +54,7 @@ interface Document {
   originalAuthor: string;
   lastModifiedBy: string;
   fileUrl: string;
+  description?: string;
 }
 
 interface SignedDocument {
@@ -59,6 +63,16 @@ interface SignedDocument {
   signerName: string;
   reason?: string;
   id?: string;
+}
+
+interface VersionRecord {
+  id: string;
+  version: number;
+  file_url: string;
+  changes_description: string | null;
+  created_at: string;
+  created_by: string;
+  creatorName?: string;
 }
 
 // Build AutoFirma invocation URL using afirma:// protocol
@@ -128,7 +142,26 @@ export function DocumentsView({
   const [signedDocuments, setSignedDocuments] = useState<Record<string, SignedDocument>>({});
   const { toast } = useToast();
   const { user, profile } = useAuth();
-  const { canEditContent, refreshPermissions } = usePermissions();
+  const { canEditContent, isSuperadmin, refreshPermissions } = usePermissions();
+
+  // Edit document state
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editDocCode, setEditDocCode] = useState("");
+  const [editDocTitle, setEditDocTitle] = useState("");
+  const [editDocCategory, setEditDocCategory] = useState("calidad");
+  const [editDocStatus, setEditDocStatus] = useState("draft");
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [isEditSaving, setIsEditSaving] = useState(false);
+
+  // Update version state
+  const [isUpdateVersionOpen, setIsUpdateVersionOpen] = useState(false);
+  const [updateVersionFile, setUpdateVersionFile] = useState<File | null>(null);
+  const [updateVersionChanges, setUpdateVersionChanges] = useState("");
+  const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
+
+  // Version history
+  const [versionHistory, setVersionHistory] = useState<VersionRecord[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // New document form state
   const [newDocCode, setNewDocCode] = useState("");
@@ -192,6 +225,7 @@ export function DocumentsView({
         category: d.category,
         categoryId: d.category.toLowerCase().replace(/ó/g, "o").replace(/í/g, "i"),
         version: String(d.version) + ".0",
+        versionNum: d.version,
         status: d.status as Document["status"],
         lastUpdated: new Date(d.updated_at).toISOString().split("T")[0],
         owner: ownerUserMap.get(d.owner_id) || d.owner_id,
@@ -217,6 +251,133 @@ export function DocumentsView({
 
   const allDocuments = useMemo(() => [...dbDocuments], [dbDocuments]);
 
+  // --- Edit document ---
+  const handleOpenEdit = (doc: Document) => {
+    setEditingDocId(doc.id);
+    setEditDocCode(doc.code);
+    setEditDocTitle(doc.title);
+    setEditDocCategory(doc.categoryId);
+    setEditDocStatus(doc.status);
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingDocId) return;
+    setIsEditSaving(true);
+    try {
+      const { error } = await supabase.from("documents").update({
+        code: editDocCode.trim(),
+        title: editDocTitle.trim(),
+        category: editDocCategory.charAt(0).toUpperCase() + editDocCategory.slice(1),
+        status: editDocStatus as any,
+      }).eq("id", editingDocId);
+      if (error) throw error;
+      toast({ title: "Documento actualizado" });
+      setIsEditOpen(false);
+      fetchDocuments();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsEditSaving(false);
+    }
+  };
+
+  // --- Version history ---
+  const fetchVersionHistory = async (docId: string) => {
+    setIsLoadingHistory(true);
+    const { data, error } = await (supabase as any)
+      .from("document_versions")
+      .select("id, version, file_url, changes_description, created_at, created_by")
+      .eq("document_id", docId)
+      .order("version", { ascending: false });
+    if (!error && data) {
+      const userIds = [...new Set((data as VersionRecord[]).map((v) => v.created_by))];
+      const { data: profiles } = userIds.length
+        ? await supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds)
+        : { data: [] };
+      const nameMap = new Map((profiles || []).map((p) => [p.user_id, p.full_name || p.email || p.user_id]));
+      setVersionHistory((data as VersionRecord[]).map((v) => ({ ...v, creatorName: nameMap.get(v.created_by) || v.created_by })));
+    } else {
+      setVersionHistory([]);
+    }
+    setIsLoadingHistory(false);
+  };
+
+  const handleOpenHistory = (doc: Document) => {
+    setSelectedDocument(doc);
+    setIsHistoryOpen(true);
+    fetchVersionHistory(doc.id);
+  };
+
+  const handleDownloadVersion = async (fileUrl: string, version: number, docCode: string) => {
+    const { data, error } = await supabase.storage.from("documents").createSignedUrl(fileUrl, 60);
+    if (error || !data?.signedUrl) {
+      toast({ title: "Error", description: "No se pudo generar el enlace.", variant: "destructive" });
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = data.signedUrl;
+    link.download = `${docCode}-v${version}`;
+    link.target = "_blank";
+    link.click();
+  };
+
+  const handleDeleteVersion = async (versionId: string) => {
+    const { error } = await (supabase as any).from("document_versions").delete().eq("id", versionId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Versión eliminada" });
+    if (selectedDocument) fetchVersionHistory(selectedDocument.id);
+  };
+
+  // --- Update version ---
+  const handleOpenUpdateVersion = (doc: Document) => {
+    setSelectedDocument(doc);
+    setUpdateVersionFile(null);
+    setUpdateVersionChanges("");
+    setIsUpdateVersionOpen(true);
+  };
+
+  const handleUpdateVersion = async () => {
+    if (!selectedDocument || !updateVersionFile || !user || !profile?.company_id) return;
+    setIsUpdatingVersion(true);
+    try {
+      const newVersion = selectedDocument.versionNum + 1;
+      const fileExt = updateVersionFile.name.split(".").pop() || "pdf";
+      const filePath = `${profile.company_id}/${selectedDocument.id}/${crypto.randomUUID()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, updateVersionFile);
+      if (uploadError) throw uploadError;
+
+      // Save current version to history
+      await (supabase as any).from("document_versions").insert({
+        document_id: selectedDocument.id,
+        version: selectedDocument.versionNum,
+        file_url: selectedDocument.fileUrl,
+        changes_description: updateVersionChanges.trim() || null,
+        created_by: user.id,
+      });
+
+      // Update document with new version
+      const { error: updateError } = await supabase.from("documents").update({
+        version: newVersion,
+        file_url: filePath,
+        file_type: fileExt,
+      }).eq("id", selectedDocument.id);
+      if (updateError) throw updateError;
+
+      toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0` });
+      setIsUpdateVersionOpen(false);
+      fetchDocuments();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUpdatingVersion(false);
+    }
+  };
+
   const handleUploadDocument = async () => {
     if (!newDocFile || !newDocCode.trim() || !newDocTitle.trim()) {
       toast({ title: "Campos requeridos", description: "Completa código, título y archivo.", variant: "destructive" });
@@ -227,59 +388,22 @@ export function DocumentsView({
       return;
     }
     if (!canEditContent) {
-      toast({
-        title: "Permisos insuficientes",
-        description: "Tu sesión no tiene permisos de administrador para subir documentos.",
-        variant: "destructive",
-      });
+      toast({ title: "Permisos insuficientes", description: "Tu sesión no tiene permisos para subir documentos.", variant: "destructive" });
       return;
     }
 
     setIsUploading(true);
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       const { data: userData, error: userError } = await supabase.auth.getUser();
-
-      if (userError || !userData.user) {
-        throw userError ?? new Error("No se pudo obtener el usuario autenticado.");
-      }
+      if (userError || !userData.user) throw userError ?? new Error("No se pudo obtener el usuario.");
 
       const uploaderUser = userData.user;
-
-      console.info("[documents.upload] auth state", {
-        sessionError,
-        userError,
-        sessionUserId: sessionData.session?.user?.id,
-        authUserId: uploaderUser.id,
-        contextUserId: user.id,
-      });
-
       const fileExt = newDocFile.name.split(".").pop() || "pdf";
       const documentId = crypto.randomUUID();
       const filePath = `${profile.company_id}/${documentId}/${newDocFile.name}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(filePath, newDocFile);
-
-      if (uploadError) {
-        console.error("[documents.upload] storage.objects insert failed", {
-          stage: "storage.objects",
-          message: uploadError.message,
-          code: uploadError.name,
-          details: (uploadError as { details?: string }).details,
-          hint: (uploadError as { hint?: string }).hint,
-          full: uploadError,
-        });
-      }
-
+      const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, newDocFile);
       if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from("documents")
-        .getPublicUrl(filePath);
-
-      const fileUrl = urlData.publicUrl;
 
       const { error: insertError } = await supabase.from("documents").insert({
         id: documentId,
@@ -292,18 +416,6 @@ export function DocumentsView({
         file_url: filePath,
         status: "draft" as const,
       });
-
-      if (insertError) {
-        console.error("[documents.upload] public.documents insert failed", {
-          stage: "public.documents",
-          message: insertError.message,
-          code: insertError.code,
-          details: insertError.details,
-          hint: insertError.hint,
-          full: insertError,
-        });
-      }
-
       if (insertError) throw insertError;
 
       toast({ title: "Documento creado", description: "El documento se ha subido correctamente." });
@@ -317,14 +429,7 @@ export function DocumentsView({
     } catch (err: unknown) {
       const uploadError = err as { message?: string; details?: string; hint?: string; code?: string };
       const details = [uploadError.message, uploadError.details, uploadError.hint].filter(Boolean).join(" · ");
-      const isPermissionError = uploadError.code === "42501" || /row-level security|permission/i.test(uploadError.message || "");
-      toast({
-        title: "Error al subir",
-        description: isPermissionError
-          ? `Permiso denegado por políticas RLS. ${details || "Verifica rol de administrador."}`
-          : details || "No se pudo subir el documento.",
-        variant: "destructive",
-      });
+      toast({ title: "Error al subir", description: details || "No se pudo subir el documento.", variant: "destructive" });
     } finally {
       setIsUploading(false);
     }
@@ -366,7 +471,6 @@ export function DocumentsView({
       const matchesCategory = filters.category === "all" || doc.categoryId === filters.category;
       const matchesStatus = filters.documentStatus === "all" || doc.status === filters.documentStatus;
       
-      // Signature status filter
       const isSigned = !!signedDocuments[doc.id];
       const matchesSignature =
         filters.signatureStatus === "all" ||
@@ -376,7 +480,7 @@ export function DocumentsView({
 
       return matchesQuery && matchesCategory && matchesStatus && matchesSignature;
     });
-  }, [searchQuery, filters, signedDocuments]);
+  }, [searchQuery, filters, signedDocuments, allDocuments]);
 
   const effectiveItemsPerPage = showAllDocuments ? Math.max(filteredDocuments.length, 1) : itemsPerPage;
   const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / effectiveItemsPerPage));
@@ -387,10 +491,7 @@ export function DocumentsView({
   );
 
   const handleAction = (action: string, docCode: string) => {
-    toast({
-      title: action,
-      description: `Acción "${action}" ejecutada para ${docCode}`,
-    });
+    toast({ title: action, description: `Acción "${action}" ejecutada para ${docCode}` });
   };
 
   const handleOpenPreview = (doc: Document) => {
@@ -412,10 +513,7 @@ export function DocumentsView({
       link.click();
       URL.revokeObjectURL(url);
     } else if (doc.fileUrl && !doc.fileUrl.startsWith("/docs/")) {
-      // Real file in storage — get a signed URL
-      const { data, error } = await supabase.storage
-        .from("documents")
-        .createSignedUrl(doc.fileUrl, 60);
+      const { data, error } = await supabase.storage.from("documents").createSignedUrl(doc.fileUrl, 60);
       if (error || !data?.signedUrl) {
         toast({ title: "Error", description: "No se pudo generar el enlace de descarga.", variant: "destructive" });
         return;
@@ -447,16 +545,8 @@ export function DocumentsView({
   };
 
   const handleCategoryChange = (categoryId: string) => {
-    onFiltersChange({
-      ...filters,
-      category: categoryId,
-    });
+    onFiltersChange({ ...filters, category: categoryId });
     setCurrentPage(1);
-  };
-
-  const handleOpenHistory = (doc: Document) => {
-    setSelectedDocument(doc);
-    setIsHistoryOpen(true);
   };
 
   const handleOpenOwners = (doc: Document) => {
@@ -476,17 +566,10 @@ export function DocumentsView({
   const handleStartSigning = async () => {
     if (!selectedDocument) return;
     setSignStatus("waiting");
-    toast({
-      title: "Invocando AutoFirma",
-      description: "Se abrirá AutoFirma para firmar con tu DNIe. Asegúrate de tener el lector conectado.",
-    });
-
+    toast({ title: "Invocando AutoFirma", description: "Se abrirá AutoFirma para firmar con tu DNIe." });
     try {
       if (selectedDocument.fileUrl && !selectedDocument.fileUrl.startsWith("/docs/")) {
-        const { data: urlData, error } = await supabase.storage
-          .from("documents")
-          .createSignedUrl(selectedDocument.fileUrl, 120);
-        
+        const { data: urlData, error } = await supabase.storage.from("documents").createSignedUrl(selectedDocument.fileUrl, 120);
         if (!error && urlData?.signedUrl) {
           const response = await fetch(urlData.signedUrl);
           const blob = await response.blob();
@@ -500,16 +583,11 @@ export function DocumentsView({
           return;
         }
       }
-      // Fallback without file data
       const afirmaUrl = buildAutoFirmaUrl("", `${selectedDocument.code}.${selectedDocument.format}`);
       window.location.href = afirmaUrl;
     } catch (err) {
       console.error("Error invoking AutoFirma:", err);
-      toast({
-        title: "Error al invocar AutoFirma",
-        description: "Asegúrate de tener AutoFirma instalada. Puedes descargarla desde firmaelectronica.gob.es",
-        variant: "destructive",
-      });
+      toast({ title: "Error al invocar AutoFirma", description: "Asegúrate de tener AutoFirma instalada.", variant: "destructive" });
       setSignStatus("idle");
     }
   };
@@ -517,16 +595,10 @@ export function DocumentsView({
   const handleCompleteSigning = async (file?: File) => {
     if (!selectedDocument || !user) return;
     if (!signerName.trim()) {
-      toast({
-        title: "Falta el firmante",
-        description: "Indica el nombre del firmante antes de confirmar.",
-        variant: "destructive",
-      });
+      toast({ title: "Falta el firmante", description: "Indica el nombre del firmante.", variant: "destructive" });
       return;
     }
-
     const signedAt = new Date().toISOString();
-    
     const { error } = await supabase.from("document_signatures").insert({
       document_id: selectedDocument.id,
       signed_by: user.id,
@@ -536,26 +608,16 @@ export function DocumentsView({
       signature_data: signReason.trim() || null,
       signed_at: signedAt,
     });
-
     if (error) {
       toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
       return;
     }
-
     setSignedDocuments((prev) => ({
       ...prev,
-      [selectedDocument.id]: {
-        file,
-        signedAt,
-        signerName: signerName.trim(),
-        reason: signReason.trim() || undefined,
-      },
+      [selectedDocument.id]: { file, signedAt, signerName: signerName.trim(), reason: signReason.trim() || undefined },
     }));
     setSignStatus("completed");
-    toast({
-      title: "Documento firmado",
-      description: `${selectedDocument.code} ha sido firmado con DNIe por ${signerName.trim()}.`,
-    });
+    toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado.` });
   };
 
   const handleSignedFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -566,9 +628,7 @@ export function DocumentsView({
 
   const handleDownloadForSigning = async (doc: Document) => {
     if (doc.fileUrl && !doc.fileUrl.startsWith("/docs/")) {
-      const { data, error } = await supabase.storage
-        .from("documents")
-        .createSignedUrl(doc.fileUrl, 60);
+      const { data, error } = await supabase.storage.from("documents").createSignedUrl(doc.fileUrl, 60);
       if (!error && data?.signedUrl) {
         const link = document.createElement("a");
         link.href = data.signedUrl;
@@ -589,11 +649,7 @@ export function DocumentsView({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             data-testid="documents-search"
-            placeholder={
-              mode === "processes"
-                ? "Buscar procesos por código, título o responsable..."
-                : "Buscar por código, título o responsable..."
-            }
+            placeholder={mode === "processes" ? "Buscar procesos por código, título o responsable..." : "Buscar por código, título o responsable..."}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-9"
@@ -604,13 +660,7 @@ export function DocumentsView({
             <Filter className="w-4 h-4 mr-2" />
             Filtrar
           </Button>
-          <Button
-            data-testid="documents-new-button"
-            variant="accent"
-            onClick={() => onNewDocumentOpenChange(true)}
-            disabled={!canEditContent}
-            title={canEditContent ? undefined : "Solo Superadmin, Administrador o Editor pueden subir documentos."}
-          >
+          <Button data-testid="documents-new-button" variant="accent" onClick={() => onNewDocumentOpenChange(true)} disabled={!canEditContent}>
             <Plus className="w-4 h-4 mr-2" />
             Nuevo Documento
           </Button>
@@ -632,15 +682,11 @@ export function DocumentsView({
                   onClick={() => handleCategoryChange(cat.id)}
                   className={cn(
                     "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors",
-                    filters.category === cat.id
-                      ? "bg-accent/10 text-accent font-medium"
-                      : "text-muted-foreground hover:bg-secondary"
+                    filters.category === cat.id ? "bg-accent/10 text-accent font-medium" : "text-muted-foreground hover:bg-secondary"
                   )}
                 >
                   <span>{cat.label}</span>
-                  <span className="text-xs bg-secondary px-2 py-0.5 rounded-full">
-                    {cat.count}
-                  </span>
+                  <span className="text-xs bg-secondary px-2 py-0.5 rounded-full">{cat.count}</span>
                 </button>
               ))}
             </div>
@@ -656,19 +702,11 @@ export function DocumentsView({
                 <Select
                   value={showAllDocuments ? "all" : itemsPerPage.toString()}
                   onValueChange={(value) => {
-                    if (value === "all") {
-                      setShowAllDocuments(true);
-                      setCurrentPage(1);
-                      return;
-                    }
-                    setShowAllDocuments(false);
-                    setItemsPerPage(Number(value));
-                    setCurrentPage(1);
+                    if (value === "all") { setShowAllDocuments(true); setCurrentPage(1); return; }
+                    setShowAllDocuments(false); setItemsPerPage(Number(value)); setCurrentPage(1);
                   }}
                 >
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="5">5</SelectItem>
                     <SelectItem value="10">10</SelectItem>
@@ -677,46 +715,23 @@ export function DocumentsView({
                     <SelectItem value="all">Todos</SelectItem>
                   </SelectContent>
                 </Select>
-                <span className="text-xs text-muted-foreground">
-                  documentos por página
-                </span>
+                <span className="text-xs text-muted-foreground">documentos por página</span>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {selectedIds.length} seleccionados
-              </span>
+              <span className="text-xs text-muted-foreground">{selectedIds.length} seleccionados</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      <Checkbox
-                        checked={
-                          paginatedDocuments.length > 0 &&
-                          selectedIds.length === paginatedDocuments.length
-                        }
-                        onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))}
-                        aria-label="Seleccionar todos"
-                      />
+                      <Checkbox checked={paginatedDocuments.length > 0 && selectedIds.length === paginatedDocuments.length} onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))} aria-label="Seleccionar todos" />
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Código
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Título
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Versión
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Estado
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Actualizado
-                    </th>
-                    <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Acciones
-                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Título</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Versión</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actualizado</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -725,44 +740,31 @@ export function DocumentsView({
                     const StatusIcon = status.icon;
                     return (
                       <Fragment key={doc.id}>
-                        <tr
-                          className="hover:bg-secondary/30 transition-colors cursor-pointer"
-                          onClick={() => handleToggleSummary(doc.id)}
-                        >
+                        <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => handleToggleSummary(doc.id)}>
                           <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                            <Checkbox
-                              checked={selectedIds.includes(doc.id)}
-                              onCheckedChange={(checked) => toggleSelect(doc.id, Boolean(checked))}
-                              aria-label={`Seleccionar ${doc.code}`}
-                            />
+                            <Checkbox checked={selectedIds.includes(doc.id)} onCheckedChange={(checked) => toggleSelect(doc.id, Boolean(checked))} aria-label={`Seleccionar ${doc.code}`} />
                           </td>
-                          <td className="px-4 py-3">
-                            <span className="font-mono text-sm text-foreground">{doc.code}</span>
-                          </td>
+                          <td className="px-4 py-3"><span className="font-mono text-sm text-foreground">{doc.code}</span></td>
                           <td className="px-4 py-3">
                             <div>
                               <p className="text-sm font-medium text-foreground">{doc.title}</p>
                               <p className="text-xs text-muted-foreground">{doc.owner}</p>
                             </div>
                           </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm text-foreground">v{doc.version}</span>
-                          </td>
+                          <td className="px-4 py-3"><span className="text-sm text-foreground">v{doc.version}</span></td>
                           <td className="px-4 py-3">
                             <span className={cn("inline-flex items-center gap-1.5 text-sm", status.class)}>
                               <StatusIcon className="w-3.5 h-3.5" />
                               {status.label}
                             </span>
                           </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm text-muted-foreground">{doc.lastUpdated}</span>
-                          </td>
+                          <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{doc.lastUpdated}</span></td>
                           <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                             <DocumentActionsMenu
                               documentId={doc.id}
                               isLocked={false}
                               onView={() => handleOpenPreview(doc)}
-                              onEdit={() => handleAction("Editar", doc.code)}
+                              onEdit={() => handleOpenEdit(doc)}
                               onViewHistory={() => handleOpenHistory(doc)}
                               onViewOwners={() => handleOpenOwners(doc)}
                               onDownload={() => handleDownload(doc)}
@@ -779,44 +781,17 @@ export function DocumentsView({
                             <td colSpan={7} className="px-4 py-4">
                               <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-muted-foreground">
-                                  <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Formato</p>
-                                    <p className="text-sm font-medium text-foreground">{doc.format.toUpperCase()}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Páginas</p>
-                                    <p className="text-sm font-medium text-foreground">{doc.pageCount}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Autor original</p>
-                                    <p className="text-sm font-medium text-foreground">{doc.originalAuthor}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Versión actual</p>
-                                    <p className="text-sm font-medium text-foreground">v{doc.version}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Última modificación</p>
-                                    <p className="text-sm font-medium text-foreground">{doc.lastUpdated}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Modificado por</p>
-                                    <p className="text-sm font-medium text-foreground">{doc.lastModifiedBy}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Firma</p>
-                                    <p className="text-sm font-medium text-foreground">
-                                      {signedDocuments[doc.id] ? "Firmado" : "Pendiente"}
-                                    </p>
-                                  </div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Formato</p><p className="text-sm font-medium text-foreground">{doc.format.toUpperCase()}</p></div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Autor original</p><p className="text-sm font-medium text-foreground">{doc.originalAuthor}</p></div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Versión actual</p><p className="text-sm font-medium text-foreground">v{doc.version}</p></div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Última modificación</p><p className="text-sm font-medium text-foreground">{doc.lastUpdated}</p></div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Modificado por</p><p className="text-sm font-medium text-foreground">{doc.lastModifiedBy}</p></div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Firma</p><p className="text-sm font-medium text-foreground">{signedDocuments[doc.id] ? "Firmado" : "Pendiente"}</p></div>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                  <Button variant="outline" onClick={() => handleOpenPreview(doc)}>
-                                    Vista previa
-                                  </Button>
-                                  <Button variant="accent" onClick={() => handleDownload(doc)}>
-                                    Descargar
-                                  </Button>
+                                  <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
+                                  <Button variant="outline" onClick={() => handleOpenUpdateVersion(doc)} disabled={!canEditContent}>Actualizar versión</Button>
+                                  <Button variant="accent" onClick={() => handleDownload(doc)}>Descargar</Button>
                                 </div>
                               </div>
                             </td>
@@ -830,328 +805,125 @@ export function DocumentsView({
             </div>
 
             {filteredDocuments.length === 0 && (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                No se encontraron documentos que coincidan con tu búsqueda o filtros.
-              </div>
+              <div className="py-10 text-center text-sm text-muted-foreground">No se encontraron documentos.</div>
             )}
 
             {/* Pagination */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 border-t border-border bg-secondary/20">
               <p className="text-sm text-muted-foreground">
-                Mostrando {startItem}-
-                {Math.min(currentPage * effectiveItemsPerPage, filteredDocuments.length)} de {filteredDocuments.length} documentos
+                Mostrando {startItem}-{Math.min(currentPage * effectiveItemsPerPage, filteredDocuments.length)} de {filteredDocuments.length} documentos
               </p>
               <div className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                >
-                  Siguiente
-                </Button>
+                <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}>Anterior</Button>
+                <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}>Siguiente</Button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Preview Dialog — shows document summary info, with real PDF embed if applicable */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="sm:max-w-3xl" data-testid="new-document-modal">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Vista previa del documento</DialogTitle>
-            <DialogDescription>
-              Visualiza detalles y descarga el archivo.
-            </DialogDescription>
+            <DialogTitle>Detalle del documento</DialogTitle>
+            <DialogDescription>Información y descarga del archivo.</DialogDescription>
           </DialogHeader>
-
           {selectedDocument && (
             <div className="space-y-4">
-              <details className="rounded-lg border border-border p-4" open>
-                <summary className="cursor-pointer font-semibold text-foreground">
-                  Resumen del documento
-                </summary>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 text-sm text-muted-foreground">
-                  <div>
-                    <p className="font-medium text-foreground">{selectedDocument.title}</p>
-                    <p>Código: {selectedDocument.code}</p>
-                    <p>Formato: {selectedDocument.format.toUpperCase()}</p>
-                    <p>Páginas: {selectedDocument.pageCount}</p>
-                  </div>
-                  <div>
-                    <p>Autor original: {selectedDocument.originalAuthor}</p>
-                    <p>Versión actual: v{selectedDocument.version}</p>
-                    <p>Última modificación: {selectedDocument.lastUpdated}</p>
-                    <p>Modificado por: {selectedDocument.lastModifiedBy}</p>
-                    <p>
-                      Firma:{" "}
-                      {signedDocuments[selectedDocument.id]
-                        ? "Firmado con DNIe"
-                        : "Pendiente"}
-                    </p>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-muted-foreground">
+                <div>
+                  <p className="font-medium text-foreground text-base">{selectedDocument.title}</p>
+                  <p>Código: {selectedDocument.code}</p>
+                  <p>Formato: {selectedDocument.format.toUpperCase()}</p>
+                  <p>Categoría: {selectedDocument.category}</p>
                 </div>
-              </details>
-
-              <div className="bg-secondary/30 rounded-lg border border-border p-6">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Vista previa {selectedDocument.format.toUpperCase()}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Previsualización simulada dentro de QualiQ con permisos actuales.
-                    </p>
-                  </div>
-                  {selectedDocument.format === "pdf" && <FileText className="w-7 h-7 text-accent" />}
-                  {selectedDocument.format === "docx" && <File className="w-7 h-7 text-accent" />}
-                  {selectedDocument.format === "xlsx" && <FileSpreadsheet className="w-7 h-7 text-accent" />}
+                <div>
+                  <p>Autor: {selectedDocument.originalAuthor}</p>
+                  <p>Versión: v{selectedDocument.version}</p>
+                  <p>Última modificación: {selectedDocument.lastUpdated}</p>
+                  <p>Firma: {signedDocuments[selectedDocument.id] ? "Firmado con DNIe" : "Pendiente"}</p>
                 </div>
-
-                {selectedDocument.format === "pdf" && (
-                  <div className="mt-4 rounded-lg border border-border bg-background p-4 text-sm text-muted-foreground space-y-2">
-                    <p className="font-medium text-foreground">Contenido destacado</p>
-                    <ul className="list-disc list-inside space-y-1">
-                      <li>Alcance y objetivo del procedimiento.</li>
-                      <li>Lista de responsabilidades y aprobaciones.</li>
-                      <li>Sección de registros y control de cambios.</li>
-                    </ul>
-                    <p className="text-xs text-muted-foreground">Previsualización tipo PDF (texto resumido).</p>
-                  </div>
-                )}
-
-                {selectedDocument.format === "docx" && (
-                  <div className="mt-4 rounded-lg border border-border bg-background p-4 text-sm text-muted-foreground space-y-2">
-                    <p className="font-medium text-foreground">Secciones del documento</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="rounded-md border border-border p-3">
-                        <p className="text-xs uppercase text-muted-foreground">Capítulo 1</p>
-                        <p className="text-sm font-medium text-foreground">Introducción y contexto</p>
-                      </div>
-                      <div className="rounded-md border border-border p-3">
-                        <p className="text-xs uppercase text-muted-foreground">Capítulo 2</p>
-                        <p className="text-sm font-medium text-foreground">Procedimiento operativo</p>
-                      </div>
-                      <div className="rounded-md border border-border p-3">
-                        <p className="text-xs uppercase text-muted-foreground">Capítulo 3</p>
-                        <p className="text-sm font-medium text-foreground">Registros y anexos</p>
-                      </div>
-                      <div className="rounded-md border border-border p-3">
-                        <p className="text-xs uppercase text-muted-foreground">Capítulo 4</p>
-                        <p className="text-sm font-medium text-foreground">Control de versiones</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedDocument.format === "xlsx" && (
-                  <div className="mt-4 rounded-lg border border-border bg-background p-4 text-sm text-muted-foreground">
-                    <p className="font-medium text-foreground mb-3">Hoja de indicadores clave</p>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-xs">
-                        <thead>
-                          <tr className="text-muted-foreground">
-                            <th className="text-left pb-2">Proceso</th>
-                            <th className="text-left pb-2">Responsable</th>
-                            <th className="text-left pb-2">Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-foreground">
-                          <tr>
-                            <td className="py-1">Control de riesgos</td>
-                            <td className="py-1">Equipo QA</td>
-                            <td className="py-1">En revisión</td>
-                          </tr>
-                          <tr>
-                            <td className="py-1">Trazabilidad</td>
-                            <td className="py-1">Equipo RA</td>
-                            <td className="py-1">Aprobado</td>
-                          </tr>
-                          <tr>
-                            <td className="py-1">Gestión CAPA</td>
-                            <td className="py-1">Auditoría interna</td>
-                            <td className="py-1">Borrador</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
               </div>
+
+              {/* Real PDF embed */}
+              {selectedDocument.format === "pdf" && selectedDocument.fileUrl && !selectedDocument.fileUrl.startsWith("/docs/") && (
+                <PdfEmbed fileUrl={selectedDocument.fileUrl} />
+              )}
             </div>
           )}
-
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
-              Cerrar
-            </Button>
+            <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>Cerrar</Button>
             {selectedDocument && (
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={() => handleOpenSign(selectedDocument)}>
-                  Firmar con DNIe
-                </Button>
-                <Button variant="accent" onClick={() => handleDownload(selectedDocument)}>
-                  Descargar
-                </Button>
+                <Button variant="outline" onClick={() => handleOpenUpdateVersion(selectedDocument)} disabled={!canEditContent}>Actualizar versión</Button>
+                <Button variant="accent" onClick={() => handleDownload(selectedDocument)}>Descargar</Button>
               </div>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Sign Dialog */}
       <Dialog open={isSignOpen} onOpenChange={setIsSignOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Firma electrónica con DNIe</DialogTitle>
-            <DialogDescription>
-              Firma electrónica cualificada integrada con el DNIe y AutoFirma.
-            </DialogDescription>
+            <DialogDescription>Firma electrónica cualificada integrada con el DNIe y AutoFirma.</DialogDescription>
           </DialogHeader>
           <div className="space-y-5">
             <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3">
               <p className="text-sm font-medium text-foreground">Documento seleccionado</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-muted-foreground">
-                <div>
-                  <p className="font-medium text-foreground">{selectedDocument?.title ?? "Documento"}</p>
-                  <p>Código: {selectedDocument?.code ?? "N/D"}</p>
-                </div>
-                <div>
-                  <p>Versión: v{selectedDocument?.version ?? "N/D"}</p>
-                  <p>Responsable: {selectedDocument?.owner ?? "N/D"}</p>
-                </div>
+                <div><p className="font-medium text-foreground">{selectedDocument?.title ?? "Documento"}</p><p>Código: {selectedDocument?.code ?? "N/D"}</p></div>
+                <div><p>Versión: v{selectedDocument?.version ?? "N/D"}</p><p>Responsable: {selectedDocument?.owner ?? "N/D"}</p></div>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-muted-foreground">
-              <div className="rounded-lg border border-border p-4 space-y-2">
-                <p className="font-medium text-foreground">Requisitos técnicos</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Lector compatible y DNIe insertado.</li>
-                  <li>AutoFirma instalada y en ejecución.</li>
-                  <li>Navegador con permisos de firma habilitados.</li>
-                </ul>
-              </div>
-              <div className="rounded-lg border border-border p-4 space-y-2">
-                <p className="font-medium text-foreground">Trazabilidad</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Hash del documento (SHA-256) almacenado.</li>
-                  <li>Marca temporal y certificado cualificado.</li>
-                  <li>Registro de auditoría en la biblioteca.</li>
-                </ul>
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Nombre del firmante</Label>
-                <Input
-                  placeholder="Nombre y apellidos"
-                  value={signerName}
-                  onChange={(event) => setSignerName(event.target.value)}
-                />
+                <Input placeholder="Nombre y apellidos" value={signerName} onChange={(e) => setSignerName(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Documento firmado (salida AutoFirma)</Label>
                 <Input type="file" accept=".pdf,.docx,.xlsx" onChange={handleSignedFileChange} />
               </div>
             </div>
-
             <div className="space-y-2">
               <Label>Motivo / comentario de firma</Label>
-              <Textarea
-                placeholder="Añade el motivo de la firma (opcional)"
-                rows={3}
-                value={signReason}
-                onChange={(event) => setSignReason(event.target.value)}
-              />
+              <Textarea placeholder="Añade el motivo de la firma (opcional)" rows={3} value={signReason} onChange={(e) => setSignReason(e.target.value)} />
             </div>
-
             <div className="rounded-lg border border-border p-4 text-sm text-muted-foreground space-y-2">
               <p className="font-medium text-foreground">Estado de la firma</p>
-              {signStatus === "idle" && (
-                <div className="space-y-2">
-                  <p>
-                    Haz clic en "Iniciar firma con DNIe" para invocar AutoFirma. Necesitarás el lector y tu DNIe insertado.
-                  </p>
-                  <p className="text-xs">
-                    ¿No tienes AutoFirma?{" "}
-                    <a
-                      href="https://firmaelectronica.gob.es/Home/Descargas.html"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-accent underline"
-                    >
-                      Descárgala aquí
-                    </a>
-                  </p>
-                </div>
-              )}
-              {signStatus === "waiting" && (
-                <div className="space-y-2">
-                  <p>
-                    AutoFirma ha sido invocada. Autoriza la operación con tu DNIe y luego sube el archivo firmado o haz clic en "Confirmar firma".
-                  </p>
-                </div>
-              )}
+              {signStatus === "idle" && <p>Haz clic en "Iniciar firma con DNIe" para invocar AutoFirma.</p>}
+              {signStatus === "waiting" && <p>AutoFirma invocada. Sube el archivo firmado o haz clic en "Confirmar firma".</p>}
               {signStatus === "completed" && (
                 <div className="space-y-1 text-success">
-                  <p>Firma completada. El documento queda registrado como firmado en la auditoría.</p>
+                  <p>Firma completada.</p>
                   {selectedDocument && signedDocuments[selectedDocument.id] && (
-                    <p className="text-xs text-muted-foreground">
-                      Firmado por {signedDocuments[selectedDocument.id].signerName} el{" "}
-                      {new Date(signedDocuments[selectedDocument.id].signedAt).toLocaleString("es-ES")}.
-                    </p>
+                    <p className="text-xs text-muted-foreground">Firmado por {signedDocuments[selectedDocument.id].signerName} el {new Date(signedDocuments[selectedDocument.id].signedAt).toLocaleString("es-ES")}.</p>
                   )}
                 </div>
               )}
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setIsSignOpen(false)}>
-              Cerrar
-            </Button>
+            <Button variant="outline" onClick={() => setIsSignOpen(false)}>Cerrar</Button>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={() => selectedDocument && handleDownloadForSigning(selectedDocument)}
-                disabled={!selectedDocument || signStatus === "completed"}
-              >
-                Descargar para firmar
-              </Button>
-              <Button
-                variant="accent"
-                onClick={handleStartSigning}
-                disabled={signStatus !== "idle"}
-              >
-                Iniciar firma con DNIe
-              </Button>
-              {signStatus === "waiting" && (
-                <Button
-                  variant="success"
-                  onClick={() => handleCompleteSigning()}
-                  disabled={!signerName.trim()}
-                >
-                  Confirmar firma
-                </Button>
-              )}
+              <Button variant="outline" onClick={() => selectedDocument && handleDownloadForSigning(selectedDocument)} disabled={!selectedDocument || signStatus === "completed"}>Descargar para firmar</Button>
+              <Button variant="accent" onClick={handleStartSigning} disabled={signStatus !== "idle"}>Iniciar firma con DNIe</Button>
+              {signStatus === "waiting" && <Button variant="default" onClick={() => handleCompleteSigning()} disabled={!signerName.trim()}>Confirmar firma</Button>}
             </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* New Document Dialog */}
       <Dialog open={isNewDocumentOpen} onOpenChange={onNewDocumentOpenChange}>
         <DialogContent className="sm:max-w-3xl" data-testid="new-document-modal">
           <DialogHeader>
             <DialogTitle>Nuevo documento</DialogTitle>
-            <DialogDescription>
-              Carga un documento individual o realiza una carga masiva mediante plantillas.
-            </DialogDescription>
+            <DialogDescription>Carga un documento individual o realiza una carga masiva.</DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="single">
             <TabsList className="grid grid-cols-2">
@@ -1169,26 +941,9 @@ export function DocumentsView({
                   <Input data-testid="document-title-input" placeholder="Nombre del documento" value={newDocTitle} onChange={(e) => setNewDocTitle(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Categoría</Label>
-                  <Select defaultValue="manual">
-                    <SelectTrigger data-testid="document-category-select">
-                      <SelectValue placeholder="Tipo de asignación" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manual">Asignación manual</SelectItem>
-                      <SelectItem value="ai">Asignación por IA</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    La asignación automática consume créditos IA y puede sobreescribir categorías manuales.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Área / Categoría específica</Label>
+                  <Label>Área / Categoría</Label>
                   <Select value={newDocCategory} onValueChange={setNewDocCategory}>
-                    <SelectTrigger data-testid="document-category-select">
-                      <SelectValue placeholder="Selecciona una categoría" />
-                    </SelectTrigger>
+                    <SelectTrigger data-testid="document-category-select"><SelectValue placeholder="Selecciona una categoría" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="calidad">Calidad</SelectItem>
                       <SelectItem value="produccion">Producción</SelectItem>
@@ -1199,12 +954,10 @@ export function DocumentsView({
                   </Select>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label>Descripción / alcance</Label>
                 <Textarea placeholder="Describe el alcance del documento..." rows={3} value={newDocDescription} onChange={(e) => setNewDocDescription(e.target.value)} />
               </div>
-
               <div className="space-y-2">
                 <Label>Archivo</Label>
                 <Input data-testid="document-file-input" type="file" accept=".pdf,.docx,.xlsx,.xls,.doc" onChange={(e) => setNewDocFile(e.target.files?.[0] || null)} />
@@ -1223,26 +976,7 @@ export function DocumentsView({
                   <Input type="file" accept=".xlsx,.xls" />
                   <Button variant="outline">Descargar plantilla</Button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Asignación por defecto</Label>
-                    <Select defaultValue="manual">
-                      <SelectTrigger data-testid="document-category-select">
-                        <SelectValue placeholder="Asignación" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="manual">Manual</SelectItem>
-                        <SelectItem value="ai">IA</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Responsable del lote</Label>
-                    <Input placeholder="Equipo / responsable" />
-                  </div>
-                </div>
               </div>
-
               <div className="bg-secondary/30 border border-border rounded-lg p-4 space-y-4">
                 <div className="flex items-center gap-3">
                   <FolderOpen className="w-5 h-5 text-accent" />
@@ -1255,58 +989,148 @@ export function DocumentsView({
                   <Input ref={folderInputRef} type="file" multiple />
                   <Button variant="outline">Verificar estructura</Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  La carpeta se relacionará con el Excel para asignar códigos, versiones y categorías.
-                </p>
               </div>
             </TabsContent>
           </Tabs>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => onNewDocumentOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="accent"
-              disabled={isUploading || !canEditContent}
-              title={canEditContent ? undefined : "Solo Superadmin, Administrador o Editor pueden subir documentos."}
-              onClick={handleUploadDocument}
-              data-testid="document-save-button"
-            >
+            <Button variant="outline" onClick={() => onNewDocumentOpenChange(false)}>Cancelar</Button>
+            <Button variant="accent" disabled={isUploading || !canEditContent} onClick={handleUploadDocument} data-testid="document-save-button">
               {isUploading ? "Subiendo..." : "Guardar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <DialogContent className="sm:max-w-xl">
+      {/* Edit Document Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Historial de versiones</DialogTitle>
-            <DialogDescription>
-              Cambios registrados para {selectedDocument?.code ?? "el documento seleccionado"}.
-            </DialogDescription>
+            <DialogTitle>Editar documento</DialogTitle>
+            <DialogDescription>Modifica los datos del documento.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <div className="border border-border rounded-lg p-3">
-              <p className="font-medium text-foreground">v{selectedDocument?.version ?? "3.0"}</p>
-              <p>Actualizado por {selectedDocument?.lastModifiedBy ?? "Equipo QA"} el {selectedDocument?.lastUpdated ?? "2024-01-05"}.</p>
-              <p>Cambios: revisión de secciones y anexos.</p>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Código</Label>
+                <Input value={editDocCode} onChange={(e) => setEditDocCode(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Título</Label>
+                <Input value={editDocTitle} onChange={(e) => setEditDocTitle(e.target.value)} />
+              </div>
             </div>
-            <div className="border border-border rounded-lg p-3">
-              <p className="font-medium text-foreground">v2.4</p>
-              <p>Actualizado por Auditoría interna el 2023-11-18.</p>
-              <p>Cambios: ajustes de control de registros.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Categoría</Label>
+                <Select value={editDocCategory} onValueChange={setEditDocCategory}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="calidad">Calidad</SelectItem>
+                    <SelectItem value="produccion">Producción</SelectItem>
+                    <SelectItem value="logistica">Logística</SelectItem>
+                    <SelectItem value="rrhh">RRHH</SelectItem>
+                    <SelectItem value="regulatory">Regulatory</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Estado</Label>
+                <Select value={editDocStatus} onValueChange={setEditDocStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Borrador</SelectItem>
+                    <SelectItem value="review">En Revisión</SelectItem>
+                    <SelectItem value="approved">Aprobado</SelectItem>
+                    <SelectItem value="obsolete">Obsoleto</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsHistoryOpen(false)}>
-              Cerrar
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
+            <Button variant="accent" onClick={handleSaveEdit} disabled={isEditSaving}>{isEditSaving ? "Guardando..." : "Guardar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Version Dialog */}
+      <Dialog open={isUpdateVersionOpen} onOpenChange={setIsUpdateVersionOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Actualizar versión</DialogTitle>
+            <DialogDescription>
+              Sube un nuevo archivo para {selectedDocument?.code}. La versión actual (v{selectedDocument?.version}) se guardará en el historial.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nuevo archivo</Label>
+              <Input type="file" accept=".pdf,.docx,.xlsx,.xls,.doc" onChange={(e) => setUpdateVersionFile(e.target.files?.[0] || null)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Descripción de cambios</Label>
+              <Textarea placeholder="Describe los cambios realizados..." rows={3} value={updateVersionChanges} onChange={(e) => setUpdateVersionChanges(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsUpdateVersionOpen(false)}>Cancelar</Button>
+            <Button variant="accent" onClick={handleUpdateVersion} disabled={isUpdatingVersion || !updateVersionFile}>
+              {isUpdatingVersion ? "Actualizando..." : "Actualizar versión"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Version History Dialog */}
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Historial de versiones</DialogTitle>
+            <DialogDescription>Versiones anteriores de {selectedDocument?.code ?? "el documento"}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            {/* Current version */}
+            {selectedDocument && (
+              <div className="border border-primary/30 bg-primary/5 rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-foreground">v{selectedDocument.version} (actual)</p>
+                  <Button variant="outline" size="sm" onClick={() => handleDownload(selectedDocument)}>
+                    <Download className="w-3 h-3 mr-1" />Descargar
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Última actualización: {selectedDocument.lastUpdated}</p>
+              </div>
+            )}
+            {isLoadingHistory && <p className="text-center py-4">Cargando historial...</p>}
+            {!isLoadingHistory && versionHistory.length === 0 && <p className="text-center py-4">No hay versiones anteriores registradas.</p>}
+            {versionHistory.map((v) => (
+              <div key={v.id} className="border border-border rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-foreground">v{v.version}.0</p>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" onClick={() => handleDownloadVersion(v.file_url, v.version, selectedDocument?.code || "doc")}>
+                      <Download className="w-3 h-3 mr-1" />Descargar
+                    </Button>
+                    {isSuperadmin && (
+                      <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteVersion(v.id)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs mt-1">Por {v.creatorName} el {new Date(v.created_at).toLocaleDateString("es-ES")}</p>
+                {v.changes_description && <p className="text-xs mt-1">Cambios: {v.changes_description}</p>}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsHistoryOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Owners Dialog */}
       <Dialog open={isOwnersOpen} onOpenChange={setIsOwnersOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -1316,30 +1140,43 @@ export function DocumentsView({
           <div className="space-y-3 text-sm text-muted-foreground">
             <div className="flex items-center justify-between border border-border rounded-lg p-3">
               <div>
-                <p className="font-medium text-foreground">{selectedDocument?.owner ?? "Equipo QA"}</p>
+                <p className="font-medium text-foreground">{selectedDocument?.owner ?? "—"}</p>
                 <p>Propietario principal</p>
               </div>
-              <Button variant="outline" size="sm">
-                Cambiar
-              </Button>
-            </div>
-            <div className="flex items-center justify-between border border-border rounded-lg p-3">
-              <div>
-                <p className="font-medium text-foreground">Dirección Técnica</p>
-                <p>Aprobador</p>
-              </div>
-              <Button variant="outline" size="sm">
-                Editar
-              </Button>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsOwnersOpen(false)}>
-              Cerrar
-            </Button>
+            <Button variant="outline" onClick={() => setIsOwnersOpen(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/** Embeds a real PDF using a signed URL from storage */
+function PdfEmbed({ fileUrl }: { fileUrl: string }) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.storage.from("documents").createSignedUrl(fileUrl, 300);
+      if (!cancelled) {
+        setSignedUrl(!error && data?.signedUrl ? data.signedUrl : null);
+        setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [fileUrl]);
+
+  if (loading) return <p className="text-sm text-muted-foreground text-center py-4">Cargando vista previa...</p>;
+  if (!signedUrl) return <p className="text-sm text-muted-foreground text-center py-4">No se pudo cargar la vista previa del PDF.</p>;
+
+  return (
+    <div className="rounded-lg border border-border overflow-hidden bg-background">
+      <iframe src={signedUrl} className="w-full h-[500px]" title="Vista previa PDF" />
     </div>
   );
 }
