@@ -17,6 +17,10 @@ type NonConformity = { id: string; capa_plan_id: string; title: string; descript
 type ActionItem = { id: string; non_conformity_id: string; action_type: "corrective" | "preventive" | "immediate"; description: string; responsible_id: string | null; due_date: string | null; status: string };
 type Profile = { id: string; full_name: string | null; email: string | null };
 
+interface AuditManagementViewProps {
+  searchQuery?: string;
+}
+
 const actionStatus = ["open", "in_progress", "closed", "overdue"] as const;
 const actionTypes = [
   { value: "immediate", label: "Inmediata" },
@@ -24,7 +28,7 @@ const actionTypes = [
   { value: "preventive", label: "Preventiva" },
 ] as const;
 
-export function AuditManagementView() {
+export function AuditManagementView({ searchQuery = "" }: AuditManagementViewProps) {
   const [audits, setAudits] = useState<Audit[]>([]);
   const [capaPlans, setCapaPlans] = useState<CapaPlan[]>([]);
   const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
@@ -54,8 +58,19 @@ export function AuditManagementView() {
   const [editingNc, setEditingNc] = useState<NonConformity | null>(null);
   const [editingAction, setEditingAction] = useState<ActionItem | null>(null);
   const [editingCapa, setEditingCapa] = useState<CapaPlan | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
+
+  const normalizeText = (value: string | null | undefined) =>
+    (value ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+  const normalizedQuery = useMemo(() => normalizeText(searchQuery), [searchQuery]);
 
   const auditCapaPlans = useMemo(() => capaPlans.filter((p) => p.audit_id === selectedAuditId), [capaPlans, selectedAuditId]);
   const selectedCapaPlan = useMemo(() => capaPlans.find((p) => p.id === selectedCapaPlanId) ?? null, [capaPlans, selectedCapaPlanId]);
@@ -71,19 +86,24 @@ export function AuditManagementView() {
   }, [selectedAuditId, auditCapaPlans.length]);
 
   const loadData = async () => {
-    const [{ data: auditsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }] = await Promise.all([
-      (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id").order("created_at", { ascending: false }),
-      (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
-      (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline"),
-      (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
-      (supabase as any).from("profiles").select("id,full_name,email"),
-    ]);
-    setAudits((auditsData ?? []) as Audit[]);
-    setCapaPlans((capaData ?? []) as CapaPlan[]);
-    setNonConformities((ncData ?? []) as NonConformity[]);
-    setActions((actionData ?? []) as ActionItem[]);
-    setUsers((usersData ?? []) as Profile[]);
-    if (!selectedAuditId && auditsData?.[0]?.id) setSelectedAuditId(auditsData[0].id);
+    setIsLoading(true);
+    try {
+      const [{ data: auditsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }] = await Promise.all([
+        (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id").order("created_at", { ascending: false }),
+        (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
+        (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline"),
+        (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
+        (supabase as any).from("profiles").select("id,full_name,email"),
+      ]);
+      setAudits((auditsData ?? []) as Audit[]);
+      setCapaPlans((capaData ?? []) as CapaPlan[]);
+      setNonConformities((ncData ?? []) as NonConformity[]);
+      setActions((actionData ?? []) as ActionItem[]);
+      setUsers((usersData ?? []) as Profile[]);
+      if (!selectedAuditId && auditsData?.[0]?.id) setSelectedAuditId(auditsData[0].id);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => { void loadData(); }, []);
@@ -95,6 +115,81 @@ export function AuditManagementView() {
     const u = users.find((u) => u.id === id);
     return u ? (u.full_name ?? u.email ?? id) : null;
   };
+
+  const auditsFiltered = useMemo(() => {
+    if (!normalizedQuery) return audits;
+
+    const filtered = audits.filter((audit) => {
+      const relatedCapa = capaPlans.filter((plan) => plan.audit_id === audit.id);
+      const searchFields = [
+        audit.id,
+        audit.title,
+        audit.description,
+        audit.audit_date,
+        getUserName(audit.auditor_id),
+        ...relatedCapa.map((plan) => plan.title),
+        ...relatedCapa.map((plan) => plan.description),
+        ...relatedCapa.map((plan) => getUserName(plan.responsible_id)),
+        (audit as unknown as { code?: string }).code,
+        (audit as unknown as { reference?: string }).reference,
+        (audit as unknown as { norma?: string }).norma,
+        (audit as unknown as { status?: string }).status,
+        (audit as unknown as { company?: string }).company,
+        (audit as unknown as { center?: string }).center,
+      ];
+
+      return searchFields.some((field) => normalizeText(field).includes(normalizedQuery));
+    });
+
+    if (import.meta.env.DEV) {
+      console.debug("[AuditManagementView] search", {
+        query: searchQuery,
+        total: audits.length,
+        filtered: filtered.length,
+      });
+    }
+
+    return filtered;
+  }, [audits, capaPlans, normalizedQuery, searchQuery, users]);
+
+  const auditsSorted = useMemo(() => {
+    return [...auditsFiltered].sort((left, right) => {
+      const leftDate = left.audit_date ? new Date(left.audit_date).getTime() : 0;
+      const rightDate = right.audit_date ? new Date(right.audit_date).getTime() : 0;
+      return rightDate - leftDate;
+    });
+  }, [auditsFiltered]);
+
+  const PAGE_SIZE = 8;
+  const totalPages = Math.max(1, Math.ceil(auditsSorted.length / PAGE_SIZE));
+  const paginatedAudits = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return auditsSorted.slice(start, start + PAGE_SIZE);
+  }, [auditsSorted, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [normalizedQuery]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    if (!selectedAuditId) {
+      if (paginatedAudits[0]?.id) {
+        setSelectedAuditId(paginatedAudits[0].id);
+      }
+      return;
+    }
+
+    const auditStillVisible = auditsSorted.some((audit) => audit.id === selectedAuditId);
+    if (!auditStillVisible) {
+      setSelectedAuditId(paginatedAudits[0]?.id ?? null);
+    }
+  }, [auditsSorted, paginatedAudits, selectedAuditId]);
 
   // --- CRUD ---
   const createAudit = async () => {
@@ -313,12 +408,48 @@ export function AuditManagementView() {
           <Button size="sm" onClick={() => setNewAuditOpen(true)}><Plus className="mr-1 h-4 w-4" />Nueva</Button>
         </CardHeader>
         <CardContent className="space-y-2">
-          {audits.map((audit) => (
+          {isLoading && <p className="text-sm text-muted-foreground">Cargando auditorías...</p>}
+
+          {!isLoading && paginatedAudits.map((audit) => (
             <button key={audit.id} onClick={() => setSelectedAuditId(audit.id)} className={`w-full rounded border p-3 text-left ${selectedAuditId === audit.id ? "border-primary bg-primary/5" : "border-border"}`}>
               <p className="font-medium">{audit.title}</p>
               <p className="text-xs text-muted-foreground">{audit.audit_date ?? "Sin fecha"}</p>
             </button>
           ))}
+
+          {!isLoading && auditsSorted.length === 0 && normalizedQuery && (
+            <p className="text-sm text-muted-foreground">No se encontraron auditorías para '{searchQuery}'</p>
+          )}
+
+          {!isLoading && auditsSorted.length === 0 && !normalizedQuery && (
+            <p className="text-sm text-muted-foreground">No hay auditorías registradas.</p>
+          )}
+
+          {!isLoading && auditsSorted.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground">
+              <span>Página {currentPage} de {totalPages}</span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
