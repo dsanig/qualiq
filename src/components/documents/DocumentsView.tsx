@@ -35,6 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { debugFileTypeMapping, fileTypeForDb, getFileExtension, runFileTypeRuntimeChecks } from "@/utils/fileTypes";
 import type { FiltersState } from "@/components/filters/FilterModal";
 
 interface Document {
@@ -263,6 +264,10 @@ export function DocumentsView({
     void refreshPermissions();
   }, [refreshPermissions]);
 
+  useEffect(() => {
+    runFileTypeRuntimeChecks();
+  }, []);
+
   const allDocuments = useMemo(() => [...dbDocuments], [dbDocuments]);
 
   // --- Edit document ---
@@ -355,11 +360,17 @@ export function DocumentsView({
   };
 
   const handleUpdateVersion = async () => {
-    if (!selectedDocument || !updateVersionFile || !user || !profile?.company_id) return;
+    if (!selectedDocument || !user || !profile?.company_id) return;
+    if (!updateVersionFile) {
+      toast({ title: "Archivo requerido", description: "Selecciona un archivo para actualizar la versión.", variant: "destructive" });
+      return;
+    }
     setIsUpdatingVersion(true);
     try {
       const newVersion = selectedDocument.versionNum + 1;
-      const fileExt = normalizeDocumentFileType(updateVersionFile.name.split(".").pop());
+      const fileType = fileTypeForDb(updateVersionFile);
+      const fileExt = getFileExtension(updateVersionFile.name) || "bin";
+      debugFileTypeMapping(updateVersionFile);
       const filePath = `${profile.company_id}/${selectedDocument.id}/${crypto.randomUUID()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, updateVersionFile);
@@ -378,7 +389,7 @@ export function DocumentsView({
       const { error: updateError } = await supabase.from("documents").update({
         version: newVersion,
         file_url: filePath,
-        file_type: fileTypeForDb,
+        file_type: fileType,
       }).eq("id", selectedDocument.id);
       if (updateError) throw updateError;
 
@@ -393,8 +404,12 @@ export function DocumentsView({
   };
 
   const handleUploadDocument = async () => {
-    if (!newDocFile || !newDocCode.trim() || !newDocTitle.trim()) {
-      toast({ title: "Campos requeridos", description: "Completa código, título y archivo.", variant: "destructive" });
+    if (!newDocCode.trim() || !newDocTitle.trim()) {
+      toast({ title: "Campos requeridos", description: "Completa código y título.", variant: "destructive" });
+      return;
+    }
+    if (!newDocFile) {
+      toast({ title: "Archivo requerido", description: "Selecciona un archivo para continuar.", variant: "destructive" });
       return;
     }
     if (!user || !profile?.company_id) {
@@ -412,7 +427,13 @@ export function DocumentsView({
       if (userError || !userData.user) throw userError ?? new Error("No se pudo obtener el usuario.");
 
       const uploaderUser = userData.user;
-      const fileExt = normalizeDocumentFileType(newDocFile.name.split(".").pop());
+      const fileType = fileTypeForDb(newDocFile);
+      debugFileTypeMapping(newDocFile);
+
+      if (fileType === "other") {
+        throw new Error("Formato no permitido. Usa PDF, Word, Excel o imagen (PNG/JPG/JPEG/WEBP).");
+      }
+
       const documentId = crypto.randomUUID();
       const filePath = `${profile.company_id}/${documentId}/${newDocFile.name}`;
 
@@ -426,7 +447,7 @@ export function DocumentsView({
         category: newDocCategory.charAt(0).toUpperCase() + newDocCategory.slice(1),
         company_id: profile.company_id,
         owner_id: uploaderUser.id,
-        file_type: fileTypeForDb,
+        file_type: fileType,
         file_url: filePath,
         status: "draft" as const,
       });
@@ -974,7 +995,7 @@ export function DocumentsView({
               </div>
               <div className="space-y-2">
                 <Label>Archivo</Label>
-                <Input data-testid="document-file-input" type="file" accept=".pdf,.docx,.xlsx,.xls,.doc" onChange={(e) => setNewDocFile(e.target.files?.[0] || null)} />
+                <Input data-testid="document-file-input" type="file" accept=".pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg,.webp" onChange={(e) => setNewDocFile(e.target.files?.[0] || null)} />
               </div>
             </TabsContent>
             <TabsContent value="batch" className="space-y-4 mt-4">
@@ -1080,7 +1101,7 @@ export function DocumentsView({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Nuevo archivo</Label>
-              <Input type="file" accept=".pdf,.docx,.xlsx,.xls,.doc" onChange={(e) => setUpdateVersionFile(e.target.files?.[0] || null)} />
+              <Input type="file" accept=".pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg,.webp" onChange={(e) => setUpdateVersionFile(e.target.files?.[0] || null)} />
             </div>
             <div className="space-y-2">
               <Label>Descripción de cambios</Label>
