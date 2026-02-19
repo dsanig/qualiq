@@ -87,6 +87,39 @@ function buildAutoFirmaUrl(fileB64: string, fileName: string): string {
   return `afirma://sign?${params.toString()}`;
 }
 
+const getDocumentFormat = (fileType?: string): Document["format"] => {
+  const normalizedType = fileType?.toLowerCase();
+
+  if (normalizedType === "doc" || normalizedType === "docx" || normalizedType === "word") {
+    return "docx";
+  }
+
+  if (normalizedType === "xls" || normalizedType === "xlsx" || normalizedType === "excel") {
+    return "xlsx";
+  }
+
+  return "pdf";
+};
+
+const getDocumentFileTypeForDb = (fileType?: string): "pdf" | "word" | "excel" => {
+  const format = getDocumentFormat(fileType);
+
+  if (format === "docx") {
+    return "word";
+  }
+
+  if (format === "xlsx") {
+    return "excel";
+  }
+
+  return "pdf";
+};
+
+const getFileExtension = (fileName: string): string => {
+  const extension = fileName.split(".").pop()?.toLowerCase();
+  return extension || "pdf";
+};
+
 
 const categoryOptions = [
   { id: "all", label: "Todos" },
@@ -231,7 +264,7 @@ export function DocumentsView({
         owner: ownerUserMap.get(d.owner_id) || d.owner_id,
         ownerId: d.owner_id,
         pageCount: 0,
-        format: (d.file_type || "pdf") as Document["format"],
+        format: getDocumentFormat(d.file_type),
         originalAuthor: ownerUserMap.get(d.owner_id) || d.owner_id,
         lastModifiedBy: ownerUserMap.get(d.owner_id) || d.owner_id,
         fileUrl: d.file_url,
@@ -345,7 +378,8 @@ export function DocumentsView({
     setIsUpdatingVersion(true);
     try {
       const newVersion = selectedDocument.versionNum + 1;
-      const fileExt = updateVersionFile.name.split(".").pop() || "pdf";
+      const fileExt = getFileExtension(updateVersionFile.name);
+      const fileTypeForDb = getDocumentFileTypeForDb(fileExt);
       const filePath = `${profile.company_id}/${selectedDocument.id}/${crypto.randomUUID()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, updateVersionFile);
@@ -364,7 +398,7 @@ export function DocumentsView({
       const { error: updateError } = await supabase.from("documents").update({
         version: newVersion,
         file_url: filePath,
-        file_type: fileExt,
+        file_type: fileTypeForDb,
       }).eq("id", selectedDocument.id);
       if (updateError) throw updateError;
 
@@ -398,7 +432,8 @@ export function DocumentsView({
       if (userError || !userData.user) throw userError ?? new Error("No se pudo obtener el usuario.");
 
       const uploaderUser = userData.user;
-      const fileExt = newDocFile.name.split(".").pop() || "pdf";
+      const fileExt = getFileExtension(newDocFile.name);
+      const fileTypeForDb = getDocumentFileTypeForDb(fileExt);
       const documentId = crypto.randomUUID();
       const filePath = `${profile.company_id}/${documentId}/${newDocFile.name}`;
 
@@ -412,7 +447,7 @@ export function DocumentsView({
         category: newDocCategory.charAt(0).toUpperCase() + newDocCategory.slice(1),
         company_id: profile.company_id,
         owner_id: uploaderUser.id,
-        file_type: fileExt,
+        file_type: fileTypeForDb,
         file_url: filePath,
         status: "draft" as const,
       });
