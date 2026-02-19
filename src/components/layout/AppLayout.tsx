@@ -10,6 +10,8 @@ interface AppLayoutProps {
   subtitle?: string;
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  onSearchSubmit?: () => void;
+  onSearchClear?: () => void;
   searchPlaceholder?: string;
   enabledFeatures?: Set<string>;
 }
@@ -23,6 +25,8 @@ export function AppLayout({
   searchQuery,
   onSearchChange,
   searchPlaceholder,
+  onSearchSubmit,
+  onSearchClear,
   enabledFeatures,
 }: AppLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -43,6 +47,8 @@ export function AppLayout({
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
           searchPlaceholder={searchPlaceholder}
+          onSearchSubmit={onSearchSubmit}
+          onSearchClear={onSearchClear}
         />
         <main className="flex-1 overflow-y-auto p-6">
           {children}

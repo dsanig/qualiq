@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Clock, Filter, Link as LinkIcon, Plus, Search, Pencil } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Filter, Link as LinkIcon, Plus, Search, Pencil, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { FiltersState } from "@/components/filters/FilterModal";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { matchesNormalizedQuery } from "@/utils/search";
 
 type IncidentType = "incidencia" | "reclamacion" | "desviacion" | "otra";
 
@@ -90,14 +92,23 @@ export function IncidentsView({
 
   useEffect(() => { void loadData(); }, []);
 
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+
   const filteredIncidents = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
     return incidents.filter((i) => {
-      const matchesQuery = !query || i.title.toLowerCase().includes(query) || (i.description ?? "").toLowerCase().includes(query);
+      const responsibleName = getUserName(i.responsible_id);
+      const matchesQuery = matchesNormalizedQuery(
+        debouncedSearchQuery,
+        i.title,
+        i.description,
+        i.incidencia_type,
+        i.status,
+        responsibleName,
+      );
       const matchesStatus = filters.incidentStatus === "all" || i.status === filters.incidentStatus;
       return matchesQuery && matchesStatus;
     });
-  }, [incidents, searchQuery, filters.incidentStatus]);
+  }, [incidents, debouncedSearchQuery, filters.incidentStatus, users]);
 
   const createIncident = async () => {
     const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "").maybeSingle();
@@ -215,7 +226,18 @@ export function IncidentsView({
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9 w-[260px]" placeholder="Buscar incidencias..." value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} />
+              <Input className="pl-9 pr-9 w-[260px]" placeholder="Buscar incidencias..." value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSearchChange(searchQuery); }} />
+              {searchQuery && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
+                  onClick={() => onSearchChange("")}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
             <Button variant="outline" onClick={onOpenFilters}><Filter className="w-4 h-4 mr-1" />Filtros</Button>
             <Button onClick={() => onNewIncidentOpenChange(true)} data-testid="incidents-new-button"><Plus className="w-4 h-4 mr-1" />Nueva incidencia</Button>
@@ -244,6 +266,9 @@ export function IncidentsView({
               </div>
             );
           })}
+          {filteredIncidents.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">No se encontraron resultados para “{searchQuery}”.</p>
+          )}
         </CardContent>
       </Card>
 

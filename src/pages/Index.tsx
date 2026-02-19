@@ -37,7 +37,7 @@ type IncidentType = "incidencia" | "reclamacion" | "desviacion" | "otra";
 
 const Index = () => {
   const [activeModule, setActiveModule] = useState("dashboard");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [moduleSearchQueries, setModuleSearchQueries] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<FiltersState>({
     category: "all",
     documentStatus: "all",
@@ -93,6 +93,17 @@ const Index = () => {
     }
   })();
 
+
+  const activeSearchQuery = moduleSearchQueries[activeModule] ?? "";
+
+  const handleSearchChange = (value: string) => {
+    setModuleSearchQueries((prev) => ({ ...prev, [activeModule]: value }));
+  };
+
+  const handleSearchClear = () => {
+    setModuleSearchQueries((prev) => ({ ...prev, [activeModule]: "" }));
+  };
+
   const handleQuickAction = (action: string) => {
     switch (action) {
       case "Nuevo PNT":
@@ -136,8 +147,8 @@ const Index = () => {
       case "documents":
         return (
           <DocumentsView
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            searchQuery={activeSearchQuery}
+            onSearchChange={handleSearchChange}
             filters={filters}
             onFiltersChange={setFilters}
             onOpenFilters={() => setIsFilterOpen(true)}
@@ -149,8 +160,8 @@ const Index = () => {
         return (
           <DocumentsView
             mode="processes"
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            searchQuery={activeSearchQuery}
+            onSearchChange={handleSearchChange}
             filters={filters}
             onFiltersChange={setFilters}
             onOpenFilters={() => setIsFilterOpen(true)}
@@ -161,8 +172,8 @@ const Index = () => {
       case "incidents":
         return (
           <IncidentsView
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            searchQuery={activeSearchQuery}
+            onSearchChange={handleSearchChange}
             filters={filters}
             onFiltersChange={setFilters}
             onOpenFilters={() => setIsFilterOpen(true)}
@@ -202,8 +213,10 @@ const Index = () => {
       onModuleChange={setActiveModule}
       title={currentModule.title}
       subtitle={currentModule.subtitle}
-      searchQuery={searchQuery}
-      onSearchChange={setSearchQuery}
+      searchQuery={activeSearchQuery}
+      onSearchChange={handleSearchChange}
+      onSearchSubmit={() => handleSearchChange(activeSearchQuery)}
+      onSearchClear={handleSearchClear}
       searchPlaceholder={searchPlaceholder}
       enabledFeatures={enabledFeatures}
     >

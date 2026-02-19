@@ -1,4 +1,4 @@
-import { Bell, Search, User, HelpCircle, LogOut } from "lucide-react";
+import { Bell, Search, User, HelpCircle, LogOut, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NotificationsDropdown } from "@/components/notifications/NotificationsDropdown";
@@ -15,10 +15,12 @@ interface HeaderProps {
   subtitle?: string;
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  onSearchSubmit?: () => void;
+  onSearchClear?: () => void;
   searchPlaceholder?: string;
 }
 
-export function Header({ title, subtitle, searchQuery, onSearchChange, searchPlaceholder }: HeaderProps) {
+export function Header({ title, subtitle, searchQuery, onSearchChange, onSearchSubmit, onSearchClear, searchPlaceholder }: HeaderProps) {
   const { user, signOut } = useAuth();
 
   return (
@@ -38,8 +40,24 @@ export function Header({ title, subtitle, searchQuery, onSearchChange, searchPla
             placeholder={searchPlaceholder ?? "Buscar documentos, procesos..."}
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
-            className="w-64 pl-9 bg-secondary border-0"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                onSearchSubmit?.();
+              }
+            }}
+            className="w-64 pl-9 pr-9 bg-secondary border-0"
           />
+          {searchQuery && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
+              onClick={() => onSearchClear?.()}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
 
         {/* Actions */}

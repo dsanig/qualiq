@@ -13,6 +13,7 @@ import {
   UploadCloud,
   Download,
   Trash2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { debugFileTypeMapping, fileTypeForDb, getFileExtension, runFileTypeRuntimeChecks } from "@/utils/fileTypes";
 import type { FiltersState } from "@/components/filters/FilterModal";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { matchesNormalizedQuery } from "@/utils/search";
 
 interface Document {
   id: string;
@@ -269,6 +272,7 @@ export function DocumentsView({
   }, []);
 
   const allDocuments = useMemo(() => [...dbDocuments], [dbDocuments]);
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
   // --- Edit document ---
   const handleOpenEdit = (doc: Document) => {
@@ -494,14 +498,19 @@ export function DocumentsView({
   );
 
   const filteredDocuments = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
     return allDocuments.filter((doc) => {
-      const matchesQuery =
-        !query ||
-        doc.code.toLowerCase().includes(query) ||
-        doc.title.toLowerCase().includes(query) ||
-        doc.owner.toLowerCase().includes(query) ||
-        doc.category.toLowerCase().includes(query);
+      const matchesQuery = matchesNormalizedQuery(
+        debouncedSearchQuery,
+        doc.code,
+        doc.title,
+        doc.owner,
+        doc.category,
+        doc.description,
+        doc.version,
+        doc.originalAuthor,
+        doc.lastModifiedBy,
+        doc.fileUrl,
+      );
 
       const matchesCategory = filters.category === "all" || doc.categoryId === filters.category;
       const matchesStatus = filters.documentStatus === "all" || doc.status === filters.documentStatus;
@@ -515,7 +524,7 @@ export function DocumentsView({
 
       return matchesQuery && matchesCategory && matchesStatus && matchesSignature;
     });
-  }, [searchQuery, filters, signedDocuments, allDocuments]);
+  }, [debouncedSearchQuery, filters, signedDocuments, allDocuments]);
 
   const effectiveItemsPerPage = showAllDocuments ? Math.max(filteredDocuments.length, 1) : itemsPerPage;
   const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / effectiveItemsPerPage));
@@ -687,8 +696,20 @@ export function DocumentsView({
             placeholder={mode === "processes" ? "Buscar procesos por código, título o responsable..." : "Buscar por código, título o responsable..."}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9"
+            onKeyDown={(event) => { if (event.key === "Enter") onSearchChange(searchQuery); }}
+            className="pl-9 pr-9"
           />
+          {searchQuery && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground"
+              onClick={() => onSearchChange("")}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onOpenFilters} data-testid="documents-filter-button">
@@ -840,7 +861,7 @@ export function DocumentsView({
             </div>
 
             {filteredDocuments.length === 0 && (
-              <div className="py-10 text-center text-sm text-muted-foreground">No se encontraron documentos.</div>
+              <div className="py-10 text-center text-sm text-muted-foreground">No se encontraron resultados para “{searchQuery}”.</div>
             )}
 
             {/* Pagination */}
