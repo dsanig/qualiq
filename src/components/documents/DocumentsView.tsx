@@ -378,7 +378,7 @@ export function DocumentsView({
       const { error: updateError } = await supabase.from("documents").update({
         version: newVersion,
         file_url: filePath,
-        file_type: fileExt,
+        file_type: fileTypeForDb,
       }).eq("id", selectedDocument.id);
       if (updateError) throw updateError;
 
@@ -426,7 +426,7 @@ export function DocumentsView({
         category: newDocCategory.charAt(0).toUpperCase() + newDocCategory.slice(1),
         company_id: profile.company_id,
         owner_id: uploaderUser.id,
-        file_type: fileExt,
+        file_type: fileTypeForDb,
         file_url: filePath,
         status: "draft" as const,
       });
