@@ -195,7 +195,7 @@ const Index = () => {
           </ErrorBoundary>
         );
       case "audits":
-        return <AuditManagementView />;
+        return <AuditManagementView searchQuery={activeSearchQuery} />;
       case "chatbot":
         return <ChatbotView />;
       case "training":
