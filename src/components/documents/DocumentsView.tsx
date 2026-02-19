@@ -87,6 +87,20 @@ function buildAutoFirmaUrl(fileB64: string, fileName: string): string {
   return `afirma://sign?${params.toString()}`;
 }
 
+const normalizeDocumentFileType = (fileType?: string): Document["format"] => {
+  const normalizedType = fileType?.toLowerCase();
+
+  if (normalizedType === "doc" || normalizedType === "docx" || normalizedType === "word") {
+    return "docx";
+  }
+
+  if (normalizedType === "xls" || normalizedType === "xlsx" || normalizedType === "excel") {
+    return "xlsx";
+  }
+
+  return "pdf";
+};
+
 
 const categoryOptions = [
   { id: "all", label: "Todos" },
@@ -231,7 +245,7 @@ export function DocumentsView({
         owner: ownerUserMap.get(d.owner_id) || d.owner_id,
         ownerId: d.owner_id,
         pageCount: 0,
-        format: (d.file_type || "pdf") as Document["format"],
+        format: normalizeDocumentFileType(d.file_type),
         originalAuthor: ownerUserMap.get(d.owner_id) || d.owner_id,
         lastModifiedBy: ownerUserMap.get(d.owner_id) || d.owner_id,
         fileUrl: d.file_url,
@@ -345,7 +359,7 @@ export function DocumentsView({
     setIsUpdatingVersion(true);
     try {
       const newVersion = selectedDocument.versionNum + 1;
-      const fileExt = updateVersionFile.name.split(".").pop() || "pdf";
+      const fileExt = normalizeDocumentFileType(updateVersionFile.name.split(".").pop());
       const filePath = `${profile.company_id}/${selectedDocument.id}/${crypto.randomUUID()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, updateVersionFile);
@@ -398,7 +412,7 @@ export function DocumentsView({
       if (userError || !userData.user) throw userError ?? new Error("No se pudo obtener el usuario.");
 
       const uploaderUser = userData.user;
-      const fileExt = newDocFile.name.split(".").pop() || "pdf";
+      const fileExt = normalizeDocumentFileType(newDocFile.name.split(".").pop());
       const documentId = crypto.randomUUID();
       const filePath = `${profile.company_id}/${documentId}/${newDocFile.name}`;
 
