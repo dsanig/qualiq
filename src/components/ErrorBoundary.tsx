@@ -23,7 +23,18 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("[ErrorBoundary] Uncaught render error", error, errorInfo);
+    const isDev =
+      (typeof import.meta !== "undefined" && import.meta.env?.DEV) ||
+      (typeof process !== "undefined" && process.env?.NODE_ENV === "development");
+
+    if (isDev) {
+      console.error("[ErrorBoundary] Uncaught render error", {
+        route: typeof window !== "undefined" ? window.location.pathname : "unknown",
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+      });
+    }
   }
 
   componentDidUpdate(prevProps: ErrorBoundaryProps) {

@@ -40,6 +40,7 @@ interface IncidentsViewProps {
   isNewIncidentOpen: boolean;
   onNewIncidentOpenChange: (open: boolean) => void;
   initialIncidentType?: IncidentType;
+  reloadToken?: number;
 }
 
 const typeLabels: Record<IncidentType, string> = {
@@ -67,7 +68,7 @@ const defaultForm = (type?: IncidentType) => ({
 
 export function IncidentsView({
   searchQuery, onSearchChange, filters, onFiltersChange, onOpenFilters,
-  isNewIncidentOpen, onNewIncidentOpenChange, initialIncidentType,
+  isNewIncidentOpen, onNewIncidentOpenChange, initialIncidentType, reloadToken,
 }: IncidentsViewProps) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [audits, setAudits] = useState<AuditRef[]>([]);
@@ -80,6 +81,27 @@ export function IncidentsView({
   const [permissionDenied, setPermissionDenied] = useState(false);
   const { toast } = useToast();
   const { canEditContent } = usePermissions();
+
+  const isPermissionError = (message: string, code?: string, status?: number) => {
+    return (
+      code === "42501" ||
+      status === 401 ||
+      status === 403 ||
+      /permission|rls|policy|forbidden|not authorized|violates row level security/i.test(message)
+    );
+  };
+
+  const getUserName = (userId: string | null | undefined) => {
+    if (!userId) return null;
+    const matchedUser = users.find((user) => user?.id === userId);
+    return matchedUser?.full_name ?? matchedUser?.email ?? userId;
+  };
+
+  const formatIncidentDate = (dateValue: string | null | undefined) => {
+    if (!dateValue) return "Fecha no disponible";
+    const parsedDate = new Date(dateValue);
+    return Number.isNaN(parsedDate.getTime()) ? "Fecha no disponible" : parsedDate.toLocaleDateString();
+  };
 
   const loadData = async () => {
     setIsLoading(true);
@@ -94,10 +116,12 @@ export function IncidentsView({
       ]);
 
       if (incidenciasError) {
-        const denied = incidenciasError.code === "42501" || /permission|rls|policy|forbidden|not authorized/i.test(incidenciasError.message);
+        const denied = isPermissionError(incidenciasError.message, incidenciasError.code, (incidenciasError as { status?: number }).status);
         setPermissionDenied(denied);
-        setLoadError(denied ? "No tienes permisos para ver incidencias." : incidenciasError.message);
+        setLoadError(denied ? "No tienes permisos para ver incidencias de esta empresa." : incidenciasError.message);
         setIncidents([]);
+        setAudits([]);
+        setUsers([]);
         toast({ title: "Error", description: denied ? "No tienes permisos para ver incidencias." : incidenciasError.message, variant: "destructive" });
         return;
       }
@@ -125,6 +149,8 @@ export function IncidentsView({
       setUsers(safeUsers);
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudieron cargar las incidencias.";
+      const denied = isPermissionError(message);
+      setPermissionDenied(denied);
       setLoadError(message);
       setIncidents([]);
       setAudits([]);
@@ -135,12 +161,14 @@ export function IncidentsView({
     }
   };
 
-  useEffect(() => { void loadData(); }, []);
+  useEffect(() => { void loadData(); }, [reloadToken]);
 
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
   const filteredIncidents = useMemo(() => {
-    return incidents.filter((i) => {
+    const safeIncidents = incidents ?? [];
+
+    return safeIncidents.filter((i) => {
       const responsibleName = getUserName(i.responsible_id);
       const matchesQuery = matchesNormalizedQuery(
         debouncedSearchQuery,
@@ -200,18 +228,6 @@ export function IncidentsView({
     await loadData();
   };
 
-  const getUserName = (userId: string | null) => {
-    if (!userId) return null;
-    const u = users.find((u) => u.id === userId);
-    return u ? (u.full_name ?? u.email ?? userId) : null;
-  };
-
-  const formatIncidentDate = (dateValue: string | null | undefined) => {
-    if (!dateValue) return "Fecha no disponible";
-    const parsedDate = new Date(dateValue);
-    return Number.isNaN(parsedDate.getTime()) ? "Fecha no disponible" : parsedDate.toLocaleDateString();
-  };
-
   const renderFormFields = () => (
     <div className="space-y-3">
       <div><Label>Título</Label><Input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} /></div>
@@ -234,7 +250,7 @@ export function IncidentsView({
           <SelectTrigger><SelectValue placeholder="Sin auditoría" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="none">Sin auditoría</SelectItem>
-            {audits.map((a) => <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>)}
+            {(audits ?? []).map((a) => <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -244,7 +260,7 @@ export function IncidentsView({
           <SelectTrigger><SelectValue placeholder="Sin responsable" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="none">Sin responsable</SelectItem>
-            {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}
+            {(users ?? []).map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -295,7 +311,7 @@ export function IncidentsView({
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {filteredIncidents.map((incident) => {
+          {(filteredIncidents ?? []).map((incident) => {
             const status = statusConfig[incident.status] ?? statusConfig.open;
             const StatusIcon = status.icon;
             const auditTitle = audits.find((a) => a.id === incident.audit_id)?.title;
@@ -322,6 +338,7 @@ export function IncidentsView({
             <div className="rounded border border-destructive/40 bg-destructive/5 p-4">
               <p className="text-sm font-medium text-destructive">{permissionDenied ? "No tienes permisos" : "Error cargando incidencias"}</p>
               <p className="text-sm text-muted-foreground mt-1">{loadError}</p>
+              {permissionDenied && <p className="text-sm text-muted-foreground mt-1">Contacta con el administrador.</p>}
               <Button variant="outline" className="mt-3" onClick={() => void loadData()}>
                 Reintentar
               </Button>

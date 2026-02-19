@@ -190,6 +190,7 @@ const Index = () => {
               isNewIncidentOpen={isNewIncidentOpen}
               onNewIncidentOpenChange={setIsNewIncidentOpen}
               initialIncidentType={incidentTypeSeed}
+              reloadToken={incidentViewResetSeed}
             />
           </ErrorBoundary>
         );
