@@ -52,7 +52,7 @@ type UserDirectoryEntry = {
 
 export function CompanyView() {
   const { canManageCompany, canManagePasswords, isSuperadmin, refreshPermissions } = usePermissions();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("perfil");
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
@@ -68,7 +68,20 @@ export function CompanyView() {
   });
   const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [devDetectedRole, setDevDetectedRole] = useState<string>("Desconocido");
   const debugUserCreation = import.meta.env.DEV || import.meta.env.VITE_DEBUG_USER_CREATION === "true";
+
+  const decodeJwtClaims = (token: string) => {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+
+    try {
+      const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+      return JSON.parse(decoded) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  };
 
   const extractFunctionErrorMessage = async (error: unknown) => {
     if (error instanceof FunctionsHttpError) {
@@ -142,16 +155,52 @@ export function CompanyView() {
     void refreshPermissions();
   }, [refreshPermissions]);
 
-  const handleCreateUser = async () => {
-    if (!canManagePasswords) {
-      toast({
-        title: "Acción no permitida",
-        description: "Solo el superadministrador puede crear usuarios.",
-        variant: "destructive",
-      });
-      return;
-    }
+  useEffect(() => {
+    const loadDevAuthDiagnostics = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
+      if (!session?.user) {
+        setDevDetectedRole("Sin sesión");
+        return;
+      }
+
+      const claims = decodeJwtClaims(session.access_token);
+      const superRes = await (supabase as any).rpc("is_superadmin", { uid: session.user.id });
+
+      let detectedRole = "Espectador";
+      if (!superRes.error && Boolean(superRes.data)) {
+        detectedRole = "Superadmin";
+      } else {
+        const adminRes = await (supabase as any).rpc("has_role", { uid: session.user.id, r: "Administrador" });
+        if (!adminRes.error && Boolean(adminRes.data)) detectedRole = "Administrador";
+      }
+
+      setDevDetectedRole(detectedRole);
+
+      if (debugUserCreation) {
+        console.info("[company-users] auth diagnostics", {
+          userId: session.user.id,
+          email: session.user.email,
+          app_metadata: session.user.app_metadata,
+          user_metadata: session.user.user_metadata,
+          jwt_claims: claims,
+          role_claim: claims?.role,
+          app_role_claim: claims?.app_role,
+          qualiq_role_claim: claims?.qualiq_role,
+          company_role_claim: claims?.company_role,
+          detected_app_role: detectedRole,
+        });
+      }
+    };
+
+    if (import.meta.env.DEV) {
+      void loadDevAuthDiagnostics();
+    }
+  }, [debugUserCreation]);
+
+  const handleCreateUser = async () => {
     if (!createForm.email || !createForm.password) {
       toast({
         title: "Campos obligatorios",
@@ -233,15 +282,6 @@ export function CompanyView() {
   };
 
   const handleUpdatePassword = async () => {
-    if (!canManagePasswords) {
-      toast({
-        title: "Acción no permitida",
-        description: "Solo el superadministrador puede cambiar contraseñas.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!selectedUserId) {
       toast({ title: "Selecciona un usuario", variant: "destructive" });
       return;
@@ -418,6 +458,15 @@ export function CompanyView() {
 
         <TabsContent value="usuarios" className="mt-6">
           <div className="bg-card rounded-lg border border-border p-6 space-y-4">
+            {import.meta.env.DEV && (
+              <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground" data-testid="dev-auth-diagnostics">
+                <p className="font-medium text-foreground">Diagnóstico (DEV)</p>
+                <p>user.id: {user?.id ?? "-"}</p>
+                <p>email: {user?.email ?? "-"}</p>
+                <p>rol detectado: {devDetectedRole}</p>
+                <p>company_id: {profile?.company_id ?? "-"}</p>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-foreground">Usuarios</h3>
@@ -428,8 +477,6 @@ export function CompanyView() {
                 onClick={() => {
                   setIsUserDialogOpen(true);
                 }}
-                disabled={!canManagePasswords}
-                title={canManagePasswords ? undefined : "Solo el superadministrador puede crear usuarios."}
                 data-testid="create-user-button"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -448,19 +495,17 @@ export function CompanyView() {
                     <span className="text-xs bg-secondary px-2 py-1 rounded-full">
                       {userItem.is_superadmin ? "Superadministrador" : userItem.role}
                     </span>
-                    {canManagePasswords && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        data-testid={`change-password-${userItem.id}`}
-                        onClick={() => {
-                          setSelectedUserId(userItem.id);
-                          setIsPasswordDialogOpen(true);
-                        }}
-                      >
-                        Cambiar contraseña
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-testid={`change-password-${userItem.id}`}
+                      onClick={() => {
+                        setSelectedUserId(userItem.id);
+                        setIsPasswordDialogOpen(true);
+                      }}
+                    >
+                      Cambiar contraseña
+                    </Button>
                   </div>
                 </div>
               ))}

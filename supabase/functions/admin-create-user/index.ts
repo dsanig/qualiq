@@ -33,6 +33,19 @@ const ASSIGNABLE_ROLES = new Set(["Administrador", "Editor", "Espectador"]);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEBUG_LOGS = Deno.env.get("DEBUG_USER_CREATION") === "true";
 
+const decodeJwtClaims = (token: string): Record<string, unknown> | null => {
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+
+  try {
+    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = atob(normalizedPayload);
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
 type ErrorCode =
   | "bad_request"
   | "unauthorized"
@@ -113,6 +126,20 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "").trim();
+    const tokenClaims = decodeJwtClaims(token);
+
+    if (DEBUG_LOGS) {
+      console.info("[admin-create-user] auth header and token diagnostics", {
+        requestId,
+        hasAuthorizationHeader: Boolean(authHeader),
+        jwtSub: tokenClaims?.sub ?? null,
+        jwtEmail: tokenClaims?.email ?? null,
+        jwtRole: tokenClaims?.role ?? null,
+        jwtAppRole: tokenClaims?.app_role ?? null,
+        jwtQualiqRole: tokenClaims?.qualiq_role ?? null,
+        jwtCompanyRole: tokenClaims?.company_role ?? null,
+      });
+    }
 
     const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const {
@@ -126,13 +153,21 @@ serve(async (req) => {
 
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: callerProfile, error: callerProfileError } = await serviceClient
-      .from("profiles")
-      .select("is_superadmin")
-      .eq("id", caller.id)
-      .single();
+    const { data: isSuperadminData, error: isSuperadminError } = await serviceClient.rpc("is_superadmin", {
+      uid: caller.id,
+    });
 
-    if (callerProfileError || !callerProfile?.is_superadmin) {
+    if (DEBUG_LOGS) {
+      console.info("[admin-create-user] caller diagnostics", {
+        requestId,
+        callerId: caller.id,
+        callerEmail: caller.email ?? null,
+        isSuperadmin: isSuperadminData ?? null,
+        isSuperadminError: isSuperadminError ? String(isSuperadminError) : null,
+      });
+    }
+
+    if (isSuperadminError || !isSuperadminData) {
       return jsonResponse(
         buildErrorBody("forbidden", "Solo el superadministrador puede gestionar usuarios."),
         403,
