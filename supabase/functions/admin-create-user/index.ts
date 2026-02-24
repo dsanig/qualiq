@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const FUNCTION_VERSION = "admin-create-user@authdiag-001";
+const FUNCTION_VERSION = "admin-create-user@authdiag-002";
 const FUNCTION_NAME = "admin-create-user";
 
 const corsHeaders = {
@@ -27,7 +27,6 @@ type CallerProfile = {
 
 type Decision =
   | "NOT_SUPERADMIN_BY_ID"
-  | "NOT_SUPERADMIN_BY_EMAIL"
   | "PROFILE_MISSING"
   | "PROFILE_SUPERADMIN_FALSE"
   | "AUTH_MISSING"
@@ -48,16 +47,12 @@ type ErrorCode =
 type DebugPayload = {
   requestId: string;
   functionVersion: string;
-  decision: Decision | "NOT_SUPERADMIN_BY_ID_BUT_EMAIL_SUPERADMIN_TRUE";
+  decision: Decision;
   callerId: string | null;
   callerEmail: string | null;
   profileById: CallerProfile | null;
-  profileByEmail: CallerProfile | null;
-  profileByEmailCount: number | null;
-  hasUniqueLowerEmailIndex: boolean | null;
   tokenProjectHost: string | null;
   functionProjectHost: string | null;
-  alignedProfileId: boolean;
   errors: string[];
 };
 
@@ -65,8 +60,6 @@ const ASSIGNABLE_ROLES = new Set(["Administrador", "Editor", "Espectador"]);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEBUG_LOGS = Deno.env.get("DEBUG_USER_CREATION") === "true";
 const INCLUDE_DEBUG_IN_RESPONSE = Deno.env.get("INCLUDE_DEBUG_IN_RESPONSE") === "true";
-const BOOTSTRAP_ALIGN_PROFILE_ID = Deno.env.get("BOOTSTRAP_ALIGN_PROFILE_ID") === "true";
-
 const normalizeEmail = (value: string | null | undefined): string | null => value?.trim().toLowerCase() ?? null;
 
 const normalizeRole = (role: string) => {
@@ -184,12 +177,8 @@ serve(async (req) => {
         callerId: null,
         callerEmail: null,
         profileById: null,
-        profileByEmail: null,
-        profileByEmailCount: null,
-        hasUniqueLowerEmailIndex: null,
         tokenProjectHost: null,
         functionProjectHost: getHostname(Deno.env.get("SUPABASE_URL")),
-        alignedProfileId: false,
         errors: [],
       };
       logDiagnostic(requestId, "auth_denied", debugPayload);
@@ -232,12 +221,8 @@ serve(async (req) => {
         callerId: null,
         callerEmail: null,
         profileById: null,
-        profileByEmail: null,
-        profileByEmailCount: null,
-        hasUniqueLowerEmailIndex: null,
         tokenProjectHost,
         functionProjectHost,
-        alignedProfileId: false,
         errors: authError?.message ? [authError.message] : [],
       };
       logDiagnostic(requestId, "auth_invalid", debugPayload);
@@ -258,27 +243,7 @@ serve(async (req) => {
       .eq("id", callerId)
       .maybeSingle<CallerProfile>();
 
-    const { data: profileByEmail, error: profileByEmailError } = await serviceClient
-      .from("profiles")
-      .select("id,email,is_superadmin")
-      .eq("email", callerEmail ?? "")
-      .maybeSingle<CallerProfile>();
-
-    const { count: profileByEmailCount, error: profileByEmailCountError } = await serviceClient
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("email", callerEmail ?? "");
-
-    const { data: indexRows, error: indexError } = await serviceClient
-      .from("pg_indexes")
-      .select("indexname")
-      .eq("schemaname", "public")
-      .eq("indexname", "profiles_email_lower_unique_idx")
-      .limit(1);
-
-    const hasUniqueLowerEmailIndex = !indexError && Array.isArray(indexRows) && indexRows.length > 0;
-
-    if (profileByIdError || profileByEmailError || profileByEmailCountError) {
+    if (profileByIdError) {
       const debugPayload: DebugPayload = {
         requestId,
         functionVersion: FUNCTION_VERSION,
@@ -286,13 +251,9 @@ serve(async (req) => {
         callerId,
         callerEmail,
         profileById: profileById ?? null,
-        profileByEmail: profileByEmail ?? null,
-        profileByEmailCount: profileByEmailCount ?? null,
-        hasUniqueLowerEmailIndex,
         tokenProjectHost,
         functionProjectHost,
-        alignedProfileId: false,
-        errors: [profileByIdError?.message, profileByEmailError?.message, profileByEmailCountError?.message].filter(Boolean) as string[],
+        errors: [profileByIdError.message],
       };
       logDiagnostic(requestId, "profile_lookup_error", debugPayload);
       return jsonResponse(buildErrorBody("internal_error", "No se pudo validar el perfil del solicitante.", null, debugPayload), 500, requestId);
@@ -300,7 +261,6 @@ serve(async (req) => {
 
     let decision: DebugPayload["decision"] = "UNKNOWN";
     let effectiveProfile = profileById ?? null;
-    let alignedProfileId = false;
 
     if (tokenProjectHost && functionProjectHost && tokenProjectHost !== functionProjectHost) {
       decision = "ENV_MISMATCH_SUSPECTED";
@@ -308,29 +268,10 @@ serve(async (req) => {
       effectiveProfile = profileById;
     } else if (profileById && !profileById.is_superadmin) {
       decision = "PROFILE_SUPERADMIN_FALSE";
-    } else if (!profileById && !profileByEmail) {
+    } else if (!profileById) {
       decision = "PROFILE_MISSING";
-    } else if (!profileById && profileByEmail && !profileByEmail.is_superadmin) {
-      decision = "NOT_SUPERADMIN_BY_EMAIL";
-    } else if (!profileById && profileByEmail?.is_superadmin) {
-      decision = "NOT_SUPERADMIN_BY_ID_BUT_EMAIL_SUPERADMIN_TRUE";
-      if (hasUniqueLowerEmailIndex && BOOTSTRAP_ALIGN_PROFILE_ID && callerEmail) {
-        const { data: alignedData, error: alignError } = await serviceClient
-          .from("profiles")
-          .update({ id: callerId, email: callerEmail, is_superadmin: true })
-          .eq("email", callerEmail)
-          .select("id,email,is_superadmin")
-          .maybeSingle<CallerProfile>();
-
-        if (!alignError && alignedData?.id === callerId && alignedData.is_superadmin) {
-          effectiveProfile = alignedData;
-          alignedProfileId = true;
-        } else {
-          decision = "NOT_SUPERADMIN_BY_ID";
-        }
-      } else {
-        decision = "NOT_SUPERADMIN_BY_ID";
-      }
+    } else {
+      decision = "NOT_SUPERADMIN_BY_ID";
     }
 
     const debugPayload: DebugPayload = {
@@ -340,13 +281,9 @@ serve(async (req) => {
       callerId,
       callerEmail,
       profileById: profileById ?? null,
-      profileByEmail: profileByEmail ?? null,
-      profileByEmailCount: profileByEmailCount ?? null,
-      hasUniqueLowerEmailIndex,
       tokenProjectHost,
       functionProjectHost,
-      alignedProfileId,
-      errors: [indexError?.message].filter(Boolean) as string[],
+      errors: [],
     };
 
     logDiagnostic(requestId, "authorization_decision", debugPayload);
@@ -355,7 +292,6 @@ serve(async (req) => {
       const deniedDecision: Decision = (
         [
           "NOT_SUPERADMIN_BY_ID",
-          "NOT_SUPERADMIN_BY_EMAIL",
           "PROFILE_MISSING",
           "PROFILE_SUPERADMIN_FALSE",
           "AUTH_MISSING",
