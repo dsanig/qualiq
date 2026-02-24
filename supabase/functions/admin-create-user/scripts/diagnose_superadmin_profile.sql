@@ -1,28 +1,19 @@
--- Uso:
---   1) Reemplaza los placeholders de callerId y callerEmail.
---   2) Ejecuta en SQL editor del mismo proyecto Supabase al que apunta la función.
+-- Replace placeholders from diagnostic headers/payload.
 
--- Parámetros esperados (edita manualmente):
---   callerId: UUID devuelto en debug.callerId
---   callerEmail: email devuelto en debug.callerEmail
-
--- Diagnóstico por id y email normalizado
+-- 1) Inspect by id
 select id, email, is_superadmin
-from profiles
-where id = '00000000-0000-0000-0000-000000000000'::uuid;
+from public.profiles
+where id = '<callerId>'::uuid;
 
+-- 2) Inspect by email
 select id, email, is_superadmin
-from profiles
-where lower(email) = lower('admin@example.com');
+from public.profiles
+where lower(email) = lower('admin@admin.com');
 
-select count(*) as duplicated_email_count
-from profiles
-where lower(email) = lower('admin@example.com');
-
--- Reparación mínima por callerId (strict server-side remains in function)
-insert into profiles (id, email, is_superadmin)
-values ('00000000-0000-0000-0000-000000000000'::uuid, lower('admin@example.com'), true)
+-- 3) Ensure admin caller profile is authoritative by id
+insert into public.profiles (id, email, is_superadmin)
+values ('<callerId>'::uuid, 'admin@admin.com', true)
 on conflict (id)
 do update set
-  email = excluded.email,
-  is_superadmin = true;
+  is_superadmin = true,
+  email = excluded.email;

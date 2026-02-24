@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const FUNCTION_VERSION = "admin-create-user@authdiag-001";
+const FUNCTION_NAME = "admin-create-user";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id",
+  "Access-Control-Expose-Headers": "x-request-id, x-function-version, x-debug-decision, x-debug-caller-email, x-debug-caller-id",
 };
 
 type CreateUserPayload = {
@@ -21,90 +25,72 @@ type CallerProfile = {
   is_superadmin: boolean;
 };
 
+type Decision =
+  | "NOT_SUPERADMIN_BY_ID"
+  | "NOT_SUPERADMIN_BY_EMAIL"
+  | "PROFILE_MISSING"
+  | "PROFILE_SUPERADMIN_FALSE"
+  | "AUTH_MISSING"
+  | "AUTH_INVALID"
+  | "ENV_MISMATCH_SUSPECTED"
+  | "UNKNOWN";
+
 type ErrorCode =
   | "bad_request"
   | "unauthorized"
   | "forbidden"
-  | "NOT_SUPERADMIN"
   | "duplicate_email"
   | "invalid_email"
   | "weak_password"
   | "permission_denied"
   | "internal_error";
 
-type Decision =
-  | "MISSING_AUTH"
-  | "INVALID_TOKEN"
-  | "TOKEN_RUNTIME_MISMATCH"
-  | "ENV_INCOMPLETE"
-  | "PROFILE_BY_ID_MISSING"
-  | "PROFILE_BY_ID_SUPERADMIN_FALSE"
-  | "PROFILE_BY_ID_SUPERADMIN_TRUE"
-  | "PROFILE_EMAIL_FALLBACK_SUPERADMIN_TRUE"
-  | "PROFILE_EMAIL_FALLBACK_NOT_ALLOWED"
-  | "PROFILE_AMBIGUOUS_EMAIL"
-  | "PROJECT_ENV_MISMATCH_SUSPECTED"
-  | "UNKNOWN_DENIAL"
-  | "UNHANDLED_EXCEPTION";
-
 type DebugPayload = {
   requestId: string;
   functionVersion: string;
-  projectHost: string | null;
-  hasAuthHeader: boolean;
-  tokenClaims: { sub: string | null; email: string | null };
+  decision: Decision | "NOT_SUPERADMIN_BY_ID_BUT_EMAIL_SUPERADMIN_TRUE";
   callerId: string | null;
   callerEmail: string | null;
   profileById: CallerProfile | null;
   profileByEmail: CallerProfile | null;
-  decision: Decision;
+  profileByEmailCount: number | null;
+  hasUniqueLowerEmailIndex: boolean | null;
+  tokenProjectHost: string | null;
+  functionProjectHost: string | null;
+  alignedProfileId: boolean;
   errors: string[];
-} & Record<string, unknown>;
+};
 
 const ASSIGNABLE_ROLES = new Set(["Administrador", "Editor", "Espectador"]);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEBUG_LOGS = Deno.env.get("DEBUG_USER_CREATION") === "true";
-const BOOTSTRAP_SUPERADMIN = Deno.env.get("BOOTSTRAP_SUPERADMIN") === "true";
+const INCLUDE_DEBUG_IN_RESPONSE = Deno.env.get("INCLUDE_DEBUG_IN_RESPONSE") === "true";
 const BOOTSTRAP_ALIGN_PROFILE_ID = Deno.env.get("BOOTSTRAP_ALIGN_PROFILE_ID") === "true";
-const ADMIN_BOOTSTRAP_EMAIL = "admin@admin.com";
-const FUNCTION_NAME = "admin-create-user";
-const FUNCTION_VERSION = "admin-create-user@diag-002";
 
-function shouldIncludeDebug(): boolean {
-  return Deno.env.get("INCLUDE_DEBUG_IN_RESPONSE") === "true";
-}
+const normalizeEmail = (value: string | null | undefined): string | null => value?.trim().toLowerCase() ?? null;
 
 const normalizeRole = (role: string) => {
   const normalized = role.trim().toLowerCase();
-  if (normalized === "admin" || normalized === "administrador") {
-    return "Administrador";
-  }
-  if (normalized === "editor") {
-    return "Editor";
-  }
-  if (normalized === "viewer" || normalized === "espectador") {
-    return "Espectador";
-  }
+  if (normalized === "admin" || normalized === "administrador") return "Administrador";
+  if (normalized === "editor") return "Editor";
+  if (normalized === "viewer" || normalized === "espectador") return "Espectador";
   return role.trim();
 };
 
-const getHostname = (value: string): string | null => {
+const decodeJwtClaims = (token: string): Record<string, unknown> | null => {
+  const payload = token.split(".")[1];
+  if (!payload) return null;
   try {
-    return new URL(value).hostname;
+    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as Record<string, unknown>;
   } catch {
     return null;
   }
 };
 
-const normalizeEmail = (value: string | null | undefined): string | null => value?.trim().toLowerCase() ?? null;
-
-const decodeJwtClaims = (token: string): Record<string, unknown> | null => {
-  const payload = token.split(".")[1];
-  if (!payload) return null;
-
+const getHostname = (value: string | null | undefined): string | null => {
+  if (!value) return null;
   try {
-    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(json) as Record<string, unknown>;
+    return new URL(value).hostname;
   } catch {
     return null;
   }
@@ -115,464 +101,281 @@ const logDiagnostic = (requestId: string, stage: string, data: Record<string, un
   console.info(JSON.stringify({ function: FUNCTION_NAME, functionVersion: FUNCTION_VERSION, requestId, stage, ...data }));
 };
 
-const buildErrorBody = (code: ErrorCode, message: string, details?: unknown, debug?: unknown) => {
-  const body: {
-    ok: false;
-    error: {
-      code: ErrorCode;
-      message: string;
-      details: unknown;
-      debug?: unknown;
-    };
-  } = {
-    ok: false,
-    error: {
-      code,
-      message,
-      details: details ?? null,
-    },
+const buildErrorBody = (
+  code: ErrorCode,
+  message: string,
+  details: unknown,
+  debug?: DebugPayload,
+) => ({
+  ok: false,
+  error: {
+    code,
+    message,
+    details,
+    ...(INCLUDE_DEBUG_IN_RESPONSE && debug ? { debug } : {}),
+  },
+});
+
+const jsonResponse = (
+  body: unknown,
+  status: number,
+  requestId: string,
+  debugHeaders?: { decision?: string; callerEmail?: string | null; callerId?: string | null },
+) => {
+  const headers: Record<string, string> = {
+    ...corsHeaders,
+    "Content-Type": "application/json",
+    "x-request-id": requestId,
+    "x-function-version": FUNCTION_VERSION,
   };
 
-  if (shouldIncludeDebug() && debug) {
-    body.error.debug = debug;
+  if (INCLUDE_DEBUG_IN_RESPONSE) {
+    headers["x-debug-decision"] = debugHeaders?.decision ?? "UNKNOWN";
+    headers["x-debug-caller-email"] = debugHeaders?.callerEmail ?? "";
+    headers["x-debug-caller-id"] = debugHeaders?.callerId ?? "";
   }
 
-  return body;
+  return new Response(JSON.stringify(body), { status, headers });
 };
-
-type ResponseDebugHeaders = {
-  decision?: string;
-  callerEmail?: string | null;
-  projectHost?: string | null;
-};
-
-const jsonResponse = (body: unknown, status: number, requestId: string, debugHeaders?: ResponseDebugHeaders) => {
-  const includeDebug = shouldIncludeDebug();
-
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json",
-      "x-request-id": requestId,
-      "x-function-version": FUNCTION_VERSION,
-    },
-  });
-};
-
-const responseDebugHeadersFromPayload = (debugPayload: { decision?: string; callerEmail?: string | null; projectHost?: string | null }) => ({
-  decision: debugPayload.decision ?? "UNKNOWN",
-  callerEmail: debugPayload.callerEmail ?? null,
-  projectHost: debugPayload.projectHost ?? null,
-});
-
-const buildDebugPayload = (payload: Partial<DebugPayload> & Pick<DebugPayload, "requestId" | "decision">): DebugPayload => ({
-  requestId: payload.requestId,
-  functionVersion: FUNCTION_VERSION,
-  projectHost: (payload.projectHost as string | null | undefined) ?? null,
-  hasAuthHeader: payload.hasAuthHeader ?? false,
-  tokenClaims: {
-    sub: payload.tokenClaims?.sub ?? null,
-    email: payload.tokenClaims?.email ?? null,
-  },
-  callerId: payload.callerId ?? null,
-  callerEmail: payload.callerEmail ?? null,
-  profileById: payload.profileById ?? null,
-  profileByEmail: payload.profileByEmail ?? null,
-  decision: payload.decision,
-  errors: payload.errors ?? [],
-  ...payload,
-});
-
-const buildDebugPayload = (payload: Partial<DebugPayload> & Pick<DebugPayload, "requestId" | "decision">): DebugPayload => ({
-  requestId: payload.requestId,
-  functionVersion: FUNCTION_VERSION,
-  projectHost: (payload.projectHost as string | null | undefined) ?? null,
-  hasAuthHeader: payload.hasAuthHeader ?? false,
-  tokenClaims: {
-    sub: payload.tokenClaims?.sub ?? null,
-    email: payload.tokenClaims?.email ?? null,
-  },
-  callerId: payload.callerId ?? null,
-  callerEmail: payload.callerEmail ?? null,
-  profileById: payload.profileById ?? null,
-  profileByEmail: payload.profileByEmail ?? null,
-  decision: payload.decision,
-  errors: payload.errors ?? [],
-  ...payload,
-});
 
 const mapSupabaseAuthError = (message: string): { status: number; code: ErrorCode; message: string } => {
   const normalized = message.toLowerCase();
-
-  if (
-    normalized.includes("already registered") ||
-    normalized.includes("already been registered") ||
-    normalized.includes("already exists")
-  ) {
+  if (normalized.includes("already registered") || normalized.includes("already exists")) {
     return { status: 409, code: "duplicate_email", message: "El email ya existe." };
   }
-
   if (normalized.includes("invalid email")) {
     return { status: 400, code: "invalid_email", message: "El email no es válido." };
   }
-
-  if (
-    normalized.includes("password") &&
-    (normalized.includes("weak") || normalized.includes("short") || normalized.includes("at least"))
-  ) {
-    return {
-      status: 400,
-      code: "weak_password",
-      message: "La contraseña no cumple los requisitos de seguridad.",
-    };
+  if (normalized.includes("password") && (normalized.includes("weak") || normalized.includes("short") || normalized.includes("at least"))) {
+    return { status: 400, code: "weak_password", message: "La contraseña no cumple los requisitos de seguridad." };
   }
-
   if (normalized.includes("not allowed") || normalized.includes("permission")) {
     return { status: 403, code: "permission_denied", message: "No tienes permisos para crear usuarios." };
   }
-
   return { status: 400, code: "bad_request", message: "No se pudo crear el usuario." };
 };
 
 serve(async (req) => {
   const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
 
-  if (DEBUG_LOGS) {
-    console.info("[admin-create-user] hit", { requestId, FUNCTION_VERSION });
-  }
-
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
-      headers: { ...corsHeaders, "x-request-id": requestId, "x-function-version": FUNCTION_VERSION },
+      headers: {
+        ...corsHeaders,
+        "x-request-id": requestId,
+        "x-function-version": FUNCTION_VERSION,
+      },
     });
   }
 
   if (req.method !== "POST") {
-    return jsonResponse(buildErrorBody("bad_request", "Método no permitido."), 405, requestId, {
-      decision: "METHOD_NOT_ALLOWED",
-      callerEmail: null,
-      projectHost: null,
-    });
+    return jsonResponse(buildErrorBody("bad_request", "Método no permitido.", null), 405, requestId);
   }
 
   try {
     const authHeader = req.headers.get("authorization");
-    const authHeaderPrefixOk = Boolean(authHeader?.startsWith("Bearer "));
-    const hasAuthHeader = Boolean(authHeader);
-    const originHeader = req.headers.get("origin");
-    const clientProvidedHost = originHeader ? getHostname(originHeader) : null;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      const decision: Decision = !authHeader ? "AUTH_MISSING" : "AUTH_INVALID";
+      const debugPayload: DebugPayload = {
+        requestId,
+        functionVersion: FUNCTION_VERSION,
+        decision,
+        callerId: null,
+        callerEmail: null,
+        profileById: null,
+        profileByEmail: null,
+        profileByEmailCount: null,
+        hasUniqueLowerEmailIndex: null,
+        tokenProjectHost: null,
+        functionProjectHost: getHostname(Deno.env.get("SUPABASE_URL")),
+        alignedProfileId: false,
+        errors: [],
+      };
+      logDiagnostic(requestId, "auth_denied", debugPayload);
+      return jsonResponse(
+        buildErrorBody("unauthorized", "No autorizado.", { decision }, debugPayload),
+        401,
+        requestId,
+        { decision, callerEmail: null, callerId: null },
+      );
+    }
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const functionProjectHost = getHostname(SUPABASE_URL);
-
-    logDiagnostic(requestId, "request_received", {
-      hasAuthHeader,
-      authHeaderPrefixOk,
-      projectHost: functionProjectHost,
-      clientProvidedHost,
-      debugEnabled: DEBUG_LOGS,
-      includeDebugInResponse: shouldIncludeDebug(),
-    });
-
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
-      const decision: Decision = "ENV_INCOMPLETE";
-      const debugPayload = buildDebugPayload({
-        requestId,
-        decision,
-        projectHost: functionProjectHost,
-        hasAuthHeader,
-        tokenClaims: { sub: null, email: null },
-        callerId: null,
-        callerEmail: null,
-        profileById: null,
-        profileByEmail: null,
-        clientProvidedHost,
-      });
-      logDiagnostic(requestId, "deny", debugPayload);
       return jsonResponse(
-        buildErrorBody("internal_error", "Variables de entorno de Supabase incompletas.", null, debugPayload),
+        buildErrorBody("internal_error", "Variables de entorno de Supabase incompletas.", null),
         500,
         requestId,
-        responseDebugHeadersFromPayload(debugPayload),
       );
-    }
-
-    if (!hasAuthHeader) {
-      const decision: Decision = "MISSING_AUTH";
-      const debugPayload = buildDebugPayload({
-        requestId,
-        decision,
-        hasAuthHeader,
-        projectHost: functionProjectHost,
-        tokenClaims: { sub: null, email: null },
-        callerId: null,
-        callerEmail: null,
-        profileById: null,
-        profileByEmail: null,
-        authHeaderPrefixOk,
-        clientProvidedHost,
-      });
-      logDiagnostic(requestId, "deny", debugPayload);
-      return jsonResponse(buildErrorBody("unauthorized", "No autorizado.", null, debugPayload), 401, requestId, responseDebugHeadersFromPayload(debugPayload));
-    }
-
-    if (!authHeaderPrefixOk) {
-      const decision: Decision = "INVALID_TOKEN";
-      const debugPayload = buildDebugPayload({
-        requestId,
-        decision,
-        hasAuthHeader,
-        projectHost: functionProjectHost,
-        tokenClaims: { sub: null, email: null },
-        callerId: null,
-        callerEmail: null,
-        profileById: null,
-        profileByEmail: null,
-        authHeaderPrefixOk,
-        clientProvidedHost,
-      });
-      logDiagnostic(requestId, "deny", debugPayload);
-      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado.", null, debugPayload), 401, requestId, responseDebugHeadersFromPayload(debugPayload));
     }
 
     const token = authHeader.replace("Bearer ", "").trim();
     const tokenClaims = decodeJwtClaims(token);
-    const tokenSub = typeof tokenClaims?.sub === "string" ? tokenClaims.sub : null;
-    const tokenEmail = normalizeEmail(typeof tokenClaims?.email === "string" ? tokenClaims.email : null);
-    const tokenIss = typeof tokenClaims?.iss === "string" ? tokenClaims.iss : null;
-    const tokenProjectHost = tokenIss ? getHostname(tokenIss) : null;
+    const tokenProjectHost = getHostname(typeof tokenClaims?.iss === "string" ? tokenClaims.iss : null);
+    const functionProjectHost = getHostname(SUPABASE_URL);
 
-    const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const {
-      data: { user: caller },
-      error: authError,
-    } = await anonClient.auth.getUser(token);
-
-    const callerEmail = normalizeEmail(caller?.email ?? null);
-    const tokenSubMatchesCaller = Boolean(tokenSub && caller?.id && tokenSub === caller.id);
-    const tokenEmailMatchesCaller = Boolean(tokenEmail && callerEmail && tokenEmail === callerEmail);
-
-    logDiagnostic(requestId, "auth_pipeline", {
-      hasAuthHeader,
-      authHeaderPrefixOk,
-      tokenClaims: {
-        sub: tokenSub,
-        email: tokenEmail,
-      },
-      callerId: caller?.id ?? null,
-      callerEmail,
-      tokenSubMatchesCaller,
-      tokenEmailMatchesCaller,
-      tokenProjectHost,
-      authError: authError?.message ?? null,
-    });
-
+    const { data: authData, error: authError } = await anonClient.auth.getUser(token);
+    const caller = authData.user;
     if (authError || !caller) {
-      const decision: Decision = "INVALID_TOKEN";
-      const debugPayload = buildDebugPayload({
+      const debugPayload: DebugPayload = {
         requestId,
-        decision,
-        projectHost: functionProjectHost,
-        clientProvidedHost,
-        hasAuthHeader,
-        authHeaderPrefixOk,
-        tokenClaims: { sub: tokenSub, email: tokenEmail },
+        functionVersion: FUNCTION_VERSION,
+        decision: "AUTH_INVALID",
         callerId: null,
         callerEmail: null,
         profileById: null,
         profileByEmail: null,
-        tokenSubMatchesCaller,
-        tokenEmailMatchesCaller,
+        profileByEmailCount: null,
+        hasUniqueLowerEmailIndex: null,
+        tokenProjectHost,
+        functionProjectHost,
+        alignedProfileId: false,
         errors: authError?.message ? [authError.message] : [],
-      });
-      logDiagnostic(requestId, "deny", debugPayload);
-      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado.", null, debugPayload), 401, requestId, responseDebugHeadersFromPayload(debugPayload));
-    }
-
-    if ((tokenSub && !tokenSubMatchesCaller) || (tokenEmail && !tokenEmailMatchesCaller)) {
-      const decision: Decision = "TOKEN_RUNTIME_MISMATCH";
-      const debugPayload = buildDebugPayload({
+      };
+      logDiagnostic(requestId, "auth_invalid", debugPayload);
+      return jsonResponse(
+        buildErrorBody("unauthorized", "Token inválido o expirado.", { decision: "AUTH_INVALID" }, debugPayload),
+        401,
         requestId,
-        decision,
-        projectHost: functionProjectHost,
-        clientProvidedHost,
-        hasAuthHeader,
-        authHeaderPrefixOk,
-        tokenClaims: { sub: tokenSub, email: tokenEmail },
-        callerId: caller.id,
-        callerEmail,
-        profileById: null,
-        profileByEmail: null,
-        tokenSubMatchesCaller,
-        tokenEmailMatchesCaller,
-      });
-      logDiagnostic(requestId, "deny", debugPayload);
-      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o inconsistente.", null, debugPayload), 401, requestId, responseDebugHeadersFromPayload(debugPayload));
+        { decision: "AUTH_INVALID", callerEmail: null, callerId: null },
+      );
     }
 
-    const byIdResult = await serviceClient
+    const callerEmail = normalizeEmail(caller.email);
+    const callerId = caller.id;
+
+    const { data: profileById, error: profileByIdError } = await serviceClient
       .from("profiles")
-      .select("id, email, is_superadmin")
-      .eq("id", caller.id)
+      .select("id,email,is_superadmin")
+      .eq("id", callerId)
       .maybeSingle<CallerProfile>();
 
-    const byEmailResult = callerEmail
-      ? await serviceClient
+    const { data: profileByEmail, error: profileByEmailError } = await serviceClient
+      .from("profiles")
+      .select("id,email,is_superadmin")
+      .eq("email", callerEmail ?? "")
+      .maybeSingle<CallerProfile>();
+
+    const { count: profileByEmailCount, error: profileByEmailCountError } = await serviceClient
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("email", callerEmail ?? "");
+
+    const { data: indexRows, error: indexError } = await serviceClient
+      .from("pg_indexes")
+      .select("indexname")
+      .eq("schemaname", "public")
+      .eq("indexname", "profiles_email_lower_unique_idx")
+      .limit(1);
+
+    const hasUniqueLowerEmailIndex = !indexError && Array.isArray(indexRows) && indexRows.length > 0;
+
+    if (profileByIdError || profileByEmailError || profileByEmailCountError) {
+      const debugPayload: DebugPayload = {
+        requestId,
+        functionVersion: FUNCTION_VERSION,
+        decision: "UNKNOWN",
+        callerId,
+        callerEmail,
+        profileById: profileById ?? null,
+        profileByEmail: profileByEmail ?? null,
+        profileByEmailCount: profileByEmailCount ?? null,
+        hasUniqueLowerEmailIndex,
+        tokenProjectHost,
+        functionProjectHost,
+        alignedProfileId: false,
+        errors: [profileByIdError?.message, profileByEmailError?.message, profileByEmailCountError?.message].filter(Boolean) as string[],
+      };
+      logDiagnostic(requestId, "profile_lookup_error", debugPayload);
+      return jsonResponse(buildErrorBody("internal_error", "No se pudo validar el perfil del solicitante.", null, debugPayload), 500, requestId);
+    }
+
+    let decision: DebugPayload["decision"] = "UNKNOWN";
+    let effectiveProfile = profileById ?? null;
+    let alignedProfileId = false;
+
+    if (tokenProjectHost && functionProjectHost && tokenProjectHost !== functionProjectHost) {
+      decision = "ENV_MISMATCH_SUSPECTED";
+    } else if (profileById?.is_superadmin) {
+      effectiveProfile = profileById;
+    } else if (profileById && !profileById.is_superadmin) {
+      decision = "PROFILE_SUPERADMIN_FALSE";
+    } else if (!profileById && !profileByEmail) {
+      decision = "PROFILE_MISSING";
+    } else if (!profileById && profileByEmail && !profileByEmail.is_superadmin) {
+      decision = "NOT_SUPERADMIN_BY_EMAIL";
+    } else if (!profileById && profileByEmail?.is_superadmin) {
+      decision = "NOT_SUPERADMIN_BY_ID_BUT_EMAIL_SUPERADMIN_TRUE";
+      if (hasUniqueLowerEmailIndex && BOOTSTRAP_ALIGN_PROFILE_ID && callerEmail) {
+        const { data: alignedData, error: alignError } = await serviceClient
           .from("profiles")
-          .select("id, email, is_superadmin")
-          .ilike("email", callerEmail)
-          .maybeSingle<CallerProfile>()
-      : { data: null, error: null };
+          .update({ id: callerId, email: callerEmail, is_superadmin: true })
+          .eq("email", callerEmail)
+          .select("id,email,is_superadmin")
+          .maybeSingle<CallerProfile>();
 
-    const emailCountResult = callerEmail
-      ? await serviceClient.from("profiles").select("id", { count: "exact", head: true }).ilike("email", callerEmail)
-      : { count: 0, error: null };
-
-    const profileByIdFound = Boolean(byIdResult.data);
-    const profileByEmailFound = Boolean(byEmailResult.data);
-    const profileByIdSuperadmin = byIdResult.data?.is_superadmin ?? null;
-    const profileByEmailSuperadmin = byEmailResult.data?.is_superadmin ?? null;
-    const profileEmailCount = emailCountResult.count ?? 0;
-
-    let decision: Decision = "UNKNOWN_DENIAL";
-
-    if (byIdResult.error || byEmailResult.error || emailCountResult.error) {
-      decision = "UNKNOWN_DENIAL";
-    } else if (tokenProjectHost && functionProjectHost && tokenProjectHost !== functionProjectHost) {
-      decision = "PROJECT_ENV_MISMATCH_SUSPECTED";
-    } else if (byIdResult.data?.is_superadmin) {
-      decision = "PROFILE_BY_ID_SUPERADMIN_TRUE";
-    } else if (profileByIdFound && !byIdResult.data?.is_superadmin) {
-      decision = "PROFILE_BY_ID_SUPERADMIN_FALSE";
-    } else if (!profileByIdFound && profileEmailCount > 1) {
-      decision = "PROFILE_AMBIGUOUS_EMAIL";
-    } else if (!profileByIdFound && byEmailResult.data?.is_superadmin) {
-      decision = "PROFILE_EMAIL_FALLBACK_SUPERADMIN_TRUE";
-    } else if (!profileByIdFound) {
-      decision = "PROFILE_BY_ID_MISSING";
-    }
-
-    let callerProfile = byIdResult.data ?? null;
-    const canRecoveryBootstrap = BOOTSTRAP_SUPERADMIN && callerEmail === ADMIN_BOOTSTRAP_EMAIL;
-
-    if (!callerProfile?.is_superadmin && decision === "PROFILE_EMAIL_FALLBACK_SUPERADMIN_TRUE") {
-      if (profileEmailCount > 1) {
-        decision = "PROFILE_AMBIGUOUS_EMAIL";
-      } else {
-        callerProfile = byEmailResult.data;
-        if (BOOTSTRAP_ALIGN_PROFILE_ID) {
-          const alignResult = await serviceClient.from("profiles").upsert(
-            {
-              id: caller.id,
-              email: callerEmail,
-              full_name: caller.user_metadata?.full_name ?? caller.user_metadata?.name ?? null,
-              is_superadmin: true,
-            },
-            { onConflict: "id" },
-          );
-
-          if (alignResult.error) {
-            decision = "UNKNOWN_DENIAL";
-          }
+        if (!alignError && alignedData?.id === callerId && alignedData.is_superadmin) {
+          effectiveProfile = alignedData;
+          alignedProfileId = true;
+        } else {
+          decision = "NOT_SUPERADMIN_BY_ID";
         }
+      } else {
+        decision = "NOT_SUPERADMIN_BY_ID";
       }
     }
 
-    if (!callerProfile?.is_superadmin && canRecoveryBootstrap && decision !== "PROFILE_AMBIGUOUS_EMAIL") {
-      const bootstrapResult = await serviceClient.from("profiles").upsert(
-        {
-          id: caller.id,
-          email: callerEmail,
-          full_name: caller.user_metadata?.full_name ?? caller.user_metadata?.name ?? null,
-          is_superadmin: true,
-        },
-        { onConflict: "id" },
-      ).select("id, email, is_superadmin").maybeSingle<CallerProfile>();
-
-      if (!bootstrapResult.error && bootstrapResult.data?.is_superadmin) {
-        callerProfile = bootstrapResult.data;
-        decision = "PROFILE_EMAIL_FALLBACK_SUPERADMIN_TRUE";
-      }
-    }
-
-    if (
-      decision === "PROFILE_BY_ID_MISSING" &&
-      (!profileByEmailFound || !profileByEmailSuperadmin)
-    ) {
-      decision = "PROFILE_EMAIL_FALLBACK_NOT_ALLOWED";
-    }
-
-    const debugPayload = buildDebugPayload({
+    const debugPayload: DebugPayload = {
       requestId,
+      functionVersion: FUNCTION_VERSION,
       decision,
-      projectHost: functionProjectHost,
-      clientProvidedHost,
-      tokenProjectHost,
-      hasAuthHeader,
-      authHeaderPrefixOk,
-      tokenClaims: {
-        sub: tokenSub,
-        email: tokenEmail,
-      },
-      callerId: caller.id,
+      callerId,
       callerEmail,
-      tokenSubMatchesCaller,
-      tokenEmailMatchesCaller,
-      profileByIdFound,
-      profileByEmailFound,
-      profileByIdSuperadmin,
-      profileByEmailSuperadmin,
-      profileEmailCount,
-      profileById: byIdResult.data ?? null,
-      profileByEmail: byEmailResult.data ?? null,
-      errors: [byIdResult.error?.message, byEmailResult.error?.message, emailCountResult.error?.message].filter(Boolean),
-    });
+      profileById: profileById ?? null,
+      profileByEmail: profileByEmail ?? null,
+      profileByEmailCount: profileByEmailCount ?? null,
+      hasUniqueLowerEmailIndex,
+      tokenProjectHost,
+      functionProjectHost,
+      alignedProfileId,
+      errors: [indexError?.message].filter(Boolean) as string[],
+    };
 
-    logDiagnostic(requestId, "superadmin_authorization", debugPayload);
+    logDiagnostic(requestId, "authorization_decision", debugPayload);
 
-    if (decision === "PROFILE_AMBIGUOUS_EMAIL") {
+    if (!effectiveProfile?.is_superadmin) {
+      const deniedDecision: Decision = (
+        [
+          "NOT_SUPERADMIN_BY_ID",
+          "NOT_SUPERADMIN_BY_EMAIL",
+          "PROFILE_MISSING",
+          "PROFILE_SUPERADMIN_FALSE",
+          "AUTH_MISSING",
+          "AUTH_INVALID",
+          "ENV_MISMATCH_SUSPECTED",
+        ] as const
+      ).includes(decision as Decision)
+        ? (decision as Decision)
+        : "UNKNOWN";
+
       return jsonResponse(
-        buildErrorBody("internal_error", "Ambigüedad: email duplicado en profiles. Contacta soporte.", null, debugPayload),
-        500,
-        requestId,
-        responseDebugHeadersFromPayload(debugPayload),
-      );
-    }
-
-    if (decision === "PROJECT_ENV_MISMATCH_SUSPECTED") {
-      return jsonResponse(
-        buildErrorBody("NOT_SUPERADMIN", "Solo el superadministrador puede gestionar usuarios.", null, debugPayload),
+        buildErrorBody(
+          "forbidden",
+          "Solo el superadministrador puede gestionar usuarios.",
+          { decision: deniedDecision },
+          { ...debugPayload, decision: deniedDecision },
+        ),
         403,
         requestId,
-        responseDebugHeadersFromPayload(debugPayload),
-      );
-    }
-
-    if (byIdResult.error || byEmailResult.error || emailCountResult.error) {
-      return jsonResponse(
-        buildErrorBody("internal_error", "No se pudo validar el perfil del solicitante.", null, debugPayload),
-        500,
-        requestId,
-        responseDebugHeadersFromPayload(debugPayload),
-      );
-    }
-
-    if (!callerProfile?.is_superadmin) {
-      return jsonResponse(
-        buildErrorBody("NOT_SUPERADMIN", "Solo el superadministrador puede gestionar usuarios.", null, debugPayload),
-        403,
-        requestId,
-        responseDebugHeadersFromPayload(debugPayload),
+        { decision: deniedDecision, callerEmail, callerId },
       );
     }
 
@@ -583,26 +386,19 @@ serve(async (req) => {
     const requestedRoles = payload.roles ?? (payload.role ? [payload.role] : []);
 
     if (!email || !password || password.length < 8) {
-      return jsonResponse(
-        buildErrorBody("bad_request", "Email y contraseña válida (mínimo 8 caracteres) son obligatorios."),
-        400,
-        requestId,
-      );
+      return jsonResponse(buildErrorBody("bad_request", "Email y contraseña válida (mínimo 8 caracteres) son obligatorios.", null), 400, requestId);
     }
-
     if (!EMAIL_REGEX.test(email)) {
-      return jsonResponse(buildErrorBody("invalid_email", "El email no es válido."), 400, requestId);
+      return jsonResponse(buildErrorBody("invalid_email", "El email no es válido.", null), 400, requestId);
     }
-
     if (requestedRoles.length === 0) {
-      return jsonResponse(buildErrorBody("bad_request", "Debes indicar al menos un rol."), 400, requestId);
+      return jsonResponse(buildErrorBody("bad_request", "Debes indicar al menos un rol.", null), 400, requestId);
     }
 
     const normalizedRoles = [...new Set(requestedRoles.map((role) => normalizeRole(role)).filter(Boolean))];
-
     if (normalizedRoles.length === 0 || normalizedRoles.some((role) => !ASSIGNABLE_ROLES.has(role))) {
       return jsonResponse(
-        buildErrorBody("bad_request", "Roles inválidos. Solo se permiten: Administrador, Editor y Espectador."),
+        buildErrorBody("bad_request", "Roles inválidos. Solo se permiten: Administrador, Editor y Espectador.", null),
         400,
         requestId,
       );
@@ -612,9 +408,7 @@ serve(async (req) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: {
-        full_name: fullName,
-      },
+      user_metadata: { full_name: fullName },
     });
 
     if (createUserError || !createdUserData.user) {
@@ -628,38 +422,27 @@ serve(async (req) => {
 
     const newUserId = createdUserData.user.id;
     const { error: profileUpsertError } = await serviceClient.from("profiles").upsert(
-      {
-        id: newUserId,
-        email,
-        full_name: fullName,
-        is_superadmin: false,
-      },
+      { id: newUserId, email, full_name: fullName, is_superadmin: false },
       { onConflict: "id" },
     );
 
     if (profileUpsertError) {
       await serviceClient.auth.admin.deleteUser(newUserId);
       return jsonResponse(
-        buildErrorBody("internal_error", "No se pudo crear el perfil del usuario.", {
-          supabaseMessage: profileUpsertError.message,
-        }),
+        buildErrorBody("internal_error", "No se pudo crear el perfil del usuario.", { supabaseMessage: profileUpsertError.message }),
         500,
         requestId,
       );
     }
 
     const roleRows = normalizedRoles.map((role) => ({ user_id: newUserId, role }));
-    const { error: rolesError } = await serviceClient.from("user_roles").upsert(roleRows, {
-      onConflict: "user_id,role",
-    });
+    const { error: rolesError } = await serviceClient.from("user_roles").upsert(roleRows, { onConflict: "user_id,role" });
 
     if (rolesError) {
       await serviceClient.auth.admin.deleteUser(newUserId);
       await serviceClient.from("profiles").delete().eq("id", newUserId);
       return jsonResponse(
-        buildErrorBody("bad_request", "No se pudieron asignar los roles.", {
-          supabaseMessage: rolesError.message,
-        }),
+        buildErrorBody("bad_request", "No se pudieron asignar los roles.", { supabaseMessage: rolesError.message }),
         400,
         requestId,
       );
@@ -670,57 +453,14 @@ serve(async (req) => {
         ok: true,
         userId: newUserId,
         email,
-        ...(shouldIncludeDebug()
-          ? {
-              debug: {
-                functionVersion: FUNCTION_VERSION,
-                requestId,
-                decision,
-                projectHost: functionProjectHost,
-                clientProvidedHost,
-              },
-            }
-          : {}),
+        ...(INCLUDE_DEBUG_IN_RESPONSE ? { debug: { requestId, functionVersion: FUNCTION_VERSION } } : {}),
       },
       201,
       requestId,
-      { decision, callerEmail, projectHost: functionProjectHost },
+      { decision: "UNKNOWN", callerEmail, callerId },
     );
   } catch (error) {
-    const authHeader = req.headers.get("authorization");
-    const token = authHeader?.startsWith("Bearer ") ? authHeader.replace("Bearer ", "").trim() : null;
-    const tokenClaims = token ? decodeJwtClaims(token) : null;
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-    const functionProjectHost = getHostname(SUPABASE_URL);
-    const debugPayload = buildDebugPayload({
-      requestId,
-      decision: "UNHANDLED_EXCEPTION",
-      projectHost: functionProjectHost,
-      hasAuthHeader: Boolean(authHeader),
-      tokenClaims: {
-        sub: typeof tokenClaims?.sub === "string" ? tokenClaims.sub : null,
-        email: normalizeEmail(typeof tokenClaims?.email === "string" ? tokenClaims.email : null),
-      },
-      callerId: null,
-      callerEmail: null,
-      profileById: null,
-      profileByEmail: null,
-      errors: [error instanceof Error ? error.message : String(error)],
-    });
-    console.error(
-      JSON.stringify({
-        function: FUNCTION_NAME,
-        functionVersion: FUNCTION_VERSION,
-        requestId,
-        stage: "exception",
-        error: error instanceof Error ? error.message : error,
-      }),
-    );
-    return jsonResponse(
-      buildErrorBody("internal_error", error instanceof Error ? error.message : "Error interno.", null, debugPayload),
-      500,
-      requestId,
-      responseDebugHeadersFromPayload(debugPayload),
-    );
+    console.error(JSON.stringify({ function: FUNCTION_NAME, functionVersion: FUNCTION_VERSION, stage: "exception", error: error instanceof Error ? error.message : String(error) }));
+    return jsonResponse(buildErrorBody("internal_error", "Error interno.", null), 500, requestId);
   }
 });
