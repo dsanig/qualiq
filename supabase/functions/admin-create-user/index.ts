@@ -56,9 +56,7 @@ const decodeJwtClaims = (token: string): Record<string, unknown> | null => {
   if (!payload) return null;
 
   try {
-    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const decoded = atob(normalizedPayload);
-    return JSON.parse(decoded) as Record<string, unknown>;
+    return new URL(value).hostname;
   } catch {
     return null;
   }
@@ -166,6 +164,9 @@ serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "").trim();
     const tokenClaims = decodeJwtClaims(token);
+    const functionProjectHost = getHostname(SUPABASE_URL);
+    const tokenIss = typeof tokenClaims?.iss === "string" ? tokenClaims.iss : null;
+    const tokenProjectHost = tokenIss ? getHostname(tokenIss) : null;
 
     if (DEBUG_LOGS) {
       console.info("[admin-create-user] auth diagnostics", {
