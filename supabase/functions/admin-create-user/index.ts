@@ -36,8 +36,6 @@ const ASSIGNABLE_ROLES = new Set(["Administrador", "Editor", "Espectador"]);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEBUG_LOGS = Deno.env.get("DEBUG_USER_CREATION") === "true";
 const INCLUDE_DEBUG_IN_RESPONSE = DEBUG_LOGS;
-const BOOTSTRAP_SUPERADMIN = Deno.env.get("BOOTSTRAP_SUPERADMIN") === "true";
-const ADMIN_BOOTSTRAP_EMAIL = "admin@admin.com";
 
 const normalizeRole = (role: string) => {
   const normalized = role.trim().toLowerCase();
@@ -57,16 +55,6 @@ const decodeJwtClaims = (token: string): Record<string, unknown> | null => {
   const payload = token.split(".")[1];
   if (!payload) return null;
 
-  try {
-    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const decoded = atob(normalizedPayload);
-    return JSON.parse(decoded) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-};
-
-const getHostname = (value: string) => {
   try {
     return new URL(value).hostname;
   } catch {
@@ -180,6 +168,16 @@ serve(async (req) => {
     const tokenIss = typeof tokenClaims?.iss === "string" ? tokenClaims.iss : null;
     const tokenProjectHost = tokenIss ? getHostname(tokenIss) : null;
 
+    if (DEBUG_LOGS) {
+      console.info("[admin-create-user] auth diagnostics", {
+        requestId,
+        hasAuthorizationHeader: Boolean(authHeader),
+        jwtSub: tokenClaims?.sub ?? null,
+        jwtEmail: tokenClaims?.email ?? null,
+        jwtRole: tokenClaims?.role ?? null,
+      });
+    }
+
     const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -196,109 +194,33 @@ serve(async (req) => {
       return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado."), 401, requestId);
     }
 
-    const callerEmail = (caller.email ?? "").trim().toLowerCase();
-
-    const { data: callerProfileById, error: callerProfileByIdError } = await serviceClient
+    const {
+      data: callerProfile,
+      error: callerProfileError,
+    } = await serviceClient
       .from("profiles")
       .select("id, email, is_superadmin")
       .eq("id", caller.id)
       .maybeSingle<CallerProfile>();
 
-    const { data: callerProfilesByEmail, error: callerProfileByEmailError } = await serviceClient
-      .from("profiles")
-      .select("id, email, is_superadmin")
-      .eq("email", callerEmail)
-      .limit(2);
-
-    const callerProfileByEmail = callerProfilesByEmail?.[0] ?? null;
-    const hasDuplicateEmailProfiles = (callerProfilesByEmail?.length ?? 0) > 1;
-
-    if (hasDuplicateEmailProfiles) {
-      return jsonResponse(
-        buildErrorBody(
-          "internal_error",
-          "Inconsistencia de datos: hay perfiles duplicados para el mismo email.",
-          { action: "Normaliza y deduplica public.profiles por email antes de continuar." },
-          {
-            requestId,
-            callerId: caller.id,
-            callerEmail,
-            duplicateEmailCount: callerProfilesByEmail?.length ?? 0,
-          },
-        ),
-        500,
-        requestId,
-      );
-    }
-
-    if (BOOTSTRAP_SUPERADMIN && callerEmail === ADMIN_BOOTSTRAP_EMAIL) {
-      const { error: bootstrapError } = await serviceClient.from("profiles").upsert(
-        {
-          id: caller.id,
-          email: callerEmail,
-          full_name: caller.user_metadata?.full_name ?? null,
-          is_superadmin: true,
-        },
-        { onConflict: "id" },
-      );
-
-      if (bootstrapError) {
-        return jsonResponse(
-          buildErrorBody(
-            "internal_error",
-            "No se pudo ejecutar el bootstrap de superadministrador.",
-            { supabaseMessage: bootstrapError.message },
-          ),
-          500,
-          requestId,
-        );
-      }
-    }
-
-    const effectiveCallerProfile = callerProfileById ?? callerProfileByEmail;
-    const roleSourceUsed = callerProfileById ? "profiles.id" : callerProfileByEmail ? "profiles.email" : "none";
-
-    const diagnosedCase =
-      functionProjectHost && tokenProjectHost && functionProjectHost !== tokenProjectHost
-        ? "CASE_D_ENV_MISMATCH"
-        : !callerProfileById && callerProfileByEmail
-          ? "CASE_A_PROFILE_ID_MISMATCH"
-          : !callerProfileById && !callerProfileByEmail
-            ? "CASE_B_PROFILE_MISSING"
-            : effectiveCallerProfile && !effectiveCallerProfile.is_superadmin
-              ? "CASE_C_SUPERADMIN_FALSE"
-              : "AUTHORIZED_OR_UNKNOWN";
-
     const debugPayload = {
-      requestId,
-      supabaseProjectHost: functionProjectHost,
-      tokenIssuerHost: tokenProjectHost,
+      roleSource: "profiles.is_superadmin",
       caller: {
         id: caller.id,
-        email: callerEmail || null,
+        email: caller.email ?? null,
       },
-      roleSourceUsed,
-      diagnosedCase,
-      callerProfileById: callerProfileById ?? null,
-      callerProfileByIdError: callerProfileByIdError ? callerProfileByIdError.message : null,
-      callerProfileByEmail: callerProfileByEmail ?? null,
-      callerProfileByEmailError: callerProfileByEmailError ? callerProfileByEmailError.message : null,
-      bootstrapEnabled: BOOTSTRAP_SUPERADMIN,
+      callerProfile: callerProfile ?? null,
+      callerProfileError: callerProfileError ? callerProfileError.message : null,
     };
 
     if (DEBUG_LOGS) {
-      console.info("[admin-create-user] diagnostics", debugPayload);
-    }
-
-    if (callerProfileByIdError || callerProfileByEmailError) {
-      return jsonResponse(
-        buildErrorBody("internal_error", "No se pudo validar el perfil del solicitante.", null, debugPayload),
-        500,
+      console.info("[admin-create-user] superadmin check", {
         requestId,
-      );
+        ...debugPayload,
+      });
     }
 
-    if (!effectiveCallerProfile?.is_superadmin) {
+    if (callerProfileError || !callerProfile?.is_superadmin) {
       return jsonResponse(
         buildErrorBody("NOT_SUPERADMIN", "Solo el superadministrador puede gestionar usuarios.", null, debugPayload),
         403,

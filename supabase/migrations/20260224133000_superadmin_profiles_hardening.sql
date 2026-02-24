@@ -1,5 +1,5 @@
 -- Hardening source of truth for superadmin authorization.
--- admin-create-user authorizes strictly with public.profiles.is_superadmin.
+-- admin-create-user now authorizes strictly with public.profiles.is_superadmin.
 
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS is_superadmin boolean;
@@ -14,29 +14,11 @@ WHERE is_superadmin IS NULL;
 ALTER TABLE public.profiles
   ALTER COLUMN is_superadmin SET NOT NULL;
 
--- Keep profile emails normalized and unique by lower(email).
+-- Keep profile emails normalized to lower-case and unique in a case-insensitive way.
 UPDATE public.profiles
 SET email = lower(email)
 WHERE email IS NOT NULL
   AND email <> lower(email);
-
-CREATE OR REPLACE FUNCTION public.normalize_profile_email()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  IF NEW.email IS NOT NULL THEN
-    NEW.email := lower(NEW.email);
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS trg_normalize_profile_email ON public.profiles;
-CREATE TRIGGER trg_normalize_profile_email
-BEFORE INSERT OR UPDATE ON public.profiles
-FOR EACH ROW
-EXECUTE FUNCTION public.normalize_profile_email();
 
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_email_lower_unique_idx
   ON public.profiles ((lower(email)))
@@ -55,8 +37,3 @@ UPDATE public.profiles
 SET is_superadmin = true,
     email = lower(email)
 WHERE lower(email) = 'admin@admin.com';
-
--- Manual one-off snippet for operators (replace UUID):
--- UPDATE public.profiles
--- SET is_superadmin = true
--- WHERE id = '00000000-0000-0000-0000-000000000000'::uuid;
