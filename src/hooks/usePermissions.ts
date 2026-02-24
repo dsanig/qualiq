@@ -45,8 +45,8 @@ export function usePermissions(): PermissionsState {
 
     const [superRes, adminRes, editorRes] = await Promise.all([
       rpcClient.rpc("is_superadmin", { uid: userId }),
-      rpcClient.rpc("has_role", { uid: userId, r: "Administrador" }),
-      rpcClient.rpc("has_role", { uid: userId, r: "Editor" }),
+      rpcClient.rpc("has_role", { _role: "Administrador", _user_id: userId }),
+      rpcClient.rpc("has_role", { _role: "Editor", _user_id: userId }),
     ]);
 
     setIsSuperadmin(!superRes.error && Boolean(superRes.data));

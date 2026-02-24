@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "verify:has-role-rpc": "node scripts/verify-has-role-rpc.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
