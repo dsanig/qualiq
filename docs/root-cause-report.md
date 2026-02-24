@@ -38,3 +38,46 @@ Se detectaron inconsistencias entre BD, RLS, backend y frontend: coexistían var
 - Administrador: gestión de empresa/usuarios + CRUD funcional (sin cambio de contraseñas).
 - Editor: edición de contenido y adjuntos sin acceso a empresa/usuarios.
 - Espectador: solo lectura.
+
+## Verificación post-migración (SQL)
+Ejecutar en SQL Editor del proyecto objetivo:
+
+```sql
+-- 1) Columnas esperadas
+select column_name, data_type, is_nullable, column_default
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'profiles'
+  and column_name in ('id', 'email', 'is_superadmin')
+order by column_name;
+
+-- 2) Índice único por email normalizado (requisito para diagnósticos por email)
+select indexname, indexdef
+from pg_indexes
+where schemaname = 'public'
+  and tablename = 'profiles'
+  and indexname = 'profiles_email_lower_unique_idx';
+
+-- 3) Estado de superadmin para admin@admin.com
+select id, email, is_superadmin
+from public.profiles
+where lower(email) = 'admin@admin.com';
+```
+
+## SQL manual de fallback (si hay datos legacy)
+Usar el `caller.id` obtenido de los logs de la Edge Function (no depender de `auth.users`):
+
+```sql
+-- Alinear fila del superadmin al UUID canónico del token actual
+insert into public.profiles (id, email, is_superadmin)
+values ('<CALLER_UUID>', 'admin@admin.com', true)
+on conflict (id) do update
+set email = excluded.email,
+    is_superadmin = true;
+
+-- Si existe fila antigua por email, forzar superadmin=true
+update public.profiles
+set is_superadmin = true,
+    email = lower(email)
+where lower(email) = 'admin@admin.com';
+```
