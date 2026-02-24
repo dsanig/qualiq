@@ -140,8 +140,16 @@ const buildErrorBody = (code: ErrorCode, message: string, details?: unknown, deb
   return body;
 };
 
-const jsonResponse = (body: unknown, status: number, requestId: string) =>
-  new Response(JSON.stringify(body), {
+type ResponseDebugHeaders = {
+  decision?: string;
+  callerEmail?: string | null;
+  projectHost?: string | null;
+};
+
+const jsonResponse = (body: unknown, status: number, requestId: string, debugHeaders?: ResponseDebugHeaders) => {
+  const includeDebug = shouldIncludeDebug();
+
+  return new Response(JSON.stringify(body), {
     status,
     headers: {
       ...corsHeaders,
@@ -150,6 +158,31 @@ const jsonResponse = (body: unknown, status: number, requestId: string) =>
       "x-function-version": FUNCTION_VERSION,
     },
   });
+};
+
+const responseDebugHeadersFromPayload = (debugPayload: { decision?: string; callerEmail?: string | null; projectHost?: string | null }) => ({
+  decision: debugPayload.decision ?? "UNKNOWN",
+  callerEmail: debugPayload.callerEmail ?? null,
+  projectHost: debugPayload.projectHost ?? null,
+});
+
+const buildDebugPayload = (payload: Partial<DebugPayload> & Pick<DebugPayload, "requestId" | "decision">): DebugPayload => ({
+  requestId: payload.requestId,
+  functionVersion: FUNCTION_VERSION,
+  projectHost: (payload.projectHost as string | null | undefined) ?? null,
+  hasAuthHeader: payload.hasAuthHeader ?? false,
+  tokenClaims: {
+    sub: payload.tokenClaims?.sub ?? null,
+    email: payload.tokenClaims?.email ?? null,
+  },
+  callerId: payload.callerId ?? null,
+  callerEmail: payload.callerEmail ?? null,
+  profileById: payload.profileById ?? null,
+  profileByEmail: payload.profileByEmail ?? null,
+  decision: payload.decision,
+  errors: payload.errors ?? [],
+  ...payload,
+});
 
 const buildDebugPayload = (payload: Partial<DebugPayload> & Pick<DebugPayload, "requestId" | "decision">): DebugPayload => ({
   requestId: payload.requestId,
@@ -205,6 +238,10 @@ const mapSupabaseAuthError = (message: string): { status: number; code: ErrorCod
 serve(async (req) => {
   const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
 
+  if (DEBUG_LOGS) {
+    console.info("[admin-create-user] hit", { requestId, FUNCTION_VERSION });
+  }
+
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -213,7 +250,11 @@ serve(async (req) => {
   }
 
   if (req.method !== "POST") {
-    return jsonResponse(buildErrorBody("bad_request", "Método no permitido."), 405, requestId);
+    return jsonResponse(buildErrorBody("bad_request", "Método no permitido."), 405, requestId, {
+      decision: "METHOD_NOT_ALLOWED",
+      callerEmail: null,
+      projectHost: null,
+    });
   }
 
   try {
@@ -256,6 +297,7 @@ serve(async (req) => {
         buildErrorBody("internal_error", "Variables de entorno de Supabase incompletas.", null, debugPayload),
         500,
         requestId,
+        responseDebugHeadersFromPayload(debugPayload),
       );
     }
 
@@ -275,7 +317,7 @@ serve(async (req) => {
         clientProvidedHost,
       });
       logDiagnostic(requestId, "deny", debugPayload);
-      return jsonResponse(buildErrorBody("unauthorized", "No autorizado.", null, debugPayload), 401, requestId);
+      return jsonResponse(buildErrorBody("unauthorized", "No autorizado.", null, debugPayload), 401, requestId, responseDebugHeadersFromPayload(debugPayload));
     }
 
     if (!authHeaderPrefixOk) {
@@ -294,7 +336,7 @@ serve(async (req) => {
         clientProvidedHost,
       });
       logDiagnostic(requestId, "deny", debugPayload);
-      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado.", null, debugPayload), 401, requestId);
+      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado.", null, debugPayload), 401, requestId, responseDebugHeadersFromPayload(debugPayload));
     }
 
     const token = authHeader.replace("Bearer ", "").trim();
@@ -354,7 +396,7 @@ serve(async (req) => {
         errors: authError?.message ? [authError.message] : [],
       });
       logDiagnostic(requestId, "deny", debugPayload);
-      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado.", null, debugPayload), 401, requestId);
+      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado.", null, debugPayload), 401, requestId, responseDebugHeadersFromPayload(debugPayload));
     }
 
     if ((tokenSub && !tokenSubMatchesCaller) || (tokenEmail && !tokenEmailMatchesCaller)) {
@@ -375,7 +417,7 @@ serve(async (req) => {
         tokenEmailMatchesCaller,
       });
       logDiagnostic(requestId, "deny", debugPayload);
-      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o inconsistente.", null, debugPayload), 401, requestId);
+      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o inconsistente.", null, debugPayload), 401, requestId, responseDebugHeadersFromPayload(debugPayload));
     }
 
     const byIdResult = await serviceClient
@@ -503,6 +545,7 @@ serve(async (req) => {
         buildErrorBody("internal_error", "Ambigüedad: email duplicado en profiles. Contacta soporte.", null, debugPayload),
         500,
         requestId,
+        responseDebugHeadersFromPayload(debugPayload),
       );
     }
 
@@ -511,6 +554,7 @@ serve(async (req) => {
         buildErrorBody("NOT_SUPERADMIN", "Solo el superadministrador puede gestionar usuarios.", null, debugPayload),
         403,
         requestId,
+        responseDebugHeadersFromPayload(debugPayload),
       );
     }
 
@@ -519,6 +563,7 @@ serve(async (req) => {
         buildErrorBody("internal_error", "No se pudo validar el perfil del solicitante.", null, debugPayload),
         500,
         requestId,
+        responseDebugHeadersFromPayload(debugPayload),
       );
     }
 
@@ -527,6 +572,7 @@ serve(async (req) => {
         buildErrorBody("NOT_SUPERADMIN", "Solo el superadministrador puede gestionar usuarios.", null, debugPayload),
         403,
         requestId,
+        responseDebugHeadersFromPayload(debugPayload),
       );
     }
 
@@ -638,6 +684,7 @@ serve(async (req) => {
       },
       201,
       requestId,
+      { decision, callerEmail, projectHost: functionProjectHost },
     );
   } catch (error) {
     const authHeader = req.headers.get("authorization");
@@ -673,6 +720,7 @@ serve(async (req) => {
       buildErrorBody("internal_error", error instanceof Error ? error.message : "Error interno.", null, debugPayload),
       500,
       requestId,
+      responseDebugHeadersFromPayload(debugPayload),
     );
   }
 });
