@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Building2, Mail, Plus, ToggleLeft } from "lucide-react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,6 +68,52 @@ export function CompanyView() {
   });
   const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const debugUserCreation = import.meta.env.DEV || import.meta.env.VITE_DEBUG_USER_CREATION === "true";
+
+  const extractFunctionErrorMessage = async (error: unknown) => {
+    if (error instanceof FunctionsHttpError) {
+      const response = error.context;
+      const requestId = response.headers.get("x-request-id") ?? response.headers.get("x-amzn-requestid");
+
+      let parsedBody: unknown = null;
+      const rawBody = await response.clone().text();
+      if (rawBody) {
+        try {
+          parsedBody = JSON.parse(rawBody);
+        } catch {
+          parsedBody = rawBody;
+        }
+      }
+
+      if (debugUserCreation) {
+        console.info("[company-users] function error", {
+          functionName: "admin-create-user",
+          status: response.status,
+          requestId,
+          body: parsedBody,
+        });
+      }
+
+      if (parsedBody && typeof parsedBody === "object") {
+        const maybeError = (parsedBody as { error?: { message?: string } | string }).error;
+        if (typeof maybeError === "string") {
+          return maybeError;
+        }
+        if (maybeError && typeof maybeError === "object" && typeof maybeError.message === "string") {
+          return maybeError.message;
+        }
+      }
+
+      return `Error del servidor (${response.status}).`;
+    }
+
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return "No se pudo crear el usuario.";
+  };
+
   const fetchUsers = useCallback(async () => {
     const { data, error } = await (supabase as any)
       .from("user_directory")
@@ -133,20 +180,44 @@ export function CompanyView() {
     }
 
     setIsSubmitting(true);
-    const { error } = await supabase.functions.invoke("admin-create-user", {
+    const createUserPayload = {
+      email: createForm.email,
+      password: createForm.password,
+      full_name: createForm.fullName,
+      role: createForm.role,
+    };
+
+    if (debugUserCreation) {
+      console.info("[company-users] invoking function", {
+        functionName: "admin-create-user",
+        payload: {
+          ...createUserPayload,
+          password: "[REDACTED]",
+        },
+      });
+    }
+
+    const { data, error } = await supabase.functions.invoke("admin-create-user", {
       body: {
-        email: createForm.email,
-        password: createForm.password,
-        full_name: createForm.fullName,
-        role: createForm.role,
+        ...createUserPayload,
       },
     });
+
+    if (debugUserCreation) {
+      console.info("[company-users] function response", {
+        functionName: "admin-create-user",
+        status: error ? "error" : "ok",
+        body: data,
+      });
+    }
+
     setIsSubmitting(false);
 
     if (error) {
+      const specificMessage = await extractFunctionErrorMessage(error);
       toast({
         title: "No se pudo crear el usuario",
-        description: error.message,
+        description: specificMessage,
         variant: "destructive",
       });
       return;

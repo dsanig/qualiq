@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -29,26 +30,78 @@ const normalizeRole = (role: string) => {
 };
 
 const ASSIGNABLE_ROLES = new Set(["Administrador", "Editor", "Espectador"]);
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DEBUG_LOGS = Deno.env.get("DEBUG_USER_CREATION") === "true";
+
+type ErrorCode =
+  | "bad_request"
+  | "unauthorized"
+  | "forbidden"
+  | "duplicate_email"
+  | "invalid_email"
+  | "weak_password"
+  | "permission_denied"
+  | "internal_error";
+
+const buildErrorBody = (code: ErrorCode, message: string, details?: unknown) => ({
+  ok: false,
+  error: {
+    code,
+    message,
+    details: details ?? null,
+  },
+});
+
+const jsonResponse = (body: unknown, status: number, requestId: string) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+      "x-request-id": requestId,
+    },
+  });
+
+const mapSupabaseAuthError = (message: string): { status: number; code: ErrorCode; message: string } => {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("already registered") || normalized.includes("already been registered") || normalized.includes("already exists")) {
+    return { status: 409, code: "duplicate_email", message: "El email ya existe." };
+  }
+
+  if (normalized.includes("invalid email")) {
+    return { status: 400, code: "invalid_email", message: "El email no es válido." };
+  }
+
+  if (normalized.includes("password") && (normalized.includes("weak") || normalized.includes("short") || normalized.includes("at least"))) {
+    return { status: 400, code: "weak_password", message: "La contraseña no cumple los requisitos de seguridad." };
+  }
+
+  if (normalized.includes("not allowed") || normalized.includes("permission")) {
+    return { status: 403, code: "permission_denied", message: "No tienes permisos para crear usuarios." };
+  }
+
+  return { status: 400, code: "bad_request", message: "No se pudo crear el usuario." };
+};
 
 serve(async (req) => {
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: { ...corsHeaders, "x-request-id": requestId },
+    });
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Método no permitido." }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse(buildErrorBody("bad_request", "Método no permitido."), 405, requestId);
   }
 
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "No autorizado." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(buildErrorBody("unauthorized", "No autorizado."), 401, requestId);
     }
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -68,10 +121,7 @@ serve(async (req) => {
     } = await anonClient.auth.getUser(token);
 
     if (authError || !caller) {
-      return new Response(JSON.stringify({ error: "Token inválido o expirado." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado."), 401, requestId);
     }
 
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -83,34 +133,52 @@ serve(async (req) => {
       .single();
 
     if (callerProfileError || !callerProfile?.is_superadmin) {
-      return new Response(JSON.stringify({ error: "Solo el superadministrador puede gestionar usuarios." }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(
+        buildErrorBody("forbidden", "Solo el superadministrador puede gestionar usuarios."),
+        403,
+        requestId
+      );
     }
 
     const payload = (await req.json()) as CreateUserPayload;
     const email = payload.email?.trim().toLowerCase();
     const password = payload.password?.trim();
     const fullName = payload.full_name?.trim() ?? null;
-    const requestedRoles = payload.roles ?? (payload.role ? [payload.role] : ["Espectador"]);
+    const requestedRoles = payload.roles ?? (payload.role ? [payload.role] : []);
+
+    if (DEBUG_LOGS) {
+      console.info("[admin-create-user] incoming payload", {
+        requestId,
+        email,
+        fullName,
+        role: payload.role,
+        roles: payload.roles,
+      });
+    }
 
     if (!email || !password || password.length < 8) {
-      return new Response(JSON.stringify({ error: "Email y contraseña válida (mínimo 8 caracteres) son obligatorios." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(
+        buildErrorBody("bad_request", "Email y contraseña válida (mínimo 8 caracteres) son obligatorios."),
+        400,
+        requestId
+      );
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      return jsonResponse(buildErrorBody("invalid_email", "El email no es válido."), 400, requestId);
+    }
+
+    if (requestedRoles.length === 0) {
+      return jsonResponse(buildErrorBody("bad_request", "Debes indicar al menos un rol."), 400, requestId);
     }
 
     const normalizedRoles = [...new Set(requestedRoles.map((role) => normalizeRole(role)).filter(Boolean))];
 
     if (normalizedRoles.length === 0 || normalizedRoles.some((role) => !ASSIGNABLE_ROLES.has(role))) {
-      return new Response(
-        JSON.stringify({ error: "Roles inválidos. Solo se permiten: Administrador, Editor y Espectador." }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+      return jsonResponse(
+        buildErrorBody("bad_request", "Roles inválidos. Solo se permiten: Administrador, Editor y Espectador."),
+        400,
+        requestId
       );
     }
 
@@ -124,10 +192,12 @@ serve(async (req) => {
     });
 
     if (createUserError || !createdUserData.user) {
-      return new Response(JSON.stringify({ error: createUserError?.message ?? "No se pudo crear el usuario." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const mapped = mapSupabaseAuthError(createUserError?.message ?? "No se pudo crear el usuario.");
+      return jsonResponse(
+        buildErrorBody(mapped.code, mapped.message, { supabaseMessage: createUserError?.message ?? null }),
+        mapped.status,
+        requestId
+      );
     }
 
     const newUserId = createdUserData.user.id;
@@ -143,10 +213,13 @@ serve(async (req) => {
 
     if (profileUpsertError) {
       await serviceClient.auth.admin.deleteUser(newUserId);
-      return new Response(JSON.stringify({ error: "No se pudo crear el perfil del usuario." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(
+        buildErrorBody("internal_error", "No se pudo crear el perfil del usuario.", {
+          supabaseMessage: profileUpsertError.message,
+        }),
+        500,
+        requestId
+      );
     }
 
     if (normalizedRoles.length > 0) {
@@ -158,28 +231,28 @@ serve(async (req) => {
       if (rolesError) {
         await serviceClient.auth.admin.deleteUser(newUserId);
         await serviceClient.from("profiles").delete().eq("id", newUserId);
-        return new Response(JSON.stringify({ error: `No se pudieron asignar los roles: ${rolesError.message}` }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse(
+          buildErrorBody("bad_request", "No se pudieron asignar los roles.", {
+            supabaseMessage: rolesError.message,
+          }),
+          400,
+          requestId
+        );
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        user_id: newUserId,
-        email,
-      }),
-      {
-        status: 201,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    const responseBody = { ok: true, userId: newUserId, email };
+    if (DEBUG_LOGS) {
+      console.info("[admin-create-user] success", { requestId, status: 201, body: responseBody });
+    }
+
+    return jsonResponse(responseBody, 201, requestId);
   } catch (error) {
-    console.error("[admin-create-user] error", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Error interno." }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("[admin-create-user] error", { requestId, error });
+    return jsonResponse(
+      buildErrorBody("internal_error", error instanceof Error ? error.message : "Error interno."),
+      500,
+      requestId
+    );
   }
 });
