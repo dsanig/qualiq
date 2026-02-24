@@ -21,15 +21,6 @@ type CallerProfile = {
   is_superadmin: boolean;
 };
 
-type SuperadminDecision =
-  | "profiles_by_id"
-  | "profiles_by_email_fallback_aligned"
-  | "profiles_by_email_fallback_bootstrapped"
-  | "no_profile"
-  | "false_flag"
-  | "bootstrap_disabled"
-  | "profile_lookup_error";
-
 type ErrorCode =
   | "bad_request"
   | "unauthorized"
@@ -41,15 +32,29 @@ type ErrorCode =
   | "permission_denied"
   | "internal_error";
 
+type Decision =
+  | "MISSING_AUTH"
+  | "INVALID_TOKEN"
+  | "TOKEN_RUNTIME_MISMATCH"
+  | "ENV_INCOMPLETE"
+  | "PROFILE_BY_ID_MISSING"
+  | "PROFILE_BY_ID_SUPERADMIN_FALSE"
+  | "PROFILE_BY_ID_SUPERADMIN_TRUE"
+  | "PROFILE_EMAIL_FALLBACK_SUPERADMIN_TRUE"
+  | "PROFILE_EMAIL_FALLBACK_NOT_ALLOWED"
+  | "PROFILE_AMBIGUOUS_EMAIL"
+  | "PROJECT_ENV_MISMATCH_SUSPECTED"
+  | "UNKNOWN_DENIAL";
+
 const ASSIGNABLE_ROLES = new Set(["Administrador", "Editor", "Espectador"]);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEBUG_LOGS = Deno.env.get("DEBUG_USER_CREATION") === "true";
 const INCLUDE_DEBUG_IN_RESPONSE = Deno.env.get("INCLUDE_DEBUG_IN_RESPONSE") === "true";
 const BOOTSTRAP_SUPERADMIN = Deno.env.get("BOOTSTRAP_SUPERADMIN") === "true";
+const BOOTSTRAP_ALIGN_PROFILE_ID = Deno.env.get("BOOTSTRAP_ALIGN_PROFILE_ID") === "true";
 const ADMIN_BOOTSTRAP_EMAIL = "admin@admin.com";
 const FUNCTION_NAME = "admin-create-user";
-const FUNCTION_VERSION =
-  Deno.env.get("FUNCTION_VERSION") ?? Deno.env.get("GIT_COMMIT_SHA") ?? Deno.env.get("DENO_DEPLOYMENT_ID") ?? "unknown";
+const FUNCTION_VERSION = "admin-create-user@diag-2";
 
 const normalizeRole = (role: string) => {
   const normalized = role.trim().toLowerCase();
@@ -73,6 +78,8 @@ const getHostname = (value: string): string | null => {
   }
 };
 
+const normalizeEmail = (value: string | null | undefined): string | null => value?.trim().toLowerCase() ?? null;
+
 const decodeJwtClaims = (token: string): Record<string, unknown> | null => {
   const payload = token.split(".")[1];
   if (!payload) return null;
@@ -87,7 +94,7 @@ const decodeJwtClaims = (token: string): Record<string, unknown> | null => {
 
 const logDiagnostic = (requestId: string, stage: string, data: Record<string, unknown>) => {
   if (!DEBUG_LOGS) return;
-  console.info(JSON.stringify({ function: FUNCTION_NAME, requestId, stage, ...data }));
+  console.info(JSON.stringify({ function: FUNCTION_NAME, functionVersion: FUNCTION_VERSION, requestId, stage, ...data }));
 };
 
 const buildErrorBody = (code: ErrorCode, message: string, details?: unknown, debug?: unknown) => {
@@ -108,7 +115,7 @@ const buildErrorBody = (code: ErrorCode, message: string, details?: unknown, deb
     },
   };
 
-  if (INCLUDE_DEBUG_IN_RESPONSE && debug) {
+  if (DEBUG_LOGS && INCLUDE_DEBUG_IN_RESPONSE && debug) {
     body.error.debug = debug;
   }
 
@@ -174,32 +181,76 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("authorization");
+    const authHeaderPrefixOk = Boolean(authHeader?.startsWith("Bearer "));
+    const hasAuthHeader = Boolean(authHeader);
+    const originHeader = req.headers.get("origin");
+    const clientProvidedHost = originHeader ? getHostname(originHeader) : null;
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const functionProjectHost = getHostname(SUPABASE_URL);
 
-    logDiagnostic(requestId, "env_fingerprint", {
+    logDiagnostic(requestId, "request_received", {
+      hasAuthHeader,
+      authHeaderPrefixOk,
       projectHost: functionProjectHost,
-      functionVersion: FUNCTION_VERSION,
+      clientProvidedHost,
       debugEnabled: DEBUG_LOGS,
       includeDebugInResponse: INCLUDE_DEBUG_IN_RESPONSE,
     });
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
+      const decision: Decision = "ENV_INCOMPLETE";
+      const debugPayload = {
+        functionVersion: FUNCTION_VERSION,
+        requestId,
+        decision,
+        projectHost: functionProjectHost,
+        clientProvidedHost,
+      };
+      logDiagnostic(requestId, "deny", debugPayload);
       return jsonResponse(
-        buildErrorBody("internal_error", "Variables de entorno de Supabase incompletas."),
+        buildErrorBody("internal_error", "Variables de entorno de Supabase incompletas.", null, debugPayload),
         500,
         requestId,
       );
     }
 
-    if (!authHeader?.startsWith("Bearer ")) {
-      return jsonResponse(buildErrorBody("unauthorized", "No autorizado."), 401, requestId);
+    if (!hasAuthHeader) {
+      const decision: Decision = "MISSING_AUTH";
+      const debugPayload = {
+        functionVersion: FUNCTION_VERSION,
+        requestId,
+        decision,
+        hasAuthHeader,
+        authHeaderPrefixOk,
+        projectHost: functionProjectHost,
+        clientProvidedHost,
+      };
+      logDiagnostic(requestId, "deny", debugPayload);
+      return jsonResponse(buildErrorBody("unauthorized", "No autorizado.", null, debugPayload), 401, requestId);
+    }
+
+    if (!authHeaderPrefixOk) {
+      const decision: Decision = "INVALID_TOKEN";
+      const debugPayload = {
+        functionVersion: FUNCTION_VERSION,
+        requestId,
+        decision,
+        hasAuthHeader,
+        authHeaderPrefixOk,
+        projectHost: functionProjectHost,
+        clientProvidedHost,
+      };
+      logDiagnostic(requestId, "deny", debugPayload);
+      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado.", null, debugPayload), 401, requestId);
     }
 
     const token = authHeader.replace("Bearer ", "").trim();
     const tokenClaims = decodeJwtClaims(token);
+    const tokenSub = typeof tokenClaims?.sub === "string" ? tokenClaims.sub : null;
+    const tokenEmail = normalizeEmail(typeof tokenClaims?.email === "string" ? tokenClaims.email : null);
     const tokenIss = typeof tokenClaims?.iss === "string" ? tokenClaims.iss : null;
     const tokenProjectHost = tokenIss ? getHostname(tokenIss) : null;
 
@@ -215,27 +266,64 @@ serve(async (req) => {
       error: authError,
     } = await anonClient.auth.getUser(token);
 
-    logDiagnostic(requestId, "auth_and_caller", {
-      hasAuthHeader: Boolean(authHeader),
+    const callerEmail = normalizeEmail(caller?.email ?? null);
+    const tokenSubMatchesCaller = Boolean(tokenSub && caller?.id && tokenSub === caller.id);
+    const tokenEmailMatchesCaller = Boolean(tokenEmail && callerEmail && tokenEmail === callerEmail);
+
+    logDiagnostic(requestId, "auth_pipeline", {
+      hasAuthHeader,
+      authHeaderPrefixOk,
+      tokenClaims: {
+        sub: tokenSub,
+        email: tokenEmail,
+      },
       callerId: caller?.id ?? null,
-      callerEmail: caller?.email ?? null,
-      tokenSub: tokenClaims?.sub ?? null,
-      tokenEmail: tokenClaims?.email ?? null,
+      callerEmail,
+      tokenSubMatchesCaller,
+      tokenEmailMatchesCaller,
       tokenProjectHost,
       authError: authError?.message ?? null,
     });
 
     if (authError || !caller) {
-      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado."), 401, requestId);
+      const decision: Decision = "INVALID_TOKEN";
+      const debugPayload = {
+        functionVersion: FUNCTION_VERSION,
+        requestId,
+        decision,
+        projectHost: functionProjectHost,
+        clientProvidedHost,
+        hasAuthHeader,
+        authHeaderPrefixOk,
+        tokenClaims: { sub: tokenSub, email: tokenEmail },
+        callerId: null,
+        callerEmail: null,
+        tokenSubMatchesCaller,
+        tokenEmailMatchesCaller,
+      };
+      logDiagnostic(requestId, "deny", debugPayload);
+      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o expirado.", null, debugPayload), 401, requestId);
     }
 
-    const countProbe = await serviceClient.from("profiles").select("id", { count: "exact", head: true }).limit(1);
-    logDiagnostic(requestId, "db_probe", {
-      profilesCount: countProbe.count ?? null,
-      error: countProbe.error?.message ?? null,
-    });
-
-    const normalizedCallerEmail = caller.email?.trim().toLowerCase() ?? null;
+    if ((tokenSub && !tokenSubMatchesCaller) || (tokenEmail && !tokenEmailMatchesCaller)) {
+      const decision: Decision = "TOKEN_RUNTIME_MISMATCH";
+      const debugPayload = {
+        functionVersion: FUNCTION_VERSION,
+        requestId,
+        decision,
+        projectHost: functionProjectHost,
+        clientProvidedHost,
+        hasAuthHeader,
+        authHeaderPrefixOk,
+        tokenClaims: { sub: tokenSub, email: tokenEmail },
+        callerId: caller.id,
+        callerEmail,
+        tokenSubMatchesCaller,
+        tokenEmailMatchesCaller,
+      };
+      logDiagnostic(requestId, "deny", debugPayload);
+      return jsonResponse(buildErrorBody("unauthorized", "Token inválido o inconsistente.", null, debugPayload), 401, requestId);
+    }
 
     const byIdResult = await serviceClient
       .from("profiles")
@@ -243,63 +331,140 @@ serve(async (req) => {
       .eq("id", caller.id)
       .maybeSingle<CallerProfile>();
 
-    const byEmailResult = normalizedCallerEmail
+    const byEmailResult = callerEmail
       ? await serviceClient
           .from("profiles")
           .select("id, email, is_superadmin")
-          .ilike("email", normalizedCallerEmail)
+          .ilike("email", callerEmail)
           .maybeSingle<CallerProfile>()
       : { data: null, error: null };
 
+    const emailCountResult = callerEmail
+      ? await serviceClient.from("profiles").select("id", { count: "exact", head: true }).ilike("email", callerEmail)
+      : { count: 0, error: null };
+
+    const profileByIdFound = Boolean(byIdResult.data);
+    const profileByEmailFound = Boolean(byEmailResult.data);
+    const profileByIdSuperadmin = byIdResult.data?.is_superadmin ?? null;
+    const profileByEmailSuperadmin = byEmailResult.data?.is_superadmin ?? null;
+    const profileEmailCount = emailCountResult.count ?? 0;
+
+    let decision: Decision = "UNKNOWN_DENIAL";
+
+    if (byIdResult.error || byEmailResult.error || emailCountResult.error) {
+      decision = "UNKNOWN_DENIAL";
+    } else if (tokenProjectHost && functionProjectHost && tokenProjectHost !== functionProjectHost) {
+      decision = "PROJECT_ENV_MISMATCH_SUSPECTED";
+    } else if (byIdResult.data?.is_superadmin) {
+      decision = "PROFILE_BY_ID_SUPERADMIN_TRUE";
+    } else if (profileByIdFound && !byIdResult.data?.is_superadmin) {
+      decision = "PROFILE_BY_ID_SUPERADMIN_FALSE";
+    } else if (!profileByIdFound && profileEmailCount > 1) {
+      decision = "PROFILE_AMBIGUOUS_EMAIL";
+    } else if (!profileByIdFound && byEmailResult.data?.is_superadmin) {
+      decision = "PROFILE_EMAIL_FALLBACK_SUPERADMIN_TRUE";
+    } else if (!profileByIdFound) {
+      decision = "PROFILE_BY_ID_MISSING";
+    }
+
     let callerProfile = byIdResult.data ?? null;
-    let decision: SuperadminDecision = "no_profile";
+    const canRecoveryBootstrap = BOOTSTRAP_SUPERADMIN && callerEmail === ADMIN_BOOTSTRAP_EMAIL;
 
-    const canBootstrapAdmin = BOOTSTRAP_SUPERADMIN && normalizedCallerEmail === ADMIN_BOOTSTRAP_EMAIL;
-
-    if (byIdResult.error || byEmailResult.error) {
-      decision = "profile_lookup_error";
-    } else if (callerProfile?.is_superadmin) {
-      decision = "profiles_by_id";
-    } else if (callerProfile && !callerProfile.is_superadmin) {
-      decision = "false_flag";
-    } else if (byEmailResult.data?.is_superadmin) {
-      if (canBootstrapAdmin) {
-        const alignResult = await serviceClient.from("profiles").upsert(
-          {
-            id: caller.id,
-            email: normalizedCallerEmail,
-            full_name: caller.user_metadata?.full_name ?? caller.user_metadata?.name ?? null,
-            is_superadmin: true,
-          },
-          { onConflict: "id" },
-        ).select("id, email, is_superadmin").maybeSingle<CallerProfile>();
-
-        callerProfile = alignResult.data ?? null;
-        decision = alignResult.error
-          ? "profile_lookup_error"
-          : byEmailResult.data.id === caller.id
-          ? "profiles_by_email_fallback_aligned"
-          : "profiles_by_email_fallback_bootstrapped";
+    if (!callerProfile?.is_superadmin && decision === "PROFILE_EMAIL_FALLBACK_SUPERADMIN_TRUE") {
+      if (profileEmailCount > 1) {
+        decision = "PROFILE_AMBIGUOUS_EMAIL";
       } else {
-        decision = "bootstrap_disabled";
+        callerProfile = byEmailResult.data;
+        if (BOOTSTRAP_ALIGN_PROFILE_ID) {
+          const alignResult = await serviceClient.from("profiles").upsert(
+            {
+              id: caller.id,
+              email: callerEmail,
+              full_name: caller.user_metadata?.full_name ?? caller.user_metadata?.name ?? null,
+              is_superadmin: true,
+            },
+            { onConflict: "id" },
+          );
+
+          if (alignResult.error) {
+            decision = "UNKNOWN_DENIAL";
+          }
+        }
       }
     }
 
+    if (!callerProfile?.is_superadmin && canRecoveryBootstrap && decision !== "PROFILE_AMBIGUOUS_EMAIL") {
+      const bootstrapResult = await serviceClient.from("profiles").upsert(
+        {
+          id: caller.id,
+          email: callerEmail,
+          full_name: caller.user_metadata?.full_name ?? caller.user_metadata?.name ?? null,
+          is_superadmin: true,
+        },
+        { onConflict: "id" },
+      ).select("id, email, is_superadmin").maybeSingle<CallerProfile>();
+
+      if (!bootstrapResult.error && bootstrapResult.data?.is_superadmin) {
+        callerProfile = bootstrapResult.data;
+        decision = "PROFILE_EMAIL_FALLBACK_SUPERADMIN_TRUE";
+      }
+    }
+
+    if (
+      decision === "PROFILE_BY_ID_MISSING" &&
+      (!profileByEmailFound || !profileByEmailSuperadmin)
+    ) {
+      decision = "PROFILE_EMAIL_FALLBACK_NOT_ALLOWED";
+    }
+
     const debugPayload = {
+      functionVersion: FUNCTION_VERSION,
       requestId,
+      decision,
+      projectHost: functionProjectHost,
+      clientProvidedHost,
+      tokenProjectHost,
+      hasAuthHeader,
+      authHeaderPrefixOk,
+      tokenClaims: {
+        sub: tokenSub,
+        email: tokenEmail,
+      },
       callerId: caller.id,
-      callerEmail: normalizedCallerEmail,
+      callerEmail,
+      tokenSubMatchesCaller,
+      tokenEmailMatchesCaller,
+      profileByIdFound,
+      profileByEmailFound,
+      profileByIdSuperadmin,
+      profileByEmailSuperadmin,
+      profileEmailCount,
       profileById: byIdResult.data ?? null,
       profileByEmail: byEmailResult.data ?? null,
       byIdError: byIdResult.error?.message ?? null,
       byEmailError: byEmailResult.error?.message ?? null,
-      decision,
-      projectHost: functionProjectHost,
+      byEmailCountError: emailCountResult.error?.message ?? null,
     };
 
-    logDiagnostic(requestId, "superadmin_check", debugPayload);
+    logDiagnostic(requestId, "superadmin_authorization", debugPayload);
 
-    if (decision === "profile_lookup_error") {
+    if (decision === "PROFILE_AMBIGUOUS_EMAIL") {
+      return jsonResponse(
+        buildErrorBody("internal_error", "Ambigüedad: email duplicado en profiles. Contacta soporte.", null, debugPayload),
+        500,
+        requestId,
+      );
+    }
+
+    if (decision === "PROJECT_ENV_MISMATCH_SUSPECTED") {
+      return jsonResponse(
+        buildErrorBody("NOT_SUPERADMIN", "Solo el superadministrador puede gestionar usuarios.", null, debugPayload),
+        403,
+        requestId,
+      );
+    }
+
+    if (byIdResult.error || byEmailResult.error || emailCountResult.error) {
       return jsonResponse(
         buildErrorBody("internal_error", "No se pudo validar el perfil del solicitante.", null, debugPayload),
         500,
@@ -409,13 +574,31 @@ serve(async (req) => {
         ok: true,
         userId: newUserId,
         email,
-        ...(INCLUDE_DEBUG_IN_RESPONSE ? { debug: { requestId, decision, projectHost: functionProjectHost } } : {}),
+        ...(DEBUG_LOGS && INCLUDE_DEBUG_IN_RESPONSE
+          ? {
+              debug: {
+                functionVersion: FUNCTION_VERSION,
+                requestId,
+                decision,
+                projectHost: functionProjectHost,
+                clientProvidedHost,
+              },
+            }
+          : {}),
       },
       201,
       requestId,
     );
   } catch (error) {
-    console.error(JSON.stringify({ function: FUNCTION_NAME, requestId, stage: "exception", error: error instanceof Error ? error.message : error }));
+    console.error(
+      JSON.stringify({
+        function: FUNCTION_NAME,
+        functionVersion: FUNCTION_VERSION,
+        requestId,
+        stage: "exception",
+        error: error instanceof Error ? error.message : error,
+      }),
+    );
     return jsonResponse(
       buildErrorBody("internal_error", error instanceof Error ? error.message : "Error interno."),
       500,
