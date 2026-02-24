@@ -173,7 +173,7 @@ export function CompanyView() {
       if (!superRes.error && Boolean(superRes.data)) {
         detectedRole = "Superadmin";
       } else {
-        const adminRes = await (supabase as any).rpc("has_role", { uid: session.user.id, r: "Administrador" });
+        const adminRes = await (supabase as any).rpc("has_role", { _role: "Administrador", _user_id: session.user.id });
         if (!adminRes.error && Boolean(adminRes.data)) detectedRole = "Administrador";
       }
 

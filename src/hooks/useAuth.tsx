@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const readIsAdministrador = async (userId: string) => {
-    const { data, error } = await rpcClient.rpc("has_role", { uid: userId, r: "Administrador" });
+    const { data, error } = await rpcClient.rpc("has_role", { _role: "Administrador", _user_id: userId });
     if (!error) return Boolean(data);
     return false;
   };
