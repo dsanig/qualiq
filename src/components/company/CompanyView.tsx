@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import {
   Dialog,
   DialogContent,
@@ -119,12 +120,10 @@ export function CompanyView() {
       return `Error del servidor (${response.status}).`;
     }
 
-    try {
-      const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-      return JSON.parse(decoded) as Record<string, unknown>;
-    } catch {
-      return null;
+    if (error instanceof Error) {
+      return error.message;
     }
+    return "Error desconocido.";
   };
 
   const fetchUsers = useCallback(async () => {

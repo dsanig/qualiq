@@ -240,7 +240,7 @@ serve(async (req) => {
     const { data: profileById, error: profileByIdError } = await serviceClient
       .from("profiles")
       .select("id,email,is_superadmin")
-      .eq("id", callerId)
+      .eq("user_id", callerId)
       .maybeSingle<CallerProfile>();
 
     if (profileByIdError) {
@@ -289,18 +289,15 @@ serve(async (req) => {
     logDiagnostic(requestId, "authorization_decision", debugPayload);
 
     if (!effectiveProfile?.is_superadmin) {
-      const deniedDecision: Decision = (
-        [
-          "NOT_SUPERADMIN_BY_ID",
-          "PROFILE_MISSING",
-          "PROFILE_SUPERADMIN_FALSE",
-          "AUTH_MISSING",
-          "AUTH_INVALID",
-          "ENV_MISMATCH_SUSPECTED",
-        ] as const
-      ).includes(decision as Decision)
-        ? (decision as Decision)
-        : "UNKNOWN";
+      const knownDenials = new Set<Decision>([
+        "NOT_SUPERADMIN_BY_ID",
+        "PROFILE_MISSING",
+        "PROFILE_SUPERADMIN_FALSE",
+        "AUTH_MISSING",
+        "AUTH_INVALID",
+        "ENV_MISMATCH_SUSPECTED",
+      ]);
+      const deniedDecision: Decision = knownDenials.has(decision) ? decision : "UNKNOWN";
 
       return jsonResponse(
         buildErrorBody(
