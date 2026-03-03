@@ -25,8 +25,8 @@ export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center">
-              <Shield className="w-5 h-5 text-accent-foreground" />
+            <div className="w-9 h-9 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
+              <img src="/iQ_V1.svg" alt="QualiQ logo" className="w-5 h-5" />
             </div>
             <span className="font-bold text-xl tracking-tight text-foreground">QualiQ</span>
           </div>
@@ -146,8 +146,8 @@ export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
         <div className="container mx-auto max-w-6xl">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
-                <Shield className="w-4 h-4 text-accent-foreground" />
+              <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
+                <img src="/iQ_V1.svg" alt="QualiQ logo" className="w-4 h-4" />
               </div>
               <span className="font-bold text-foreground">QualiQ</span>
             </div>
