@@ -14,6 +14,7 @@ import {
   Download,
   Trash2,
   X,
+  ArrowRightLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,6 +123,22 @@ const statusConfig = {
   obsolete: { label: "Obsoleto", icon: AlertCircle, class: "text-destructive" },
 };
 
+const statusOptions = [
+  { value: "draft", label: "Borrador" },
+  { value: "review", label: "En Revisión" },
+  { value: "approved", label: "Aprobado" },
+];
+
+interface StatusChangeRecord {
+  id: string;
+  old_status: string | null;
+  new_status: string;
+  changed_by: string;
+  changed_at: string;
+  comment: string | null;
+  changerName?: string;
+}
+
 interface DocumentsViewProps {
   mode?: "documents" | "processes";
   searchQuery: string;
@@ -180,6 +197,15 @@ export function DocumentsView({
   // Version history
   const [versionHistory, setVersionHistory] = useState<VersionRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Status change state
+  const [isChangeStatusOpen, setIsChangeStatusOpen] = useState(false);
+  const [changeStatusTarget, setChangeStatusTarget] = useState<string>("draft");
+  const [changeStatusComment, setChangeStatusComment] = useState("");
+  const [isChangingStatus, setIsChangingStatus] = useState(false);
+  const [statusHistory, setStatusHistory] = useState<StatusChangeRecord[]>([]);
+  const [isStatusHistoryOpen, setIsStatusHistoryOpen] = useState(false);
+  const [isLoadingStatusHistory, setIsLoadingStatusHistory] = useState(false);
 
   // New document form state
   const [newDocCode, setNewDocCode] = useState("");
@@ -303,6 +329,75 @@ export function DocumentsView({
     } finally {
       setIsEditSaving(false);
     }
+  };
+
+  // --- Status change ---
+  const handleOpenChangeStatus = (doc: Document) => {
+    setSelectedDocument(doc);
+    setChangeStatusTarget(doc.status);
+    setChangeStatusComment("");
+    setIsChangeStatusOpen(true);
+  };
+
+  const handleChangeStatus = async () => {
+    if (!selectedDocument || !user) return;
+    if (changeStatusTarget === selectedDocument.status) {
+      toast({ title: "Sin cambios", description: "Selecciona un estado diferente.", variant: "destructive" });
+      return;
+    }
+    setIsChangingStatus(true);
+    try {
+      // Update document status
+      const { error: updateError } = await supabase.from("documents").update({
+        status: changeStatusTarget as any,
+      }).eq("id", selectedDocument.id);
+      if (updateError) throw updateError;
+
+      // Record the status change
+      const { error: insertError } = await (supabase as any).from("document_status_changes").insert({
+        document_id: selectedDocument.id,
+        old_status: selectedDocument.status,
+        new_status: changeStatusTarget,
+        changed_by: user.id,
+        comment: changeStatusComment.trim() || null,
+      });
+      if (insertError) throw insertError;
+
+      const statusLabel = statusOptions.find(s => s.value === changeStatusTarget)?.label || changeStatusTarget;
+      toast({ title: "Estado actualizado", description: `El documento ahora está en "${statusLabel}".` });
+      setIsChangeStatusOpen(false);
+      fetchDocuments();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsChangingStatus(false);
+    }
+  };
+
+  const fetchStatusHistory = async (docId: string) => {
+    setIsLoadingStatusHistory(true);
+    const { data, error } = await (supabase as any)
+      .from("document_status_changes")
+      .select("id, old_status, new_status, changed_by, changed_at, comment")
+      .eq("document_id", docId)
+      .order("changed_at", { ascending: false });
+    if (!error && data) {
+      const userIds = [...new Set((data as StatusChangeRecord[]).map(s => s.changed_by))];
+      const { data: profiles } = userIds.length
+        ? await supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds)
+        : { data: [] };
+      const nameMap = new Map((profiles || []).map(p => [p.user_id, p.full_name || p.email || p.user_id]));
+      setStatusHistory((data as StatusChangeRecord[]).map(s => ({ ...s, changerName: nameMap.get(s.changed_by) || s.changed_by })));
+    } else {
+      setStatusHistory([]);
+    }
+    setIsLoadingStatusHistory(false);
+  };
+
+  const handleOpenStatusHistory = (doc: Document) => {
+    setSelectedDocument(doc);
+    setIsStatusHistoryOpen(true);
+    fetchStatusHistory(doc.id);
   };
 
   // --- Version history ---
@@ -824,7 +919,8 @@ export function DocumentsView({
                               onViewHistory={() => handleOpenHistory(doc)}
                               onViewOwners={() => handleOpenOwners(doc)}
                               onDownload={() => handleDownload(doc)}
-                              onSign={() => handleOpenSign(doc)}
+                               onSign={() => handleOpenSign(doc)}
+                               onChangeStatus={() => handleOpenChangeStatus(doc)}
                               onShare={() => handleAction("Compartir", doc.code)}
                               onArchive={() => handleAction("Archivar", doc.code)}
                               onToggleLock={() => handleAction("Bloquear/Desbloquear", doc.code)}
@@ -1097,7 +1193,6 @@ export function DocumentsView({
                     <SelectItem value="draft">Borrador</SelectItem>
                     <SelectItem value="review">En Revisión</SelectItem>
                     <SelectItem value="approved">Aprobado</SelectItem>
-                    <SelectItem value="obsolete">Obsoleto</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1203,6 +1298,98 @@ export function DocumentsView({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsOwnersOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Status Dialog */}
+      <Dialog open={isChangeStatusOpen} onOpenChange={setIsChangeStatusOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cambiar estado del documento</DialogTitle>
+            <DialogDescription>
+              Selecciona el nuevo estado para {selectedDocument?.code ?? "el documento"}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Estado actual</Label>
+              <p className="text-sm font-medium text-foreground">
+                {selectedDocument ? (statusConfig[selectedDocument.status]?.label ?? selectedDocument.status) : "—"}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Nuevo estado</Label>
+              <Select value={changeStatusTarget} onValueChange={setChangeStatusTarget}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Comentario (opcional)</Label>
+              <Textarea
+                placeholder="Motivo del cambio de estado..."
+                rows={3}
+                value={changeStatusComment}
+                onChange={(e) => setChangeStatusComment(e.target.value)}
+              />
+            </div>
+            <Button variant="outline" size="sm" className="w-full" onClick={() => { if (selectedDocument) handleOpenStatusHistory(selectedDocument); }}>
+              <ArrowRightLeft className="w-3.5 h-3.5 mr-2" />
+              Ver historial de estados
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsChangeStatusOpen(false)}>Cancelar</Button>
+            <Button
+              variant="accent"
+              onClick={handleChangeStatus}
+              disabled={isChangingStatus || changeStatusTarget === selectedDocument?.status}
+            >
+              {isChangingStatus ? "Guardando..." : "Cambiar estado"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Status History Dialog */}
+      <Dialog open={isStatusHistoryOpen} onOpenChange={setIsStatusHistoryOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Historial de estados</DialogTitle>
+            <DialogDescription>
+              Cambios de estado de {selectedDocument?.code ?? "el documento"}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm max-h-96 overflow-y-auto">
+            {isLoadingStatusHistory && <p className="text-center py-4 text-muted-foreground">Cargando historial...</p>}
+            {!isLoadingStatusHistory && statusHistory.length === 0 && (
+              <p className="text-center py-4 text-muted-foreground">No hay cambios de estado registrados.</p>
+            )}
+            {statusHistory.map((entry) => {
+              const oldLabel = entry.old_status ? (statusConfig[entry.old_status as keyof typeof statusConfig]?.label ?? entry.old_status) : "—";
+              const newLabel = statusConfig[entry.new_status as keyof typeof statusConfig]?.label ?? entry.new_status;
+              return (
+                <div key={entry.id} className="border border-border rounded-lg p-3 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">{oldLabel}</span>
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="font-medium text-foreground">{newLabel}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Por {entry.changerName} el {new Date(entry.changed_at).toLocaleString("es-ES")}
+                  </p>
+                  {entry.comment && <p className="text-xs text-muted-foreground">Comentario: {entry.comment}</p>}
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsStatusHistoryOpen(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

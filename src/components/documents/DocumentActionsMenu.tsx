@@ -10,7 +10,8 @@ import {
   Unlock, 
   Eye,
   Trash2,
-  PenTool
+  PenTool,
+  ArrowRightLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,7 @@ interface DocumentActionsMenuProps {
   onView?: () => void;
   onDelete?: () => void;
   onSign?: () => void;
+  onChangeStatus?: () => void;
 }
 
 export function DocumentActionsMenu({
@@ -49,6 +51,7 @@ export function DocumentActionsMenu({
   onView,
   onDelete,
   onSign,
+  onChangeStatus,
 }: DocumentActionsMenuProps) {
   return (
     <DropdownMenu>
@@ -65,6 +68,10 @@ export function DocumentActionsMenu({
         <DropdownMenuItem onClick={onEdit} disabled={isLocked} className="cursor-pointer">
           <Pencil className="w-4 h-4 mr-2" />
           Editar
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onChangeStatus} className="cursor-pointer">
+          <ArrowRightLeft className="w-4 h-4 mr-2" />
+          Cambiar Estado
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onViewHistory} className="cursor-pointer">
