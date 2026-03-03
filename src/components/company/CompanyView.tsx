@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Building2, Mail, Plus, ToggleLeft } from "lucide-react";
+import { Building2, Mail, Plus, ToggleLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -374,6 +374,40 @@ export function CompanyView() {
     setIsPasswordDialogOpen(false);
   };
 
+  const handleDeleteUser = async (targetUserId: string, email: string) => {
+    if (!confirm(`¿Seguro que quieres eliminar al usuario ${email}? Esta acción no se puede deshacer.`)) return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      toast({ title: "Sesión inválida", variant: "destructive" });
+      return;
+    }
+
+    const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-delete-user`;
+    const res = await fetch(functionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ target_user_id: targetUserId }),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toast({
+        title: "No se pudo eliminar el usuario",
+        description: (body as any)?.error ?? "Error desconocido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: "Usuario eliminado" });
+    void fetchUsers();
+  };
+
   if (!canManageCompany) {
     return (
       <div className="bg-card rounded-lg border border-border p-6 space-y-4">
@@ -510,15 +544,6 @@ export function CompanyView() {
 
         <TabsContent value="usuarios" className="mt-6">
           <div className="bg-card rounded-lg border border-border p-6 space-y-4">
-            {import.meta.env.DEV && (
-              <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground" data-testid="dev-auth-diagnostics">
-                <p className="font-medium text-foreground">Diagnóstico (DEV)</p>
-                <p>user.id: {user?.id ?? "-"}</p>
-                <p>email: {user?.email ?? "-"}</p>
-                <p>rol detectado: {devDetectedRole}</p>
-                <p>company_id: {profile?.company_id ?? "-"}</p>
-              </div>
-            )}
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-foreground">Usuarios</h3>
@@ -547,17 +572,29 @@ export function CompanyView() {
                     <span className="text-xs bg-secondary px-2 py-1 rounded-full">
                       {userItem.is_superadmin ? "Superadministrador" : userItem.role}
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      data-testid={`change-password-${userItem.id}`}
-                      onClick={() => {
-                        setSelectedUserId(userItem.id);
-                        setIsPasswordDialogOpen(true);
-                      }}
-                    >
-                      Cambiar contraseña
-                    </Button>
+                    {canManagePasswords && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        data-testid={`change-password-${userItem.id}`}
+                        onClick={() => {
+                          setSelectedUserId(userItem.id);
+                          setIsPasswordDialogOpen(true);
+                        }}
+                      >
+                        Cambiar contraseña
+                      </Button>
+                    )}
+                    {isSuperadmin && !userItem.is_superadmin && userItem.id !== user?.id && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteUser(userItem.id, userItem.email)}
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        Eliminar
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
