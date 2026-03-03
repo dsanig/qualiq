@@ -354,8 +354,17 @@ serve(async (req) => {
     }
 
     const newUserId = createdUserData.user.id;
+
+    // Get the caller's company_id to assign to the new user
+    const { data: callerFullProfile } = await serviceClient
+      .from("profiles")
+      .select("company_id")
+      .eq("user_id", callerId)
+      .maybeSingle();
+    const callerCompanyId = callerFullProfile?.company_id ?? null;
+
     const { error: profileUpsertError } = await serviceClient.from("profiles").upsert(
-      { user_id: newUserId, email, full_name: fullName, is_superadmin: false },
+      { user_id: newUserId, email, full_name: fullName, is_superadmin: false, company_id: callerCompanyId },
       { onConflict: "user_id" },
     );
 
