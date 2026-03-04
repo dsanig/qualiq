@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { DocumentActionsMenu } from "./DocumentActionsMenu";
+import { DocumentResponsibilities } from "./DocumentResponsibilities";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -206,7 +207,9 @@ export function DocumentsView({
   const [statusHistory, setStatusHistory] = useState<StatusChangeRecord[]>([]);
   const [isStatusHistoryOpen, setIsStatusHistoryOpen] = useState(false);
   const [isLoadingStatusHistory, setIsLoadingStatusHistory] = useState(false);
-
+  
+  // Responsibilities state
+  const [isResponsibilitiesOpen, setIsResponsibilitiesOpen] = useState(false);
   // New document form state
   const [newDocCode, setNewDocCode] = useState("");
   const [newDocTitle, setNewDocTitle] = useState("");
@@ -921,6 +924,7 @@ export function DocumentsView({
                               onDownload={() => handleDownload(doc)}
                                onSign={() => handleOpenSign(doc)}
                                onChangeStatus={() => handleOpenChangeStatus(doc)}
+                               onManageResponsibilities={() => { setSelectedDocument(doc); setIsResponsibilitiesOpen(true); }}
                               onShare={() => handleAction("Compartir", doc.code)}
                               onArchive={() => handleAction("Archivar", doc.code)}
                               onToggleLock={() => handleAction("Bloquear/Desbloquear", doc.code)}
@@ -1393,6 +1397,15 @@ export function DocumentsView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Responsibilities Dialog */}
+      {selectedDocument && (
+        <DocumentResponsibilities
+          documentId={selectedDocument.id}
+          documentCode={selectedDocument.code}
+          open={isResponsibilitiesOpen}
+          onOpenChange={setIsResponsibilitiesOpen}
+        />
+      )}
     </div>
   );
 }

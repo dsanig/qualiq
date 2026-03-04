@@ -403,6 +403,50 @@ export type Database = {
           },
         ]
       }
+      document_responsibilities: {
+        Row: {
+          action_type: string
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          document_id: string
+          due_date: string
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          document_id: string
+          due_date: string
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          document_id?: string
+          due_date?: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_responsibilities_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_signatures: {
         Row: {
           created_at: string

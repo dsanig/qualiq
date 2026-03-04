@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, FileText, AlertCircle } from "lucide-react";
+import { CheckCircle2, Clock, FileText, AlertCircle, PenTool, CheckCircle, Search as SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 
 interface PendingAction {
@@ -12,18 +13,26 @@ interface PendingAction {
   due_date: string | null;
   status: string;
   isOverdue: boolean;
+  source: "capa" | "document";
+  documentCode?: string;
 }
 
 const typeIcons: Record<string, typeof CheckCircle2> = {
   immediate: AlertCircle,
   corrective: FileText,
   preventive: CheckCircle2,
+  firma: PenTool,
+  aprobacion: CheckCircle,
+  revision: SearchIcon,
 };
 
 const typeLabels: Record<string, string> = {
   immediate: "Inmediata",
   corrective: "Correctiva",
   preventive: "Preventiva",
+  firma: "Firma",
+  aprobacion: "Aprobación",
+  revision: "Revisión",
 };
 
 interface PendingActionsProps {
@@ -33,27 +42,70 @@ interface PendingActionsProps {
 export function PendingActions({ onViewAll }: PendingActionsProps) {
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    async function fetch() {
-      const { data } = await (supabase as any)
+    async function fetchAll() {
+      const now = new Date();
+
+      // Fetch CAPA actions
+      const { data: capaData } = await (supabase as any)
         .from("actions")
         .select("id, description, action_type, due_date, status")
         .in("status", ["open", "in_progress"])
         .order("due_date", { ascending: true, nullsFirst: false })
         .limit(5);
 
-      const now = new Date();
-      setActions(
-        ((data as any[]) ?? []).map((a) => ({
-          ...a,
-          isOverdue: a.due_date ? new Date(a.due_date) < now : false,
-        }))
-      );
+      const capaActions: PendingAction[] = ((capaData as any[]) ?? []).map((a) => ({
+        ...a,
+        isOverdue: a.due_date ? new Date(a.due_date) < now : false,
+        source: "capa" as const,
+      }));
+
+      // Fetch document responsibilities for current user
+      let docActions: PendingAction[] = [];
+      if (user) {
+        const { data: respData } = await (supabase as any)
+          .from("document_responsibilities")
+          .select("id, action_type, due_date, status, document_id")
+          .eq("user_id", user.id)
+          .eq("status", "pending")
+          .order("due_date", { ascending: true })
+          .limit(10);
+
+        if (respData && (respData as any[]).length > 0) {
+          const docIds = [...new Set((respData as any[]).map(r => r.document_id))];
+          const { data: docs } = await supabase.from("documents").select("id, code, title").in("id", docIds);
+          const docMap = new Map((docs || []).map(d => [d.id, d]));
+
+          docActions = (respData as any[]).map((r) => {
+            const doc = docMap.get(r.document_id);
+            return {
+              id: r.id,
+              description: `${typeLabels[r.action_type] || r.action_type}: ${doc?.title || doc?.code || "Documento"}`,
+              action_type: r.action_type,
+              due_date: r.due_date,
+              status: r.status,
+              isOverdue: r.due_date ? new Date(r.due_date) < now : false,
+              source: "document" as const,
+              documentCode: doc?.code,
+            };
+          });
+        }
+      }
+
+      // Combine and sort by due_date
+      const combined = [...capaActions, ...docActions].sort((a, b) => {
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      }).slice(0, 8);
+
+      setActions(combined);
       setIsLoading(false);
     }
-    void fetch();
-  }, []);
+    void fetchAll();
+  }, [user]);
 
   const overdueCount = actions.filter((a) => a.isOverdue).length;
 
@@ -90,8 +142,11 @@ export function PendingActions({ onViewAll }: PendingActionsProps) {
                   <Icon className={cn("w-4 h-4 mt-0.5", action.isOverdue ? "text-destructive" : "text-muted-foreground")} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{action.description}</p>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-xs text-muted-foreground">{typeLabels[action.action_type] || action.action_type}</span>
+                      {action.source === "document" && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">Documento</span>
+                      )}
                       {action.due_date && (
                         <>
                           <span className="text-xs text-muted-foreground">•</span>
