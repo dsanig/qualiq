@@ -63,10 +63,6 @@ const Index = () => {
     navigate("/auth");
   };
 
-  const handleViewDemo = () => {
-    navigate("/demo");
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -76,7 +72,7 @@ const Index = () => {
   }
 
   if (!user) {
-    return <LandingPage onGetStarted={handleGetStarted} onViewDemo={handleViewDemo} />;
+    return <LandingPage onGetStarted={handleGetStarted} />;
   }
 
   const currentModule = moduleConfig[activeModule] || moduleConfig.dashboard;

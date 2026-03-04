@@ -1,12 +1,11 @@
-import { 
+import {
   Shield, FileText, AlertTriangle, BarChart3, MessageSquare,
-  Lock, ArrowRight, Building2, Zap, Eye
+  Lock, ArrowRight, Building2, Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface LandingPageProps {
   onGetStarted: () => void;
-  onViewDemo: () => void;
 }
 
 const features = [
@@ -18,10 +17,9 @@ const features = [
   { icon: Lock, title: "Seguridad & RGPD", description: "Datos encriptados, control de acceso por roles y logs de auditoría completos." },
 ];
 
-export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
+export function LandingPage({ onGetStarted }: LandingPageProps) {
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -30,18 +28,12 @@ export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
             </div>
             <span className="font-bold text-xl tracking-tight text-foreground">QualiQ</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onViewDemo}>
-              <Eye className="w-4 h-4 mr-1" /> Ver Demo
-            </Button>
-            <Button variant="accent" size="sm" onClick={onGetStarted}>
-              Acceso al Sistema
-            </Button>
-          </div>
+          <Button variant="accent" size="sm" onClick={onGetStarted}>
+            Acceso al Sistema
+          </Button>
         </div>
       </header>
 
-      {/* Hero */}
       <section className="pt-32 pb-20 px-4">
         <div className="container mx-auto max-w-5xl text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-sm font-medium mb-6">
@@ -49,22 +41,16 @@ export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
             Ecosistema de Cumplimiento con IA
           </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight mb-6 text-balance">
-            Gestión de Cumplimiento{" "}
-            <span className="text-accent">Inteligente</span>{" "}
-            para Sector Salud
+            Gestión de Cumplimiento <span className="text-accent">Inteligente</span> para Sector Salud
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-10">
-            Plataforma integral para empresas farmacéuticas, sanitarias y de dispositivos médicos en España. 
+            Plataforma integral para empresas farmacéuticas, sanitarias y de dispositivos médicos en España.
             SOPs, no conformidades, CAPAs y cumplimiento normativo — todo en un solo lugar.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-4">
             <Button variant="hero" size="xl" onClick={onGetStarted}>
               Acceso al Sistema
               <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
-            <Button variant="hero-outline" size="xl" onClick={onViewDemo}>
-              <Eye className="w-5 h-5 mr-2" />
-              Ver Demo
             </Button>
           </div>
           <p className="mt-6 text-sm text-muted-foreground">
@@ -73,12 +59,9 @@ export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Trusted By */}
       <section className="py-12 border-y border-border bg-secondary/30">
         <div className="container mx-auto px-4">
-          <p className="text-center text-sm text-muted-foreground mb-6">
-            Diseñado para empresas reguladas en España
-          </p>
+          <p className="text-center text-sm text-muted-foreground mb-6">Diseñado para empresas reguladas en España</p>
           <div className="flex items-center justify-center gap-12 flex-wrap opacity-50">
             {["Farmacéuticas", "Nutraceúticas", "Dispositivos Médicos", "Laboratorios", "Wellness"].map((item) => (
               <div key={item} className="flex items-center gap-2">
@@ -90,13 +73,10 @@ export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Features */}
       <section className="py-20 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Todo lo que necesita para el cumplimiento
-            </h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Todo lo que necesita para el cumplimiento</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Herramientas diseñadas específicamente para la gestión de calidad y regulatory affairs
               en el sector salud español.
@@ -116,7 +96,6 @@ export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
         </div>
       </section>
 
-      {/* CTA */}
       <section className="py-20 px-4">
         <div className="container mx-auto max-w-4xl">
           <div className="bg-primary rounded-2xl p-8 md:p-12 text-center">
@@ -127,21 +106,14 @@ export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
               Únase a las empresas del sector salud español que ya confían en QualiQ
               para su gestión de calidad y cumplimiento normativo.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button variant="accent" size="xl" onClick={onGetStarted} className="bg-accent hover:bg-accent/90">
-                Acceso al Sistema
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-              <Button variant="outline" size="xl" onClick={onViewDemo} className="bg-transparent text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/10 hover:text-primary-foreground">
-                <Eye className="w-5 h-5 mr-2" />
-                Ver Demo
-              </Button>
-            </div>
+            <Button variant="accent" size="xl" onClick={onGetStarted} className="bg-accent hover:bg-accent/90">
+              Acceso al Sistema
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t border-border py-12 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -151,9 +123,7 @@ export function LandingPage({ onGetStarted, onViewDemo }: LandingPageProps) {
               </div>
               <span className="font-bold text-foreground">QualiQ</span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              © 2026 QualiQ. Todos los derechos reservados. Conforme a RGPD.
-            </p>
+            <p className="text-sm text-muted-foreground">© 2026 QualiQ. Todos los derechos reservados. Conforme a RGPD.</p>
           </div>
         </div>
       </footer>

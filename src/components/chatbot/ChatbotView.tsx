@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -34,11 +35,13 @@ type Msg = { role: "user" | "assistant"; content: string };
 
 async function streamChat({
   messages,
+  accessToken,
   onDelta,
   onDone,
   onError,
 }: {
   messages: Msg[];
+  accessToken: string;
   onDelta: (deltaText: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
@@ -47,7 +50,7 @@ async function streamChat({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({ messages }),
   });
@@ -265,8 +268,14 @@ export function ChatbotView() {
         .filter((message) => message.id !== "welcome")
         .map((message) => ({ role: message.role, content: message.content }));
 
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("No hay sesión activa para consultar el asistente IA.");
+      }
+
       await streamChat({
         messages: chatMessages,
+        accessToken: session.access_token,
         onDelta: (chunk) => upsertAssistant(chunk),
         onDone: () => setIsLoading(false),
         onError: (error) => {
