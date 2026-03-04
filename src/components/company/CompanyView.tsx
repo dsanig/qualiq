@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -21,24 +20,6 @@ import {
 } from "@/components/ui/dialog";
 import { FeatureToggles } from "./FeatureToggles";
 import { useAuth } from "@/hooks/useAuth";
-
-const mockCompany = {
-  name: "QualiQ Labs",
-  legalName: "QualiQ Labs S.L.",
-  industry: "Calidad y cumplimiento",
-  size: "250-500",
-  address: "Calle Gran Vía 45, Madrid",
-  city: "Madrid",
-  postalCode: "28013",
-  country: "España",
-  cif: "B-12345678",
-  vat: "ESB12345678",
-  contact: "contacto@qualiq.ai",
-  phone: "+34 910 000 000",
-  dpo: "dpo@qualiq.ai",
-  complianceLead: "María García",
-  regulatoryScope: "ISO 9001, GMP, GDP",
-};
 
 type UserDirectoryEntry = {
   id: string;
@@ -58,6 +39,8 @@ export function CompanyView() {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [users, setUsers] = useState<UserDirectoryEntry[]>([]);
+  const [companyName, setCompanyName] = useState("");
+  const [isCompanySaving, setIsCompanySaving] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [createForm, setCreateForm] = useState({
     fullName: "",
@@ -149,6 +132,31 @@ export function CompanyView() {
       void fetchUsers();
     }
   }, [canManageCompany, fetchUsers]);
+
+  useEffect(() => {
+    const fetchCompany = async () => {
+      if (!profile?.company_id) return;
+
+      const { data, error } = await supabase
+        .from("companies")
+        .select("name")
+        .eq("id", profile.company_id)
+        .maybeSingle();
+
+      if (error) {
+        toast({
+          title: "No se pudo cargar la empresa",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setCompanyName(data?.name ?? "");
+    };
+
+    void fetchCompany();
+  }, [profile?.company_id, toast]);
 
   useEffect(() => {
     void refreshPermissions();
@@ -408,6 +416,39 @@ export function CompanyView() {
     void fetchUsers();
   };
 
+  const handleSaveCompany = async () => {
+    if (!profile?.company_id || !companyName.trim()) {
+      toast({
+        title: "Datos incompletos",
+        description: "El nombre de la empresa es obligatorio.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCompanySaving(true);
+    const { error } = await supabase
+      .from("companies")
+      .update({ name: companyName.trim() })
+      .eq("id", profile.company_id);
+
+    setIsCompanySaving(false);
+
+    if (error) {
+      toast({
+        title: "No se pudo guardar",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Perfil actualizado",
+      description: "Se guardaron los datos reales de la empresa.",
+    });
+  };
+
   if (!canManageCompany) {
     return (
       <div className="bg-card rounded-lg border border-border p-6 space-y-4">
@@ -454,90 +495,17 @@ export function CompanyView() {
                 <li>Revisa la facturación y genera facturas españolas si es necesario.</li>
               </ol>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label>Nombre comercial</Label>
-                <Input defaultValue={mockCompany.name} />
+                <Label>Nombre de la empresa</Label>
+                <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label>Razón social</Label>
-                <Input defaultValue={mockCompany.legalName} />
-              </div>
-              <div className="space-y-2">
-                <Label>Industria</Label>
-                <Input defaultValue={mockCompany.industry} />
-              </div>
-              <div className="space-y-2">
-                <Label>Tamaño</Label>
-                <Select defaultValue={mockCompany.size}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1-50">1-50</SelectItem>
-                    <SelectItem value="51-250">51-250</SelectItem>
-                    <SelectItem value="250-500">250-500</SelectItem>
-                    <SelectItem value="500+">500+</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>CIF</Label>
-                <Input defaultValue={mockCompany.cif} />
-              </div>
-              <div className="space-y-2">
-                <Label>IVA intracomunitario</Label>
-                <Input defaultValue={mockCompany.vat} />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Dirección</Label>
-                <Textarea defaultValue={mockCompany.address} rows={2} />
-              </div>
-              <div className="space-y-2">
-                <Label>Ciudad</Label>
-                <Input defaultValue={mockCompany.city} />
-              </div>
-              <div className="space-y-2">
-                <Label>Código postal</Label>
-                <Input defaultValue={mockCompany.postalCode} />
-              </div>
-              <div className="space-y-2">
-                <Label>País</Label>
-                <Input defaultValue={mockCompany.country} />
-              </div>
-              <div className="space-y-2">
-                <Label>Email de contacto</Label>
-                <Input defaultValue={mockCompany.contact} />
-              </div>
-              <div className="space-y-2">
-                <Label>Teléfono</Label>
-                <Input defaultValue={mockCompany.phone} />
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Esta vista solo muestra y permite editar datos reales disponibles en la base de datos.
+              </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Delegado de protección de datos (DPO)</Label>
-                <Input defaultValue={mockCompany.dpo} />
-              </div>
-              <div className="space-y-2">
-                <Label>Responsable de cumplimiento</Label>
-                <Input defaultValue={mockCompany.complianceLead} />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Ámbitos regulatorios</Label>
-                <Textarea defaultValue={mockCompany.regulatoryScope} rows={2} />
-              </div>
-            </div>
-            <Button
-              variant="accent"
-              onClick={() =>
-                toast({
-                  title: "Perfil actualizado",
-                  description: "Los datos de la empresa se han guardado correctamente.",
-                })
-              }
-            >
-              Guardar cambios
+            <Button variant="accent" onClick={handleSaveCompany} disabled={isCompanySaving}>
+              {isCompanySaving ? "Guardando..." : "Guardar cambios"}
             </Button>
           </div>
         </TabsContent>

@@ -87,11 +87,28 @@ export function PredictiveAnalyticsView() {
     setIsAnalyzing(true);
 
     try {
-      // In a real scenario, we'd fetch actual incident data
+      const { data: incidentsData, error: incidentsError } = await supabase
+        .from("incidencias")
+        .select("id, incidencia_type, status, title, description, created_at, deadline")
+        .eq("company_id", profile.company_id)
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (incidentsError) throw incidentsError;
+
+      if (!incidentsData || incidentsData.length === 0) {
+        toast({
+          title: "Sin datos para analizar",
+          description: "No hay incidencias reales registradas en la empresa.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { error } = await supabase.functions.invoke("analyze-capa-patterns", {
         body: {
           companyId: profile.company_id,
-          incidentsData: null, // Will use mock data in the function
+          incidentsData,
         },
       });
 

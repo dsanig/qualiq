@@ -93,16 +93,15 @@ serve(async (req) => {
 
     console.log("Analyzing CAPA patterns for company:", companyId);
 
+    if (!Array.isArray(incidentsData) || incidentsData.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No hay incidencias reales disponibles para analizar." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Format incidents data for analysis
-    const incidentsContext = incidentsData?.length > 0
-      ? JSON.stringify(incidentsData, null, 2)
-      : `[
-  {"type": "deviation", "area": "Línea 4", "shift": "B", "date": "2024-01-15", "description": "Desviación de temperatura"},
-  {"type": "deviation", "area": "Línea 4", "shift": "B", "date": "2024-01-22", "description": "Desviación de humedad"},
-  {"type": "nc", "area": "Almacén", "shift": "A", "date": "2024-01-18", "description": "Documentación incompleta"},
-  {"type": "deviation", "area": "Línea 4", "shift": "B", "date": "2024-02-05", "description": "Parámetros fuera de especificación"},
-  {"type": "capa", "area": "Línea 4", "shift": "B", "date": "2024-02-10", "description": "CAPA por desviaciones recurrentes"}
-]`;
+    const incidentsContext = JSON.stringify(incidentsData, null, 2);
 
     const userPrompt = `Analiza los siguientes datos de incidencias y detecta patrones predictivos:
 

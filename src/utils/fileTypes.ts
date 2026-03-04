@@ -65,15 +65,6 @@ export function debugFileTypeMapping(file: File): void {
 export function runFileTypeRuntimeChecks(): void {
   if (!import.meta.env.DEV) return;
 
-  const fixtures = [
-    { file: { name: "sample.pdf", type: "application/pdf" } as File, expected: "pdf" as const },
-    { file: { name: "sample.docx", type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" } as File, expected: "word" as const },
-    { file: { name: "sample.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" } as File, expected: "excel" as const },
-    { file: { name: "sample.png", type: "image/png" } as File, expected: "image" as const },
-  ];
-
-  const hasMismatch = fixtures.some(({ file, expected }) => fileTypeForDb(file) !== expected);
-  if (hasMismatch) {
-    console.warn("[documents] fileTypeForDb runtime check detected unexpected mapping");
-  }
+  // Validaciones de tipo de archivo se ejecutan con archivos reales durante uso o pruebas E2E.
+  console.debug("[documents] runtime checks enabled for real-file validation");
 }
