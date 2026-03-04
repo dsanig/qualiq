@@ -167,6 +167,17 @@ Genera entre 2 y 5 insights relevantes basados en los patrones detectados.`;
     const parsed = JSON.parse(content);
     const insights = parsed.insights || [];
 
+    // Replace previous results so each run reflects only the latest real-data analysis
+    const { error: deleteInsightsError } = await supabase
+      .from("predictive_insights")
+      .delete()
+      .eq("company_id", companyId);
+
+    if (deleteInsightsError) {
+      console.error("Error deleting previous insights:", deleteInsightsError);
+      throw new Error("No se pudieron limpiar los insights anteriores");
+    }
+
     // Insert insights and pattern detections
     for (const insight of insights) {
       const { data: insightData, error: insightError } = await supabase
