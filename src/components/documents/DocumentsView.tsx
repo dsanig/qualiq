@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
   ArrowRightLeft,
+  UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -218,6 +219,18 @@ export function DocumentsView({
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Inline responsibilities for new document
+  interface InlineResponsibility {
+    userId: string;
+    actionType: string;
+    dueDate: string;
+  }
+  const [newDocResponsibilities, setNewDocResponsibilities] = useState<InlineResponsibility[]>([]);
+  const [newRespUserId, setNewRespUserId] = useState("");
+  const [newRespAction, setNewRespAction] = useState("revision");
+  const [newRespDueDate, setNewRespDueDate] = useState("");
+  const [companyUsers, setCompanyUsers] = useState<{ user_id: string; full_name: string | null; email: string }[]>([]);
+
   // Real documents from database
   const [dbDocuments, setDbDocuments] = useState<Document[]>([]);
 
@@ -287,10 +300,17 @@ export function DocumentsView({
     }
   }, [profile?.company_id]);
 
+  const fetchCompanyUsers = useCallback(async () => {
+    if (!profile?.company_id) return;
+    const { data } = await supabase.from("profiles").select("user_id, full_name, email").eq("company_id", profile.company_id);
+    setCompanyUsers(data || []);
+  }, [profile?.company_id]);
+
   useEffect(() => {
     fetchDocuments();
     fetchSignatures();
-  }, [fetchDocuments, fetchSignatures]);
+    fetchCompanyUsers();
+  }, [fetchDocuments, fetchSignatures, fetchCompanyUsers]);
 
   useEffect(() => {
     void refreshPermissions();
@@ -555,6 +575,18 @@ export function DocumentsView({
       });
       if (insertError) throw insertError;
 
+      // Insert responsibilities if any
+      if (newDocResponsibilities.length > 0) {
+        const respRows = newDocResponsibilities.map(r => ({
+          document_id: documentId,
+          user_id: r.userId,
+          action_type: r.actionType,
+          due_date: r.dueDate,
+          created_by: uploaderUser.id,
+        }));
+        await (supabase as any).from("document_responsibilities").insert(respRows);
+      }
+
       toast({ title: "Documento creado", description: "El documento se ha subido correctamente." });
       onNewDocumentOpenChange(false);
       setNewDocCode("");
@@ -562,6 +594,7 @@ export function DocumentsView({
       setNewDocCategory("calidad");
       setNewDocDescription("");
       setNewDocFile(null);
+      setNewDocResponsibilities([]);
       fetchDocuments();
     } catch (err: unknown) {
       const uploadError = err as { message?: string; details?: string; hint?: string; code?: string };
@@ -1117,6 +1150,59 @@ export function DocumentsView({
               <div className="space-y-2">
                 <Label>Archivo</Label>
                 <Input data-testid="document-file-input" type="file" accept=".pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg,.webp" onChange={(e) => setNewDocFile(e.target.files?.[0] || null)} />
+              </div>
+
+              {/* Responsables inline */}
+              <div className="border border-border rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-accent" />
+                  <Label className="font-medium">Responsables</Label>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Select value={newRespUserId} onValueChange={setNewRespUserId}>
+                    <SelectTrigger><SelectValue placeholder="Usuario..." /></SelectTrigger>
+                    <SelectContent>
+                      {companyUsers.map(u => (
+                        <SelectItem key={u.user_id} value={u.user_id}>{u.full_name || u.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={newRespAction} onValueChange={setNewRespAction}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="firma">Firma</SelectItem>
+                      <SelectItem value="aprobacion">Aprobación</SelectItem>
+                      <SelectItem value="revision">Revisión</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2">
+                    <Input type="date" value={newRespDueDate} onChange={e => setNewRespDueDate(e.target.value)} className="flex-1" />
+                    <Button type="button" size="sm" variant="outline" onClick={() => {
+                      if (!newRespUserId || !newRespDueDate) return;
+                      setNewDocResponsibilities(prev => [...prev, { userId: newRespUserId, actionType: newRespAction, dueDate: newRespDueDate }]);
+                      setNewRespUserId("");
+                      setNewRespDueDate("");
+                    }} disabled={!newRespUserId || !newRespDueDate}>
+                      <Plus className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                {newDocResponsibilities.length > 0 && (
+                  <div className="space-y-1.5">
+                    {newDocResponsibilities.map((r, i) => {
+                      const userName = companyUsers.find(u => u.user_id === r.userId);
+                      const actionLabel = r.actionType === "firma" ? "Firma" : r.actionType === "aprobacion" ? "Aprobación" : "Revisión";
+                      return (
+                        <div key={i} className="flex items-center justify-between text-sm border border-border rounded px-3 py-1.5">
+                          <span className="text-foreground">{userName?.full_name || userName?.email || r.userId} — <span className="text-muted-foreground">{actionLabel}</span> — <span className="text-muted-foreground">{r.dueDate}</span></span>
+                          <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => setNewDocResponsibilities(prev => prev.filter((_, idx) => idx !== i))}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </TabsContent>
             <TabsContent value="batch" className="space-y-4 mt-4">
