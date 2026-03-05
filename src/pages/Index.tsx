@@ -47,6 +47,7 @@ const Index = () => {
   const [moduleSearchQueries, setModuleSearchQueries] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<FiltersState>({
     category: "all",
+    documentTypology: "all",
     documentStatus: "all",
     signatureStatus: "all",
     incidentArea: "all",

@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export type FiltersState = {
   category: string;
+  documentTypology: "all" | "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro";
   documentStatus: string;
   signatureStatus: string;
   incidentArea: string;
@@ -30,6 +31,7 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange }: Fi
   const handleReset = () => {
     onFiltersChange({
       category: "all",
+      documentTypology: "all",
       documentStatus: "all",
       signatureStatus: "all",
       incidentArea: "all",
@@ -44,24 +46,24 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange }: Fi
         <DialogHeader>
           <DialogTitle>Crear filtros</DialogTitle>
           <DialogDescription>
-            Define criterios de filtrado que se aplicarán en Documentos, Procesos e Incidencias.
+            Define criterios de filtrado que se aplicarán en Documentos e Incidencias.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-2">
           <div className="space-y-2">
-            <Label>Categoría (Documentos/Procesos)</Label>
-            <Select value={filters.category} onValueChange={(value) => updateFilter("category", value)}>
+            <Label>Tipología (Documentos)</Label>
+            <Select value={filters.documentTypology} onValueChange={(value) => updateFilter("documentTypology", value)}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona una categoría" />
+                <SelectValue placeholder="Selecciona una tipología" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="calidad">Calidad</SelectItem>
-                <SelectItem value="produccion">Producción</SelectItem>
-                <SelectItem value="logistica">Logística</SelectItem>
-                <SelectItem value="rrhh">RRHH</SelectItem>
-                <SelectItem value="regulatory">Regulatory</SelectItem>
+                <SelectItem value="Proceso">Proceso</SelectItem>
+                <SelectItem value="PNT">PNT</SelectItem>
+                <SelectItem value="Documento">Documento</SelectItem>
+                <SelectItem value="Normativa">Normativa</SelectItem>
+                <SelectItem value="Otro">Otro</SelectItem>
               </SelectContent>
             </Select>
           </div>
