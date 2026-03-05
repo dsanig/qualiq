@@ -642,21 +642,7 @@ export function DocumentsView({
         _responsibilities: cleanedResponsibilities,
       };
 
-      let { error: rpcError } = await (supabase as any).rpc("create_new_document_version", createVersionArgs);
-
-      const missingChangeSummarySignature =
-        rpcError?.message?.includes("Could not find the function public.create_new_document_version") ?? false;
-
-      if (rpcError && missingChangeSummarySignature) {
-        const fallbackArgs = {
-          _document_id: selectedDocument.id,
-          _file_path: filePath,
-          _responsibilities: cleanedResponsibilities,
-        };
-
-        const fallbackResult = await (supabase as any).rpc("create_new_document_version", fallbackArgs);
-        rpcError = fallbackResult.error;
-      }
+      const { error: rpcError } = await (supabase as any).rpc("create_new_document_version", createVersionArgs);
 
       if (rpcError) throw rpcError;
 
