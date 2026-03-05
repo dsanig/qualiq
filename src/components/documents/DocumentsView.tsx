@@ -636,9 +636,9 @@ export function DocumentsView({
       }
 
       const createVersionArgs = {
+        _change_summary: updateVersionChanges.trim() || null,
         _document_id: selectedDocument.id,
         _file_path: filePath,
-        _change_summary: updateVersionChanges.trim() || null,
         _responsibilities: cleanedResponsibilities,
       };
 
@@ -791,13 +791,23 @@ export function DocumentsView({
 
     const runRpcProbe = async () => {
       const probeArgs = {
+        _change_summary: null,
         _document_id: crypto.randomUUID(),
         _file_path: "dev/rpc-probe.txt",
         _responsibilities: [],
       };
       const { error } = await (supabase as any).rpc("create_new_document_version", probeArgs);
+      const projectHostname = (() => {
+        try {
+          return new URL(import.meta.env.VITE_SUPABASE_URL).hostname;
+        } catch {
+          return "invalid-url";
+        }
+      })();
+
       console.info("[documents:update-version] RPC probe", {
         supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+        projectHostname,
         payloadKeys: Object.keys(probeArgs),
         errorCode: error?.code ?? null,
         errorMessage: error?.message ?? null,
