@@ -184,7 +184,7 @@ export function DocumentsView({
   const [signedDocuments, setSignedDocuments] = useState<Record<string, SignedDocument>>({});
   const { toast } = useToast();
   const { user, profile } = useAuth();
-  const { canEditContent, isSuperadmin, refreshPermissions } = usePermissions();
+  const { canEditContent, canManageCompany, isSuperadmin, refreshPermissions } = usePermissions();
 
   // Edit document state
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -217,6 +217,9 @@ export function DocumentsView({
   // Responsibilities state
   const [isResponsibilitiesOpen, setIsResponsibilitiesOpen] = useState(false);
   const [isSignatureStatusOpen, setIsSignatureStatusOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeletingDocument, setIsDeletingDocument] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
   // New document form state
   const [newDocCode, setNewDocCode] = useState("");
   const [newDocTitle, setNewDocTitle] = useState("");
@@ -726,6 +729,83 @@ export function DocumentsView({
     toast({ title: action, description: `Acción "${action}" ejecutada para ${docCode}` });
   };
 
+  const handleRequestDelete = (doc: Document) => {
+    if (!canManageCompany && !isSuperadmin) {
+      toast({
+        title: "Permisos insuficientes",
+        description: "Solo administradores pueden eliminar documentos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setDocumentToDelete(doc);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!documentToDelete) return;
+
+    setIsDeletingDocument(true);
+    try {
+      const { data: versions, error: versionsError } = await supabase
+        .from("document_versions")
+        .select("file_url")
+        .eq("document_id", documentToDelete.id);
+
+      if (versionsError) {
+        throw versionsError;
+      }
+
+      const filesToDelete = Array.from(
+        new Set(
+          [documentToDelete.fileUrl, ...(versions || []).map((version) => version.file_url)].filter(
+            (filePath): filePath is string => Boolean(filePath && !filePath.startsWith("/docs/"))
+          )
+        )
+      );
+
+      const { error: deleteDocumentError } = await supabase.from("documents").delete().eq("id", documentToDelete.id);
+      if (deleteDocumentError) {
+        throw deleteDocumentError;
+      }
+
+      if (filesToDelete.length > 0) {
+        const { error: storageDeleteError } = await supabase.storage.from("documents").remove(filesToDelete);
+        if (storageDeleteError) {
+          console.error("[documents] error deleting storage objects", storageDeleteError);
+          toast({
+            title: "Documento eliminado",
+            description: "Se eliminó el registro, pero algunos archivos en storage no pudieron borrarse.",
+            variant: "destructive",
+          });
+        }
+      }
+
+      setDbDocuments((prev) => prev.filter((doc) => doc.id !== documentToDelete.id));
+      setSelectedIds((prev) => prev.filter((id) => id !== documentToDelete.id));
+      if (selectedDocument?.id === documentToDelete.id) {
+        setSelectedDocument(null);
+        setIsPreviewOpen(false);
+      }
+
+      await Promise.all([fetchDocuments(), fetchFirmaStatus()]);
+
+      toast({ title: "Documento eliminado", description: `${documentToDelete.code} fue eliminado correctamente.` });
+      setIsDeleteConfirmOpen(false);
+      setDocumentToDelete(null);
+    } catch (err: any) {
+      console.error("[documents] error deleting document", err);
+      toast({
+        title: "Error al eliminar",
+        description: err?.message || "No se pudo eliminar el documento.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingDocument(false);
+    }
+  };
+
   const handleOpenPreview = (doc: Document) => {
     setSelectedDocument(doc);
     setIsPreviewOpen(true);
@@ -1120,7 +1200,7 @@ export function DocumentsView({
                               onShare={() => handleAction("Compartir", doc.code)}
                               onArchive={() => handleAction("Archivar", doc.code)}
                               onToggleLock={() => handleAction("Bloquear/Desbloquear", doc.code)}
-                              onDelete={() => handleAction("Eliminar", doc.code)}
+                              onDelete={() => handleRequestDelete(doc)}
                             />
                           </td>
                         </tr>
@@ -1208,6 +1288,43 @@ export function DocumentsView({
                 <Button variant="accent" onClick={() => handleDownload(selectedDocument)}>Descargar</Button>
               </div>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isDeleteConfirmOpen}
+        onOpenChange={(open) => {
+          if (isDeletingDocument) return;
+          setIsDeleteConfirmOpen(open);
+          if (!open) setDocumentToDelete(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar documento</DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará el documento y sus relaciones asociadas (versiones, responsables y firmas).
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            ¿Seguro que deseas eliminar <span className="font-semibold text-foreground">{documentToDelete?.code}</span>?
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (isDeletingDocument) return;
+                setIsDeleteConfirmOpen(false);
+                setDocumentToDelete(null);
+              }}
+              disabled={isDeletingDocument}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={isDeletingDocument}>
+              {isDeletingDocument ? "Eliminando..." : "Eliminar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
