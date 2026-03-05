@@ -414,6 +414,7 @@ export type Database = {
           id: string
           status: string
           user_id: string
+          version_id: string
         }
         Insert: {
           action_type: string
@@ -425,6 +426,7 @@ export type Database = {
           id?: string
           status?: string
           user_id: string
+          version_id: string
         }
         Update: {
           action_type?: string
@@ -436,6 +438,7 @@ export type Database = {
           id?: string
           status?: string
           user_id?: string
+          version_id?: string
         }
         Relationships: [
           {
@@ -443,6 +446,13 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_responsibilities_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -458,6 +468,7 @@ export type Database = {
           signed_by: string
           signer_email: string | null
           signer_name: string | null
+          version_id: string
         }
         Insert: {
           created_at?: string
@@ -469,6 +480,7 @@ export type Database = {
           signed_by: string
           signer_email?: string | null
           signer_name?: string | null
+          version_id: string
         }
         Update: {
           created_at?: string
@@ -480,6 +492,7 @@ export type Database = {
           signed_by?: string
           signer_email?: string | null
           signer_name?: string | null
+          version_id?: string
         }
         Relationships: [
           {
@@ -487,6 +500,13 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_signatures_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -531,30 +551,36 @@ export type Database = {
       }
       document_versions: {
         Row: {
+          change_summary: string | null
           changes_description: string | null
           created_at: string
           created_by: string
           document_id: string
           file_url: string
           id: string
+          status: Database["public"]["Enums"]["document_status"]
           version: number
         }
         Insert: {
+          change_summary?: string | null
           changes_description?: string | null
           created_at?: string
           created_by: string
           document_id: string
           file_url: string
           id?: string
+          status?: Database["public"]["Enums"]["document_status"]
           version: number
         }
         Update: {
+          change_summary?: string | null
           changes_description?: string | null
           created_at?: string
           created_by?: string
           document_id?: string
           file_url?: string
           id?: string
+          status?: Database["public"]["Enums"]["document_status"]
           version?: number
         }
         Relationships: [
