@@ -110,6 +110,8 @@ const normalizeDocumentFileType = (fileType?: string): Document["format"] => {
   return "pdf";
 };
 
+const DOCUMENT_SIGNATURE_CONFLICT_TARGET = "document_id,signed_by";
+
 
 const categoryOptions = [
   { id: "all", label: "Todos" },
@@ -1003,7 +1005,7 @@ export function DocumentsView({
       signature_method: "autofirma_dnie",
       signature_data: signReason.trim() || null,
       signed_at: signedAt,
-    }, { onConflict: "document_id,signed_by" });
+    }, { onConflict: DOCUMENT_SIGNATURE_CONFLICT_TARGET });
     if (error) {
       toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
       return;
@@ -1075,7 +1077,7 @@ export function DocumentsView({
       signature_method: "nombre_completo",
       signature_data: manualSignReason.trim() || null,
       signed_at: signedAt,
-    }, { onConflict: "document_id,signed_by" });
+    }, { onConflict: DOCUMENT_SIGNATURE_CONFLICT_TARGET });
     if (error) {
       toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
       return;
