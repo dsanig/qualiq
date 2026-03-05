@@ -296,7 +296,6 @@ export function DocumentsView({
   const [newDocTitle, setNewDocTitle] = useState("");
   const [newDocCategory, setNewDocCategory] = useState("calidad");
   const [newDocTypology, setNewDocTypology] = useState<DocumentTypology>("Documento");
-  const [typologyFilter, setTypologyFilter] = useState<"all" | DocumentTypology>("all");
   const [newDocDescription, setNewDocDescription] = useState("");
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -369,11 +368,76 @@ export function DocumentsView({
 
   const fetchDocuments = useCallback(async () => {
     if (!profile?.company_id) return;
-    const { data, error } = await supabase
+
+    let query = supabase
       .from("documents")
       .select("*")
       .eq("company_id", profile.company_id)
       .order("created_at", { ascending: false });
+
+    if (filters.documentTypology !== "all") {
+      query = query.eq("typology", filters.documentTypology);
+    }
+
+    const { data, error } = await query;
+
+    if (isMissingTypologyColumnError(error)) {
+      toast({
+        title: "Tipología no disponible aún en este entorno",
+        description: "Se reintentará la carga de documentos sin este filtro.",
+      });
+
+      if (filters.documentTypology !== "all") {
+        onFiltersChange({ ...filters, documentTypology: "all" });
+      }
+
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("company_id", profile.company_id)
+        .order("created_at", { ascending: false });
+
+      if (fallbackError || !fallbackData) return;
+
+      const ownerUserIds = [...new Set(fallbackData.map((doc) => doc.owner_id).filter(Boolean))];
+
+      const { data: ownersData } = ownerUserIds.length
+        ? await supabase
+            .from("profiles")
+            .select("user_id, full_name, email")
+            .in("user_id", ownerUserIds)
+        : { data: [] };
+
+      const ownerUserMap = new Map(
+        (ownersData || []).map((owner) => [
+          owner.user_id,
+          owner.full_name?.trim() || owner.email || owner.user_id,
+        ])
+      );
+
+      const mapped: Document[] = fallbackData.map((d) => ({
+        id: d.id,
+        code: d.code,
+        title: d.title,
+        typology: typologyNormalizeMap[d.typology ?? "Documento"] ?? "Documento",
+        category: d.category,
+        categoryId: d.category.toLowerCase().replace(/ó/g, "o").replace(/í/g, "i"),
+        version: String(d.version) + ".0",
+        versionNum: d.version,
+        status: d.status as Document["status"],
+        lastUpdated: new Date(d.updated_at).toISOString().split("T")[0],
+        owner: ownerUserMap.get(d.owner_id) || d.owner_id,
+        ownerId: d.owner_id,
+        pageCount: 0,
+        format: normalizeDocumentFileType(d.file_type),
+        originalAuthor: ownerUserMap.get(d.owner_id) || d.owner_id,
+        lastModifiedBy: ownerUserMap.get(d.owner_id) || d.owner_id,
+        fileUrl: d.file_url,
+      }));
+      setDbDocuments(mapped);
+      return;
+    }
+
     if (!error && data) {
       const ownerUserIds = [...new Set(data.map((doc) => doc.owner_id).filter(Boolean))];
 
@@ -412,7 +476,7 @@ export function DocumentsView({
       }));
       setDbDocuments(mapped);
     }
-  }, [profile?.company_id]);
+  }, [filters, onFiltersChange, profile?.company_id, toast]);
 
   const fetchCompanyUsers = useCallback(async () => {
     if (!profile?.company_id) return;
@@ -999,7 +1063,7 @@ export function DocumentsView({
 
       const matchesCategory = filters.category === "all" || doc.categoryId === filters.category;
       const matchesStatus = filters.documentStatus === "all" || doc.status === filters.documentStatus;
-      const matchesTypology = typologyFilter === "all" || doc.typology === typologyFilter;
+      const matchesTypology = filters.documentTypology === "all" || doc.typology === filters.documentTypology;
       
       const isSigned = !!signedDocuments[doc.id];
       const matchesSignature =
@@ -1010,7 +1074,7 @@ export function DocumentsView({
 
       return matchesQuery && matchesCategory && matchesStatus && matchesTypology && matchesSignature;
     });
-  }, [debouncedSearchQuery, filters, signedDocuments, allDocuments, typologyFilter]);
+  }, [debouncedSearchQuery, filters, signedDocuments, allDocuments]);
 
   const effectiveItemsPerPage = showAllDocuments ? Math.max(filteredDocuments.length, 1) : itemsPerPage;
   const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / effectiveItemsPerPage));
@@ -1426,7 +1490,10 @@ export function DocumentsView({
                 </Select>
                 <span className="text-xs text-muted-foreground">documentos por página</span>
                 <Label className="text-xs text-muted-foreground ml-3">Tipología</Label>
-                <Select value={typologyFilter} onValueChange={(value) => setTypologyFilter(value as "all" | DocumentTypology)}>
+                <Select
+                  value={filters.documentTypology}
+                  onValueChange={(value) => onFiltersChange({ ...filters, documentTypology: value as FiltersState["documentTypology"] })}
+                >
                   <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
