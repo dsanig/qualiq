@@ -50,8 +50,14 @@ export function DocumentSignatureStatusDialog({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [showOnlyResponsibilities, setShowOnlyResponsibilities] = useState(false);
+  const [showOnlyResponsibilities, setShowOnlyResponsibilities] = useState(true);
   const [users, setUsers] = useState<SignatureStatusUser[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      setShowOnlyResponsibilities(true);
+    }
+  }, [open, documentId]);
 
   useEffect(() => {
     const load = async () => {
