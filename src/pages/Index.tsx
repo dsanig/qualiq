@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DashboardView } from "@/components/dashboard/DashboardView";
@@ -22,7 +22,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   dashboard: { title: "Panel de Control", subtitle: "Visión general del estado de cumplimiento" },
   documents: { title: "Gestión Documental", subtitle: "SOPs, PNTs y documentación de calidad" },
-  processes: { title: "Procesos / PNT", subtitle: "Gestión de procedimientos normalizados" },
   incidents: { title: "Incidencias", subtitle: "No conformidades, desviaciones y CAPAs" },
   audits: { title: "Auditorías", subtitle: "Gestión de auditorías, CAPA y acciones" },
   training: { title: "Formación Dinámica", subtitle: "Evaluación de comprensión de procedimientos" },
@@ -43,7 +42,8 @@ interface IncidentPrefillPayload {
 }
 
 const Index = () => {
-  const [activeModule, setActiveModule] = useState("dashboard");
+  const location = useLocation();
+  const [activeModule, setActiveModule] = useState(() => location.pathname === "/documentos" ? "documents" : "dashboard");
   const [moduleSearchQueries, setModuleSearchQueries] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<FiltersState>({
     category: "all",
@@ -66,6 +66,12 @@ const Index = () => {
   // Auto-logout after 10 minutes of inactivity
   useInactivityLogout();
 
+  useEffect(() => {
+    if (location.pathname === "/documentos") {
+      setActiveModule("documents");
+    }
+  }, [location.pathname]);
+
   const handleGetStarted = () => {
     navigate("/auth");
   };
@@ -87,14 +93,12 @@ const Index = () => {
     switch (activeModule) {
       case "documents":
         return "Buscar documentos...";
-      case "processes":
-        return "Buscar procesos...";
       case "incidents":
         return "Buscar incidencias...";
       case "audits":
         return "Buscar auditorías...";
       default:
-        return "Buscar documentos, procesos...";
+        return "Buscar documentos...";
     }
   })();
 
@@ -112,7 +116,7 @@ const Index = () => {
   const handleQuickAction = (action: string) => {
     switch (action) {
       case "Nuevo PNT":
-        setActiveModule("processes");
+        setActiveModule("documents");
         setIsNewDocumentOpen(true);
         break;
       case "Registrar Incidencia":
@@ -165,19 +169,6 @@ const Index = () => {
       case "documents":
         return (
           <DocumentsView
-            searchQuery={activeSearchQuery}
-            onSearchChange={handleSearchChange}
-            filters={filters}
-            onFiltersChange={setFilters}
-            onOpenFilters={() => setIsFilterOpen(true)}
-            isNewDocumentOpen={isNewDocumentOpen}
-            onNewDocumentOpenChange={setIsNewDocumentOpen}
-          />
-        );
-      case "processes":
-        return (
-          <DocumentsView
-            mode="processes"
             searchQuery={activeSearchQuery}
             onSearchChange={handleSearchChange}
             filters={filters}
