@@ -30,13 +30,14 @@ interface DocumentSignatureStatusDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   documentId: string | null;
+  versionId: string | null;
   documentCode?: string;
 }
 
 const formatMethod = (method?: string) => {
   if (!method) return "—";
-  if (method === "autofirma_dnie") return "DNIe";
-  if (method === "nombre_completo") return "Nombre";
+  if (method === "autofirma_dnie" || method === "DNIE") return "DNIe";
+  if (method === "nombre_completo" || method === "NOMBRE") return "Nombre";
   return method;
 };
 
@@ -44,6 +45,7 @@ export function DocumentSignatureStatusDialog({
   open,
   onOpenChange,
   documentId,
+  versionId,
   documentCode,
 }: DocumentSignatureStatusDialogProps) {
   const { profile } = useAuth();
@@ -57,7 +59,7 @@ export function DocumentSignatureStatusDialog({
     if (open) {
       setShowOnlyResponsibilities(true);
     }
-  }, [open, documentId]);
+  }, [open, documentId, versionId]);
 
   useEffect(() => {
     const load = async () => {
@@ -80,16 +82,17 @@ export function DocumentSignatureStatusDialog({
         .from("user_roles")
         .select("user_id, role");
 
-      const { data: responsibilitiesData } = await supabase
-        .from("document_responsibilities")
-        .select("user_id, action_type")
-        .eq("document_id", documentId);
+      const targetVersionId = versionId;
+      if (!targetVersionId) {
+        setUsers([]);
+        setIsLoading(false);
+        return;
+      }
 
-      const { data: signaturesData, error: signaturesError } = await supabase
-        .from("document_signatures")
-        .select("signed_by, signed_at, signature_method, signature_data")
-        .eq("document_id", documentId)
-        .order("signed_at", { ascending: false });
+      const { data: statusRows, error: signaturesError } = await (supabase as any).rpc("get_version_signature_status", {
+        _version_id: targetVersionId,
+        _scope: showOnlyResponsibilities ? "responsibles_only" : "all_company_users",
+      });
 
       if (signaturesError) {
         toast({ title: "Error", description: signaturesError.message, variant: "destructive" });
@@ -104,35 +107,23 @@ export function DocumentSignatureStatusDialog({
         roleMap.set(row.user_id, current);
       });
 
-      const responsibleIds = new Set(
-        (responsibilitiesData || [])
-          .filter((row) => row.action_type === "firma")
-          .map((row) => row.user_id)
-      );
-
-      const signaturesByUser = new Map<string, { signedAt: string; method: string; metadata: string | null }>();
-      for (const signature of signaturesData || []) {
-        if (!signaturesByUser.has(signature.signed_by)) {
-          signaturesByUser.set(signature.signed_by, {
-            signedAt: signature.signed_at,
-            method: signature.signature_method,
-            metadata: signature.signature_data,
-          });
-        }
-      }
+      const rowByUser = new Map<string, any>();
+      (statusRows || []).forEach((row: any) => {
+        rowByUser.set(row.user_id, row);
+      });
 
       const merged: SignatureStatusUser[] = (profilesData || []).map((row) => {
-        const signature = signaturesByUser.get(row.user_id);
+        const signature = rowByUser.get(row.user_id);
         return {
           userId: row.user_id,
           fullName: row.full_name || "Sin nombre",
           email: row.email || "",
           role: (roleMap.get(row.user_id) || []).join(", ") || "—",
-          isSigned: Boolean(signature),
-          signedAt: signature?.signedAt,
-          method: signature?.method,
-          metadata: signature?.metadata,
-          isResponsible: responsibleIds.has(row.user_id),
+          isSigned: Boolean(signature?.is_signed),
+          signedAt: signature?.signed_at,
+          method: signature?.signature_method,
+          metadata: null,
+          isResponsible: Boolean(signature?.action_type),
         };
       });
 
@@ -146,7 +137,7 @@ export function DocumentSignatureStatusDialog({
     };
 
     void load();
-  }, [open, documentId, profile?.company_id, toast]);
+  }, [open, documentId, versionId, profile?.company_id, showOnlyResponsibilities, toast]);
 
   const hasResponsibilities = users.some((u) => u.isResponsible);
 
