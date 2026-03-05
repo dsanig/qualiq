@@ -408,6 +408,25 @@ export function DocumentsView({
     }
     setIsChangingStatus(true);
     try {
+      const requiredAction =
+        changeStatusTarget === "review"
+          ? "revision"
+          : changeStatusTarget === "approved"
+            ? "aprobacion"
+            : null;
+
+      if (requiredAction) {
+        const allowed = await canPerformAction(user.id, selectedDocument.id, requiredAction);
+        if (!allowed) {
+          toast({
+            title: "Permisos insuficientes",
+            description: "No eres responsable de esta acción para el documento seleccionado.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       // Update document status
       const { error: updateError } = await supabase.from("documents").update({
         status: changeStatusTarget as any,
@@ -776,6 +795,22 @@ export function DocumentsView({
     setIsSignOpen(true);
   };
 
+  const canPerformAction = useCallback(async (userId: string, documentId: string, actionType: string) => {
+    if (isSuperadmin) return true;
+    const { count, error } = await (supabase as any)
+      .from("document_responsibilities")
+      .select("id", { count: "exact", head: true })
+      .eq("document_id", documentId)
+      .eq("user_id", userId)
+      .eq("action_type", actionType);
+
+    if (error) {
+      throw error;
+    }
+
+    return (count || 0) > 0;
+  }, [isSuperadmin]);
+
   const handleStartSigning = async () => {
     if (!selectedDocument) return;
     setSignStatus("waiting");
@@ -812,6 +847,16 @@ export function DocumentsView({
       return;
     }
     const signedAt = new Date().toISOString();
+    const allowed = await canPerformAction(user.id, selectedDocument.id, "firma");
+    if (!allowed) {
+      toast({
+        title: "Permisos insuficientes",
+        description: "Solo el responsable de firma puede firmar este documento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const { error } = await supabase.from("document_signatures").upsert({
       document_id: selectedDocument.id,
       signed_by: user.id,
@@ -874,6 +919,16 @@ export function DocumentsView({
       return;
     }
     const signedAt = new Date().toISOString();
+    const allowed = await canPerformAction(user.id, selectedDocument.id, "firma");
+    if (!allowed) {
+      toast({
+        title: "Permisos insuficientes",
+        description: "Solo el responsable de firma puede firmar este documento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const { error } = await supabase.from("document_signatures").upsert({
       document_id: selectedDocument.id,
       signed_by: user.id,
