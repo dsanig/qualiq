@@ -48,7 +48,6 @@ import { matchesNormalizedQuery } from "@/utils/search";
 
 interface Document {
   id: string;
-  currentVersionId: string;
   code: string;
   title: string;
   category: string;
@@ -80,8 +79,6 @@ interface VersionRecord {
   version: number;
   file_url: string;
   changes_description: string | null;
-  change_summary?: string | null;
-  status?: string;
   created_at: string;
   created_by: string;
   creatorName?: string;
@@ -318,48 +315,24 @@ export function DocumentsView({
         ])
       );
 
-      const versionIds = data.map((doc) => doc.current_version_id).filter(Boolean);
-      const { data: versionsData } = versionIds.length
-        ? await (supabase as any)
-            .from("document_versions")
-            .select("id, version, version_label, status")
-            .in("id", versionIds)
-        : { data: [] };
-      const versionMap = new Map((versionsData || []).map((v: any) => [v.id, v]));
-
-      const mapped: Document[] = data.map((d) => {
-        const currentVersion = d.current_version_id ? versionMap.get(d.current_version_id) : null;
-        const versionNumber = currentVersion?.version ?? d.version;
-        const versionLabel = currentVersion?.version_label ?? `${versionNumber}.0`;
-        const mappedStatus: Document["status"] =
-          currentVersion?.status === "APROBADO"
-            ? "approved"
-            : currentVersion?.status === "EN_REVISION"
-              ? "review"
-              : currentVersion?.status === "OBSOLETO"
-                ? "obsolete"
-                : (d.status as Document["status"]);
-
-        return {
-          id: d.id,
-          currentVersionId: d.current_version_id,
-          code: d.code,
-          title: d.title,
-          category: d.category,
-          categoryId: d.category.toLowerCase().replace(/ó/g, "o").replace(/í/g, "i"),
-          version: String(versionLabel).replace(/^v/i, ""),
-          versionNum: versionNumber,
-          status: mappedStatus,
-          lastUpdated: new Date(d.updated_at).toISOString().split("T")[0],
-          owner: ownerUserMap.get(d.owner_id) || d.owner_id,
-          ownerId: d.owner_id,
-          pageCount: 0,
-          format: normalizeDocumentFileType(d.file_type),
-          originalAuthor: ownerUserMap.get(d.owner_id) || d.owner_id,
-          lastModifiedBy: ownerUserMap.get(d.owner_id) || d.owner_id,
-          fileUrl: d.file_url,
-        };
-      });
+      const mapped: Document[] = data.map((d) => ({
+        id: d.id,
+        code: d.code,
+        title: d.title,
+        category: d.category,
+        categoryId: d.category.toLowerCase().replace(/ó/g, "o").replace(/í/g, "i"),
+        version: String(d.version) + ".0",
+        versionNum: d.version,
+        status: d.status as Document["status"],
+        lastUpdated: new Date(d.updated_at).toISOString().split("T")[0],
+        owner: ownerUserMap.get(d.owner_id) || d.owner_id,
+        ownerId: d.owner_id,
+        pageCount: 0,
+        format: normalizeDocumentFileType(d.file_type),
+        originalAuthor: ownerUserMap.get(d.owner_id) || d.owner_id,
+        lastModifiedBy: ownerUserMap.get(d.owner_id) || d.owner_id,
+        fileUrl: d.file_url,
+      }));
       setDbDocuments(mapped);
     }
   }, [profile?.company_id]);
@@ -443,7 +416,7 @@ export function DocumentsView({
             : null;
 
       if (requiredAction) {
-        const allowed = await canPerformAction(user.id, selectedDocument.currentVersionId, requiredAction);
+        const allowed = await canPerformAction(user.id, selectedDocument.id, requiredAction);
         if (!allowed) {
           toast({
             title: "Permisos insuficientes",
@@ -454,21 +427,21 @@ export function DocumentsView({
         }
       }
 
-      const dbNewStatus =
-        changeStatusTarget === "review"
-          ? "EN_REVISION"
-          : changeStatusTarget === "approved"
-            ? "APROBADO"
-            : changeStatusTarget === "obsolete"
-              ? "OBSOLETO"
-              : "BORRADOR";
+      // Update document status
+      const { error: updateError } = await supabase.from("documents").update({
+        status: changeStatusTarget as any,
+      }).eq("id", selectedDocument.id);
+      if (updateError) throw updateError;
 
-      const { error: statusError } = await (supabase as any).rpc("set_version_status", {
-        _version_id: selectedDocument.currentVersionId,
-        _new_status: dbNewStatus,
-        _reason: changeStatusComment.trim() || null,
+      // Record the status change
+      const { error: insertError } = await (supabase as any).from("document_status_changes").insert({
+        document_id: selectedDocument.id,
+        old_status: selectedDocument.status,
+        new_status: changeStatusTarget,
+        changed_by: user.id,
+        comment: changeStatusComment.trim() || null,
       });
-      if (statusError) throw statusError;
+      if (insertError) throw insertError;
 
       const statusLabel = statusOptions.find(s => s.value === changeStatusTarget)?.label || changeStatusTarget;
       toast({ title: "Estado actualizado", description: `El documento ahora está en "${statusLabel}".` });
@@ -512,7 +485,7 @@ export function DocumentsView({
     setIsLoadingHistory(true);
     const { data, error } = await (supabase as any)
       .from("document_versions")
-      .select("id, version, file_url, changes_description, change_summary, status, created_at, created_by")
+      .select("id, version, file_url, changes_description, created_at, created_by")
       .eq("document_id", docId)
       .order("version", { ascending: false });
     if (!error && data) {
@@ -582,38 +555,21 @@ export function DocumentsView({
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, updateVersionFile);
       if (uploadError) throw uploadError;
 
-      if (!updateVersionChanges.trim()) {
-        throw new Error("Debes completar 'Cambios respecto a versión anterior'.");
-      }
-
-      let inlineResponsibilities = newDocResponsibilities.map((resp) => ({
-        action_type: resp.actionType.toUpperCase(),
-        responsible_user_id: resp.userId,
-        due_date: resp.dueDate,
-      }));
-
-      if (inlineResponsibilities.length === 0) {
-        const { data: currentResp, error: respError } = await (supabase as any)
-          .from("document_responsibilities")
-          .select("action_type, user_id, due_date")
-          .eq("version_id", selectedDocument.currentVersionId);
-        if (respError) throw respError;
-
-        inlineResponsibilities = (currentResp || []).map((resp: any) => ({
-          action_type: String(resp.action_type || "").toUpperCase(),
-          responsible_user_id: resp.user_id,
-          due_date: resp.due_date,
-        }));
-      }
-
-      const { error: updateError } = await (supabase as any).rpc("create_new_version", {
-        _document_id: selectedDocument.id,
-        _new_version: newVersion,
-        _file_path: filePath,
-        _change_summary: updateVersionChanges.trim(),
-        _responsibilities: inlineResponsibilities,
-        _checksum: null,
+      // Save current version to history
+      await (supabase as any).from("document_versions").insert({
+        document_id: selectedDocument.id,
+        version: selectedDocument.versionNum,
+        file_url: selectedDocument.fileUrl,
+        changes_description: updateVersionChanges.trim() || null,
+        created_by: user.id,
       });
+
+      // Update document with new version
+      const { error: updateError } = await supabase.from("documents").update({
+        version: newVersion,
+        file_url: filePath,
+        file_type: fileType,
+      }).eq("id", selectedDocument.id);
       if (updateError) throw updateError;
 
       toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0` });
@@ -839,12 +795,12 @@ export function DocumentsView({
     setIsSignOpen(true);
   };
 
-  const canPerformAction = useCallback(async (userId: string, versionId: string, actionType: string) => {
+  const canPerformAction = useCallback(async (userId: string, documentId: string, actionType: string) => {
     if (isSuperadmin) return true;
     const { count, error } = await (supabase as any)
       .from("document_responsibilities")
       .select("id", { count: "exact", head: true })
-      .eq("version_id", versionId)
+      .eq("document_id", documentId)
       .eq("user_id", userId)
       .eq("action_type", actionType);
 
@@ -891,16 +847,25 @@ export function DocumentsView({
       return;
     }
     const signedAt = new Date().toISOString();
-    const { error } = await (supabase as any).rpc("sign_version", {
-      _version_id: selectedDocument.currentVersionId,
-      _signature_type: "FIRMA",
-      _method: "DNIE",
-      _payload: {
-        signer_name: signerName.trim(),
-        signer_email: user.email || null,
-        reason: signReason.trim() || null,
-      },
-    });
+    const allowed = await canPerformAction(user.id, selectedDocument.id, "firma");
+    if (!allowed) {
+      toast({
+        title: "Permisos insuficientes",
+        description: "Solo el responsable de firma puede firmar este documento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await supabase.from("document_signatures").upsert({
+      document_id: selectedDocument.id,
+      signed_by: user.id,
+      signer_name: signerName.trim(),
+      signer_email: user.email || null,
+      signature_method: "autofirma_dnie",
+      signature_data: signReason.trim() || null,
+      signed_at: signedAt,
+    }, { onConflict: "document_id,signed_by" });
     if (error) {
       toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
       return;
@@ -954,16 +919,25 @@ export function DocumentsView({
       return;
     }
     const signedAt = new Date().toISOString();
-    const { error } = await (supabase as any).rpc("sign_version", {
-      _version_id: selectedDocument.currentVersionId,
-      _signature_type: "FIRMA",
-      _method: "NOMBRE",
-      _payload: {
-        signer_name: manualSignName.trim(),
-        signer_email: user.email || null,
-        reason: manualSignReason.trim() || null,
-      },
-    });
+    const allowed = await canPerformAction(user.id, selectedDocument.id, "firma");
+    if (!allowed) {
+      toast({
+        title: "Permisos insuficientes",
+        description: "Solo el responsable de firma puede firmar este documento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await supabase.from("document_signatures").upsert({
+      document_id: selectedDocument.id,
+      signed_by: user.id,
+      signer_name: manualSignName.trim(),
+      signer_email: user.email || null,
+      signature_method: "nombre_completo",
+      signature_data: manualSignReason.trim() || null,
+      signed_at: signedAt,
+    }, { onConflict: "document_id,signed_by" });
     if (error) {
       toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
       return;
@@ -1587,8 +1561,7 @@ export function DocumentsView({
                   </div>
                 </div>
                 <p className="text-xs mt-1">Por {v.creatorName} el {new Date(v.created_at).toLocaleDateString("es-ES")}</p>
-                {(v.change_summary || v.changes_description) && <p className="text-xs mt-1">Cambios respecto versión previa: {v.change_summary || v.changes_description}</p>}
-                {v.status && <p className="text-xs mt-1">Estado: {v.status}</p>}
+                {v.changes_description && <p className="text-xs mt-1">Cambios: {v.changes_description}</p>}
               </div>
             ))}
           </div>
@@ -1715,14 +1688,12 @@ export function DocumentsView({
         open={isSignatureStatusOpen}
         onOpenChange={setIsSignatureStatusOpen}
         documentId={selectedDocument?.id ?? null}
-        versionId={selectedDocument?.currentVersionId ?? null}
         documentCode={selectedDocument?.code}
       />
       {/* Responsibilities Dialog */}
       {selectedDocument && (
         <DocumentResponsibilities
           documentId={selectedDocument.id}
-          versionId={selectedDocument.currentVersionId}
           documentCode={selectedDocument.code}
           open={isResponsibilitiesOpen}
           onOpenChange={setIsResponsibilitiesOpen}

@@ -40,7 +40,6 @@ interface Responsibility {
   status: string;
   completed_at: string | null;
   created_at: string;
-  version_id: string;
   userName?: string;
   userEmail?: string;
 }
@@ -53,13 +52,12 @@ interface CompanyUser {
 
 interface DocumentResponsibilitiesProps {
   documentId: string;
-  versionId: string;
   documentCode: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function DocumentResponsibilities({ documentId, versionId, documentCode, open, onOpenChange }: DocumentResponsibilitiesProps) {
+export function DocumentResponsibilities({ documentId, documentCode, open, onOpenChange }: DocumentResponsibilitiesProps) {
   const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,8 +73,8 @@ export function DocumentResponsibilities({ documentId, versionId, documentCode, 
     setIsLoading(true);
     const { data, error } = await (supabase as any)
       .from("document_responsibilities")
-      .select("id, user_id, action_type, due_date, status, completed_at, created_at, version_id")
-      .eq("version_id", versionId)
+      .select("id, user_id, action_type, due_date, status, completed_at, created_at")
+      .eq("document_id", documentId)
       .order("created_at", { ascending: true });
 
     if (!error && data) {
@@ -92,7 +90,7 @@ export function DocumentResponsibilities({ documentId, versionId, documentCode, 
       })));
     }
     setIsLoading(false);
-  }, [versionId]);
+  }, [documentId]);
 
   const fetchCompanyUsers = useCallback(async () => {
     if (!profile?.company_id) return;
@@ -117,12 +115,12 @@ export function DocumentResponsibilities({ documentId, versionId, documentCode, 
     }
     setIsAdding(true);
     try {
-      const { error } = await (supabase as any).rpc("assign_responsibility", {
-        _version_id: versionId,
-        _action_type: selectedActionType.toUpperCase(),
-        _responsible_user_id: selectedUserId,
-        _due_date: selectedDueDate,
-        _notes: null,
+      const { error } = await (supabase as any).from("document_responsibilities").insert({
+        document_id: documentId,
+        user_id: selectedUserId,
+        action_type: selectedActionType,
+        due_date: selectedDueDate,
+        created_by: user.id,
       });
       if (error) throw error;
       toast({ title: "Responsable añadido" });
@@ -138,9 +136,7 @@ export function DocumentResponsibilities({ documentId, versionId, documentCode, 
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await (supabase as any).rpc("unassign_responsibility", {
-        _responsibility_id: id,
-      });
+      const { error } = await (supabase as any).from("document_responsibilities").delete().eq("id", id);
       if (error) throw error;
       toast({ title: "Responsable eliminado" });
       fetchResponsibilities();
