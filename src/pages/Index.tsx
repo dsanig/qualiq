@@ -36,6 +36,12 @@ const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
 
 type IncidentType = "incidencia" | "reclamacion" | "desviacion" | "otra";
 
+interface IncidentPrefillPayload {
+  title: string;
+  description: string;
+  sourceInsightId?: string;
+}
+
 const Index = () => {
   const [activeModule, setActiveModule] = useState("dashboard");
   const [moduleSearchQueries, setModuleSearchQueries] = useState<Record<string, string>>({});
@@ -52,6 +58,7 @@ const Index = () => {
   const [isNewIncidentOpen, setIsNewIncidentOpen] = useState(false);
   const [incidentViewResetSeed, setIncidentViewResetSeed] = useState(0);
   const [incidentTypeSeed, setIncidentTypeSeed] = useState<IncidentType | undefined>(undefined);
+  const [incidentPrefill, setIncidentPrefill] = useState<IncidentPrefillPayload | null>(null);
   const { user, isLoading } = useAuth();
   const { enabledFeatures } = useCompanyFeatures();
   const navigate = useNavigate();
@@ -132,6 +139,13 @@ const Index = () => {
     setActiveModule("incidents");
   };
 
+  const handleCreateIncidentFromInsight = (prefill: IncidentPrefillPayload) => {
+    setIncidentTypeSeed("incidencia");
+    setIncidentPrefill(prefill);
+    setActiveModule("incidents");
+    setIsNewIncidentOpen(true);
+  };
+
   const handleNavigateToDocument = (documentCode: string) => {
     setModuleSearchQueries((prev) => ({ ...prev, documents: documentCode }));
     setActiveModule("documents");
@@ -193,6 +207,8 @@ const Index = () => {
               onNewIncidentOpenChange={setIsNewIncidentOpen}
               initialIncidentType={incidentTypeSeed}
               reloadToken={incidentViewResetSeed}
+              prefill={incidentPrefill}
+              onPrefillConsumed={() => setIncidentPrefill(null)}
             />
           </ErrorBoundary>
         );
@@ -205,7 +221,7 @@ const Index = () => {
       case "audit-simulator":
         return <AuditSimulatorView />;
       case "predictive-analytics":
-        return <PredictiveAnalyticsView />;
+        return <PredictiveAnalyticsView onCreateIncidentFromInsight={handleCreateIncidentFromInsight} />;
       case "company":
         return <CompanyView />;
       case "settings":

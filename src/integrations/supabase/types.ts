@@ -219,6 +219,7 @@ export type Database = {
           description: string | null
           id: string
           status: string
+          source_insight_id: string | null
           title: string
         }
         Insert: {
@@ -230,6 +231,7 @@ export type Database = {
           description?: string | null
           id?: string
           status?: string
+          source_insight_id?: string | null
           title: string
         }
         Update: {
@@ -241,6 +243,7 @@ export type Database = {
           description?: string | null
           id?: string
           status?: string
+          source_insight_id?: string | null
           title?: string
         }
         Relationships: [
@@ -653,6 +656,7 @@ export type Database = {
           resolution_notes: string | null
           responsible_id: string | null
           status: string
+          source_insight_id: string | null
           title: string
         }
         Insert: {
@@ -667,6 +671,7 @@ export type Database = {
           resolution_notes?: string | null
           responsible_id?: string | null
           status?: string
+          source_insight_id?: string | null
           title: string
         }
         Update: {
@@ -681,6 +686,7 @@ export type Database = {
           resolution_notes?: string | null
           responsible_id?: string | null
           status?: string
+          source_insight_id?: string | null
           title?: string
         }
         Relationships: [
@@ -698,6 +704,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "incidencias_source_insight_id_fkey"
+            columns: ["source_insight_id"]
+            isOneToOne: false
+            referencedRelation: "predictive_insights"
+            referencedColumns: ["id"]
+          },
         ]
       }
       non_conformities: {
@@ -710,6 +723,7 @@ export type Database = {
           root_cause: string | null
           severity: string | null
           status: string
+          source_insight_id: string | null
           title: string
         }
         Insert: {
@@ -721,6 +735,7 @@ export type Database = {
           root_cause?: string | null
           severity?: string | null
           status?: string
+          source_insight_id?: string | null
           title: string
         }
         Update: {
@@ -732,6 +747,7 @@ export type Database = {
           root_cause?: string | null
           severity?: string | null
           status?: string
+          source_insight_id?: string | null
           title?: string
         }
         Relationships: [
@@ -835,9 +851,13 @@ export type Database = {
           insight_type: string
           is_acknowledged: boolean | null
           pattern_details: Json | null
+          read_at: string | null
+          read_by: string | null
           severity: string
+          source: Json | null
           suggested_actions: string[] | null
           title: string
+          converted_to_incident_id: string | null
         }
         Insert: {
           acknowledged_at?: string | null
@@ -851,9 +871,13 @@ export type Database = {
           insight_type: string
           is_acknowledged?: boolean | null
           pattern_details?: Json | null
+          read_at?: string | null
+          read_by?: string | null
           severity: string
+          source?: Json | null
           suggested_actions?: string[] | null
           title: string
+          converted_to_incident_id?: string | null
         }
         Update: {
           acknowledged_at?: string | null
@@ -867,9 +891,13 @@ export type Database = {
           insight_type?: string
           is_acknowledged?: boolean | null
           pattern_details?: Json | null
+          read_at?: string | null
+          read_by?: string | null
           severity?: string
+          source?: Json | null
           suggested_actions?: string[] | null
           title?: string
+          converted_to_incident_id?: string | null
         }
         Relationships: [
           {
@@ -877,6 +905,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "predictive_insights_converted_to_incident_id_fkey"
+            columns: ["converted_to_incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidencias"
             referencedColumns: ["id"]
           },
         ]

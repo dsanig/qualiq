@@ -17,6 +17,7 @@ type IncidentType = "incidencia" | "reclamacion" | "desviacion" | "otra";
 
 interface Incident {
   id: string;
+  source_insight_id?: string | null;
   title: string;
   description: string | null;
   incidencia_type: IncidentType;
@@ -39,6 +40,12 @@ interface AttachmentInfo {
   file?: File;
 }
 
+interface IncidentPrefillPayload {
+  title: string;
+  description: string;
+  sourceInsightId?: string;
+}
+
 interface IncidentsViewProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
@@ -49,6 +56,8 @@ interface IncidentsViewProps {
   onNewIncidentOpenChange: (open: boolean) => void;
   initialIncidentType?: IncidentType;
   reloadToken?: number;
+  prefill?: IncidentPrefillPayload | null;
+  onPrefillConsumed?: () => void;
 }
 
 const typeLabels: Record<IncidentType, string> = {
@@ -78,7 +87,7 @@ const defaultForm = (type?: IncidentType): IncidentFormData => ({
 
 export function IncidentsView({
   searchQuery, onSearchChange, filters, onFiltersChange, onOpenFilters,
-  isNewIncidentOpen, onNewIncidentOpenChange, initialIncidentType, reloadToken,
+  isNewIncidentOpen, onNewIncidentOpenChange, initialIncidentType, reloadToken, prefill, onPrefillConsumed,
 }: IncidentsViewProps) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [audits, setAudits] = useState<AuditRef[]>([]);
@@ -91,6 +100,7 @@ export function IncidentsView({
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [newAttachments, setNewAttachments] = useState<AttachmentInfo[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<AttachmentInfo[]>([]);
+  const [sourceInsightId, setSourceInsightId] = useState<string | null>(null);
   const { toast } = useToast();
   const { canEditContent } = usePermissions();
 
@@ -117,7 +127,7 @@ export function IncidentsView({
 
     try {
       const [{ data: incidenciasData, error: incidenciasError }, { data: auditsData, error: auditsError }, { data: usersData, error: usersError }] = await Promise.all([
-        (supabase as any).from("incidencias").select("id,title,description,incidencia_type,audit_id,responsible_id,status,created_at,created_by,deadline,resolution_notes").order("created_at", { ascending: false }),
+        (supabase as any).from("incidencias").select("id,title,description,incidencia_type,audit_id,responsible_id,status,created_at,created_by,deadline,resolution_notes,source_insight_id").order("created_at", { ascending: false }),
         (supabase as any).from("audits").select("id,title").order("created_at", { ascending: false }),
         supabase.from("profiles").select("user_id,full_name,email"),
       ]);
@@ -156,6 +166,18 @@ export function IncidentsView({
   };
 
   useEffect(() => { void loadData(); }, [reloadToken]);
+
+  useEffect(() => {
+    if (!prefill || !isNewIncidentOpen) return;
+    setForm((prev) => ({
+      ...prev,
+      title: prefill.title,
+      description: prefill.description,
+      incidencia_type: "incidencia",
+    }));
+    setSourceInsightId(prefill.sourceInsightId ?? null);
+    onPrefillConsumed?.();
+  }, [prefill, isNewIncidentOpen, onPrefillConsumed]);
 
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
@@ -200,6 +222,7 @@ export function IncidentsView({
       created_by: userId,
       deadline: form.deadline ? format(form.deadline, "yyyy-MM-dd") : null,
       resolution_notes: form.resolution_notes || null,
+      source_insight_id: sourceInsightId,
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (inserted && newAttachments.length > 0) await uploadAttachments(inserted.id);
@@ -207,6 +230,7 @@ export function IncidentsView({
     onNewIncidentOpenChange(false);
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
+    setSourceInsightId(null);
     await loadData();
   };
 
@@ -250,6 +274,7 @@ export function IncidentsView({
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
     setExistingAttachments([]);
+    setSourceInsightId(null);
     await loadData();
   };
 
@@ -359,7 +384,7 @@ export function IncidentsView({
       </Card>
 
       {/* New incident dialog */}
-      <Dialog open={isNewIncidentOpen} onOpenChange={(open) => { onNewIncidentOpenChange(open); if (!open) { setNewAttachments([]); setForm(defaultForm(initialIncidentType)); } }}>
+      <Dialog open={isNewIncidentOpen} onOpenChange={(open) => { onNewIncidentOpenChange(open); if (!open) { setNewAttachments([]); setForm(defaultForm(initialIncidentType)); setSourceInsightId(null); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nueva incidencia</DialogTitle>
