@@ -6,6 +6,49 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+
+const PREDICTION_MIN_RECORDS = 10;
+const PREDICTION_MIN_RANGE_DAYS = 30;
+
+function validateIncidentsForPrediction(incidentsData: Array<{ created_at?: string | null }>) {
+  if (incidentsData.length < PREDICTION_MIN_RECORDS) {
+    return {
+      ok: false,
+      reason: `Se requieren al menos ${PREDICTION_MIN_RECORDS} incidencias reales para ejecutar el análisis predictivo.`,
+    };
+  }
+
+  const timestamps = incidentsData
+    .map((incident) => incident.created_at)
+    .filter((date): date is string => Boolean(date))
+    .map((date) => new Date(date).getTime())
+    .filter((timestamp) => Number.isFinite(timestamp));
+
+  if (timestamps.length !== incidentsData.length) {
+    return {
+      ok: false,
+      reason: "Existen incidencias con fechas inválidas; no se puede ejecutar el análisis predictivo.",
+    };
+  }
+
+  const minDate = Math.min(...timestamps);
+  const maxDate = Math.max(...timestamps);
+  const rangeDays = Math.floor((maxDate - minDate) / (1000 * 60 * 60 * 24));
+
+  if (rangeDays < PREDICTION_MIN_RANGE_DAYS) {
+    return {
+      ok: false,
+      reason: `Se requiere un histórico mínimo de ${PREDICTION_MIN_RANGE_DAYS} días para generar predicciones confiables.`,
+    };
+  }
+
+  return {
+    ok: true,
+    rangeDays,
+    records: incidentsData.length,
+  };
+}
+
 const SYSTEM_PROMPT = `Eres un experto en análisis predictivo para gestión de calidad en el sector farmacéutico y sanitario.
 
 Tu rol es detectar patrones en datos históricos de incidencias, desviaciones y CAPAs para predecir y prevenir problemas futuros.
@@ -99,6 +142,16 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const validation = validateIncidentsForPrediction(incidentsData);
+    if (!validation.ok) {
+      return new Response(
+        JSON.stringify({ error: validation.reason }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Predictive analysis source=incidencias records=", validation.records, "rangeDays=", validation.rangeDays);
 
     // Format incidents data for analysis
     const incidentsContext = JSON.stringify(incidentsData, null, 2);
