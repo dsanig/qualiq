@@ -46,7 +46,7 @@ import type { FiltersState } from "@/components/filters/FilterModal";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
 
-type DocumentTypology = "proceso" | "pnt" | "documento" | "normativa" | "otro";
+type DocumentTypology = "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro";
 
 interface Document {
   id: string;
@@ -123,12 +123,31 @@ const categoryOptions = [
 ];
 
 const typologyOptions: Array<{ value: DocumentTypology; label: string }> = [
-  { value: "proceso", label: "Proceso" },
-  { value: "pnt", label: "PNT" },
-  { value: "documento", label: "Documento" },
-  { value: "normativa", label: "Normativa" },
-  { value: "otro", label: "Otro" },
+  { value: "Proceso", label: "Proceso" },
+  { value: "PNT", label: "PNT" },
+  { value: "Documento", label: "Documento" },
+  { value: "Normativa", label: "Normativa" },
+  { value: "Otro", label: "Otro" },
 ];
+
+const typologyNormalizeMap: Record<string, DocumentTypology> = {
+  proceso: "Proceso",
+  pnt: "PNT",
+  documento: "Documento",
+  normativa: "Normativa",
+  otro: "Otro",
+  Proceso: "Proceso",
+  PNT: "PNT",
+  Documento: "Documento",
+  Normativa: "Normativa",
+  Otro: "Otro",
+};
+
+const isMissingTypologyColumnError = (error: { message?: string; details?: string; hint?: string } | null) => {
+  if (!error) return false;
+  const text = `${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`;
+  return text.includes("Could not find the 'typology' column");
+};
 
 const typologyLabelMap: Record<DocumentTypology, string> = Object.fromEntries(
   typologyOptions.map((option) => [option.value, option.label])
@@ -238,7 +257,7 @@ export function DocumentsView({
   const [editDocCode, setEditDocCode] = useState("");
   const [editDocTitle, setEditDocTitle] = useState("");
   const [editDocCategory, setEditDocCategory] = useState("calidad");
-  const [editDocTypology, setEditDocTypology] = useState<DocumentTypology>("documento");
+  const [editDocTypology, setEditDocTypology] = useState<DocumentTypology>("Documento");
   const [editDocStatus, setEditDocStatus] = useState("draft");
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [isEditSaving, setIsEditSaving] = useState(false);
@@ -276,7 +295,7 @@ export function DocumentsView({
   const [newDocCode, setNewDocCode] = useState("");
   const [newDocTitle, setNewDocTitle] = useState("");
   const [newDocCategory, setNewDocCategory] = useState("calidad");
-  const [newDocTypology, setNewDocTypology] = useState<DocumentTypology>("documento");
+  const [newDocTypology, setNewDocTypology] = useState<DocumentTypology>("Documento");
   const [typologyFilter, setTypologyFilter] = useState<"all" | DocumentTypology>("all");
   const [newDocDescription, setNewDocDescription] = useState("");
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
@@ -376,7 +395,7 @@ export function DocumentsView({
         id: d.id,
         code: d.code,
         title: d.title,
-        typology: (d.typology ?? "documento") as DocumentTypology,
+        typology: typologyNormalizeMap[d.typology ?? "Documento"] ?? "Documento",
         category: d.category,
         categoryId: d.category.toLowerCase().replace(/ó/g, "o").replace(/í/g, "i"),
         version: String(d.version) + ".0",
@@ -441,7 +460,22 @@ export function DocumentsView({
         typology: editDocTypology,
         status: editDocStatus as any,
       }).eq("id", editingDocId);
-      if (error) throw error;
+      if (isMissingTypologyColumnError(error)) {
+        const { error: retryError } = await supabase.from("documents").update({
+          code: editDocCode.trim(),
+          title: editDocTitle.trim(),
+          category: editDocCategory.charAt(0).toUpperCase() + editDocCategory.slice(1),
+          status: editDocStatus as any,
+        }).eq("id", editingDocId);
+        if (retryError) throw retryError;
+
+        toast({
+          title: "Tipología no disponible aún",
+          description: "Pendiente de actualización del sistema. Se guardó sin tipología.",
+        });
+      } else if (error) {
+        throw error;
+      }
       toast({ title: "Documento actualizado" });
       setIsEditOpen(false);
       fetchDocuments();
@@ -814,6 +848,16 @@ export function DocumentsView({
       const fileType = fileTypeForDb(newDocFile);
       debugFileTypeMapping(newDocFile);
 
+      if (import.meta.env.DEV) {
+        let supabaseHost = "invalid-url";
+        try {
+          supabaseHost = new URL(import.meta.env.VITE_SUPABASE_URL).host;
+        } catch {
+          supabaseHost = "invalid-url";
+        }
+        console.log("SUPABASE_HOST", supabaseHost);
+      }
+
       if (fileType === "other") {
         throw new Error("Formato no permitido. Usa PDF, Word, Excel o imagen (PNG/JPG/JPEG/WEBP).");
       }
@@ -824,7 +868,7 @@ export function DocumentsView({
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, newDocFile);
       if (uploadError) throw uploadError;
 
-      const { error: insertError } = await supabase.from("documents").insert({
+      const payload = {
         id: documentId,
         code: newDocCode.trim(),
         title: newDocTitle.trim(),
@@ -835,8 +879,22 @@ export function DocumentsView({
         file_type: fileType,
         file_url: filePath,
         status: "draft" as const,
-      });
-      if (insertError) throw insertError;
+      };
+
+      const { error: insertError } = await supabase.from("documents").insert(payload);
+
+      if (isMissingTypologyColumnError(insertError)) {
+        const { typology: _ignoredTypology, ...payloadWithoutTypology } = payload;
+        const { error: retryError } = await supabase.from("documents").insert(payloadWithoutTypology);
+        if (retryError) throw retryError;
+
+        toast({
+          title: "Tipología no disponible aún",
+          description: "Pendiente de actualización del sistema. Guardado sin tipología.",
+        });
+      } else if (insertError) {
+        throw insertError;
+      }
 
       // Insert responsibilities if any
       if (newDocResponsibilities.length > 0) {
@@ -855,7 +913,7 @@ export function DocumentsView({
       setNewDocCode("");
       setNewDocTitle("");
       setNewDocCategory("calidad");
-      setNewDocTypology("documento");
+      setNewDocTypology("Documento");
       setNewDocDescription("");
       setNewDocFile(null);
       setNewDocResponsibilities([]);

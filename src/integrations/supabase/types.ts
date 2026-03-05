@@ -554,7 +554,7 @@ export type Database = {
           locked_by: string | null
           owner_id: string
           status: Database["public"]["Enums"]["document_status"]
-          typology: Database["public"]["Enums"]["document_typology"]
+          typology: "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro"
           title: string
           updated_at: string
           version: number
@@ -572,7 +572,7 @@ export type Database = {
           locked_by?: string | null
           owner_id: string
           status?: Database["public"]["Enums"]["document_status"]
-          typology?: Database["public"]["Enums"]["document_typology"]
+          typology?: "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro"
           title: string
           updated_at?: string
           version?: number
@@ -590,7 +590,7 @@ export type Database = {
           locked_by?: string | null
           owner_id?: string
           status?: Database["public"]["Enums"]["document_status"]
-          typology?: Database["public"]["Enums"]["document_typology"]
+          typology?: "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro"
           title?: string
           updated_at?: string
           version?: number
@@ -1156,7 +1156,6 @@ export type Database = {
         | "Editor"
         | "Espectador"
       document_status: "draft" | "review" | "approved" | "obsolete" | "archived"
-      document_typology: "proceso" | "pnt" | "documento" | "normativa" | "otro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1295,7 +1294,6 @@ export const Constants = {
         "Espectador",
       ],
       document_status: ["draft", "review", "approved", "obsolete", "archived"],
-      document_typology: ["proceso", "pnt", "documento", "normativa", "otro"],
     },
   },
 } as const
