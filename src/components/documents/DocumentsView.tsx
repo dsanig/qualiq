@@ -635,12 +635,29 @@ export function DocumentsView({
         throw new Error("Debes asignar al menos un responsable para crear la nueva versión.");
       }
 
-      const { error: rpcError } = await (supabase as any).rpc("create_new_document_version", {
+      const createVersionArgs = {
         _document_id: selectedDocument.id,
         _file_path: filePath,
         _change_summary: updateVersionChanges.trim() || null,
         _responsibilities: cleanedResponsibilities,
-      });
+      };
+
+      let { error: rpcError } = await (supabase as any).rpc("create_new_document_version", createVersionArgs);
+
+      const missingChangeSummarySignature =
+        rpcError?.message?.includes("Could not find the function public.create_new_document_version") ?? false;
+
+      if (rpcError && missingChangeSummarySignature) {
+        const fallbackArgs = {
+          _document_id: selectedDocument.id,
+          _file_path: filePath,
+          _responsibilities: cleanedResponsibilities,
+        };
+
+        const fallbackResult = await (supabase as any).rpc("create_new_document_version", fallbackArgs);
+        rpcError = fallbackResult.error;
+      }
+
       if (rpcError) throw rpcError;
 
       const { error: updateError } = await supabase.from("documents").update({ file_type: fileType }).eq("id", selectedDocument.id);
