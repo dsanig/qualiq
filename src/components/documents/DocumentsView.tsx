@@ -642,6 +642,33 @@ export function DocumentsView({
         _responsibilities: cleanedResponsibilities,
       };
 
+      if (import.meta.env.DEV) {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        const payloadTypes = Object.fromEntries(
+          Object.entries(createVersionArgs).map(([key, value]) => [
+            key,
+            Array.isArray(value) ? "array" : typeof value,
+          ]),
+        );
+        const projectHostname = (() => {
+          try {
+            return new URL(import.meta.env.VITE_SUPABASE_URL).hostname;
+          } catch {
+            return "invalid-url";
+          }
+        })();
+
+        console.info("[documents:update-version] RPC preflight", {
+          supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+          projectHostname,
+          payloadKeys: Object.keys(createVersionArgs),
+          payloadTypes,
+          payloadJson: JSON.stringify(createVersionArgs),
+          authUserId: authData.user?.id ?? null,
+          authError: authError?.message ?? null,
+        });
+      }
+
       const { error: rpcError } = await (supabase as any).rpc("create_new_document_version", createVersionArgs);
 
       if (rpcError) throw rpcError;
@@ -758,6 +785,27 @@ export function DocumentsView({
       setIsUploading(false);
     }
   };
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+
+    const runRpcProbe = async () => {
+      const probeArgs = {
+        _document_id: crypto.randomUUID(),
+        _file_path: "dev/rpc-probe.txt",
+        _responsibilities: [],
+      };
+      const { error } = await (supabase as any).rpc("create_new_document_version", probeArgs);
+      console.info("[documents:update-version] RPC probe", {
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+        payloadKeys: Object.keys(probeArgs),
+        errorCode: error?.code ?? null,
+        errorMessage: error?.message ?? null,
+      });
+    };
+
+    runRpcProbe();
+  }, []);
 
   useEffect(() => {
     if (folderInputRef.current) {
