@@ -143,6 +143,18 @@ const typologyNormalizeMap: Record<string, DocumentTypology> = {
   Otro: "Otro",
 };
 
+const normalizeTypology = (value: string | null | undefined): DocumentTypology => {
+  if (!value?.trim()) return "Documento";
+
+  const normalizedValue = value.trim();
+
+  return (
+    typologyNormalizeMap[normalizedValue] ??
+    typologyNormalizeMap[normalizedValue.toLowerCase()] ??
+    "Documento"
+  );
+};
+
 const isMissingTypologyColumnError = (error: { message?: string; details?: string; hint?: string } | null) => {
   if (!error) return false;
   const text = `${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`;
@@ -295,7 +307,7 @@ export function DocumentsView({
   const [newDocCode, setNewDocCode] = useState("");
   const [newDocTitle, setNewDocTitle] = useState("");
   const [newDocCategory, setNewDocCategory] = useState("calidad");
-  const [newDocTypology, setNewDocTypology] = useState<DocumentTypology>("Documento");
+  const [newDocTypology, setNewDocTypology] = useState<DocumentTypology | "">("");
   const [newDocDescription, setNewDocDescription] = useState("");
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -419,7 +431,7 @@ export function DocumentsView({
         id: d.id,
         code: d.code,
         title: d.title,
-        typology: typologyNormalizeMap[d.typology ?? "Documento"] ?? "Documento",
+        typology: normalizeTypology(d.typology),
         category: d.category,
         categoryId: d.category.toLowerCase().replace(/ó/g, "o").replace(/í/g, "i"),
         version: String(d.version) + ".0",
@@ -459,7 +471,7 @@ export function DocumentsView({
         id: d.id,
         code: d.code,
         title: d.title,
-        typology: typologyNormalizeMap[d.typology ?? "Documento"] ?? "Documento",
+        typology: normalizeTypology(d.typology),
         category: d.category,
         categoryId: d.category.toLowerCase().replace(/ó/g, "o").replace(/í/g, "i"),
         version: String(d.version) + ".0",
@@ -937,7 +949,7 @@ export function DocumentsView({
         code: newDocCode.trim(),
         title: newDocTitle.trim(),
         category: newDocCategory.charAt(0).toUpperCase() + newDocCategory.slice(1),
-        typology: newDocTypology,
+        typology: newDocTypology || "Documento",
         company_id: profile.company_id,
         owner_id: uploaderUser.id,
         file_type: fileType,
@@ -977,7 +989,7 @@ export function DocumentsView({
       setNewDocCode("");
       setNewDocTitle("");
       setNewDocCategory("calidad");
-      setNewDocTypology("Documento");
+      setNewDocTypology("");
       setNewDocDescription("");
       setNewDocFile(null);
       setNewDocResponsibilities([]);
@@ -1844,7 +1856,7 @@ export function DocumentsView({
                 <div className="space-y-2">
                   <Label>Tipología</Label>
                   <Select value={newDocTypology} onValueChange={(value) => setNewDocTypology(value as DocumentTypology)}>
-                    <SelectTrigger data-testid="document-typology-select"><SelectValue /></SelectTrigger>
+                    <SelectTrigger data-testid="document-typology-select"><SelectValue placeholder="Selecciona una tipología" /></SelectTrigger>
                     <SelectContent>
                       {typologyOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
