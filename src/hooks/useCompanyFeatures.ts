@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const ALL_FEATURES = [
   { key: "documents", label: "Documentos" },
-  { key: "processes", label: "Procesos / PNT" },
   { key: "incidents", label: "Incidencias" },
   { key: "audits", label: "Auditorías" },
   { key: "training", label: "Formación" },

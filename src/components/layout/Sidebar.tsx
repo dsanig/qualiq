@@ -2,8 +2,6 @@ import {
   LayoutDashboard, 
   FileText, 
   AlertTriangle, 
-  GitBranch, 
-  BarChart3, 
   MessageSquare, 
   Settings,
   ChevronLeft,
@@ -26,7 +24,6 @@ interface SidebarProps {
 const navigationItems = [
   { id: "dashboard", label: "Panel de Control", icon: LayoutDashboard },
   { id: "documents", label: "Documentos", icon: FileText },
-  { id: "processes", label: "Procesos / PNT", icon: GitBranch },
   { id: "incidents", label: "Incidencias", icon: AlertTriangle },
   { id: "audits", label: "Auditorías", icon: ClipboardCheck },
   { id: "training", label: "Formación", icon: GraduationCap },

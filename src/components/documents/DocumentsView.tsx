@@ -46,10 +46,13 @@ import type { FiltersState } from "@/components/filters/FilterModal";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
 
+type DocumentTypology = "proceso" | "pnt" | "documento" | "normativa" | "otro";
+
 interface Document {
   id: string;
   code: string;
   title: string;
+  typology: DocumentTypology;
   category: string;
   categoryId: string;
   version: string;
@@ -119,6 +122,18 @@ const categoryOptions = [
   { id: "regulatory", label: "Regulatorio" },
 ];
 
+const typologyOptions: Array<{ value: DocumentTypology; label: string }> = [
+  { value: "proceso", label: "Proceso" },
+  { value: "pnt", label: "PNT" },
+  { value: "documento", label: "Documento" },
+  { value: "normativa", label: "Normativa" },
+  { value: "otro", label: "Otro" },
+];
+
+const typologyLabelMap: Record<DocumentTypology, string> = Object.fromEntries(
+  typologyOptions.map((option) => [option.value, option.label])
+) as Record<DocumentTypology, string>;
+
 const statusConfig = {
   approved: { label: "Aprobado", icon: CheckCircle, class: "text-success" },
   draft: { label: "Borrador", icon: Clock, class: "text-muted-foreground" },
@@ -144,7 +159,6 @@ interface StatusChangeRecord {
 }
 
 interface DocumentsViewProps {
-  mode?: "documents" | "processes";
   searchQuery: string;
   onSearchChange: (value: string) => void;
   filters: FiltersState;
@@ -155,7 +169,6 @@ interface DocumentsViewProps {
 }
 
 export function DocumentsView({
-  mode = "documents",
   searchQuery,
   onSearchChange,
   filters,
@@ -225,6 +238,7 @@ export function DocumentsView({
   const [editDocCode, setEditDocCode] = useState("");
   const [editDocTitle, setEditDocTitle] = useState("");
   const [editDocCategory, setEditDocCategory] = useState("calidad");
+  const [editDocTypology, setEditDocTypology] = useState<DocumentTypology>("documento");
   const [editDocStatus, setEditDocStatus] = useState("draft");
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [isEditSaving, setIsEditSaving] = useState(false);
@@ -262,6 +276,8 @@ export function DocumentsView({
   const [newDocCode, setNewDocCode] = useState("");
   const [newDocTitle, setNewDocTitle] = useState("");
   const [newDocCategory, setNewDocCategory] = useState("calidad");
+  const [newDocTypology, setNewDocTypology] = useState<DocumentTypology>("documento");
+  const [typologyFilter, setTypologyFilter] = useState<"all" | DocumentTypology>("all");
   const [newDocDescription, setNewDocDescription] = useState("");
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -360,6 +376,7 @@ export function DocumentsView({
         id: d.id,
         code: d.code,
         title: d.title,
+        typology: (d.typology ?? "documento") as DocumentTypology,
         category: d.category,
         categoryId: d.category.toLowerCase().replace(/ó/g, "o").replace(/í/g, "i"),
         version: String(d.version) + ".0",
@@ -408,6 +425,7 @@ export function DocumentsView({
     setEditDocCode(doc.code);
     setEditDocTitle(doc.title);
     setEditDocCategory(doc.categoryId);
+    setEditDocTypology(doc.typology);
     setEditDocStatus(doc.status);
     setIsEditOpen(true);
   };
@@ -420,6 +438,7 @@ export function DocumentsView({
         code: editDocCode.trim(),
         title: editDocTitle.trim(),
         category: editDocCategory.charAt(0).toUpperCase() + editDocCategory.slice(1),
+        typology: editDocTypology,
         status: editDocStatus as any,
       }).eq("id", editingDocId);
       if (error) throw error;
@@ -810,6 +829,7 @@ export function DocumentsView({
         code: newDocCode.trim(),
         title: newDocTitle.trim(),
         category: newDocCategory.charAt(0).toUpperCase() + newDocCategory.slice(1),
+        typology: newDocTypology,
         company_id: profile.company_id,
         owner_id: uploaderUser.id,
         file_type: fileType,
@@ -835,6 +855,7 @@ export function DocumentsView({
       setNewDocCode("");
       setNewDocTitle("");
       setNewDocCategory("calidad");
+      setNewDocTypology("documento");
       setNewDocDescription("");
       setNewDocFile(null);
       setNewDocResponsibilities([]);
@@ -910,6 +931,7 @@ export function DocumentsView({
         doc.title,
         doc.owner,
         doc.category,
+        typologyLabelMap[doc.typology],
         doc.description,
         doc.version,
         doc.originalAuthor,
@@ -919,6 +941,7 @@ export function DocumentsView({
 
       const matchesCategory = filters.category === "all" || doc.categoryId === filters.category;
       const matchesStatus = filters.documentStatus === "all" || doc.status === filters.documentStatus;
+      const matchesTypology = typologyFilter === "all" || doc.typology === typologyFilter;
       
       const isSigned = !!signedDocuments[doc.id];
       const matchesSignature =
@@ -927,9 +950,9 @@ export function DocumentsView({
         (filters.signatureStatus === "pending" && !isSigned && doc.status === "approved") ||
         (filters.signatureStatus === "not_required" && doc.status !== "approved");
 
-      return matchesQuery && matchesCategory && matchesStatus && matchesSignature;
+      return matchesQuery && matchesCategory && matchesStatus && matchesTypology && matchesSignature;
     });
-  }, [debouncedSearchQuery, filters, signedDocuments, allDocuments]);
+  }, [debouncedSearchQuery, filters, signedDocuments, allDocuments, typologyFilter]);
 
   const effectiveItemsPerPage = showAllDocuments ? Math.max(filteredDocuments.length, 1) : itemsPerPage;
   const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / effectiveItemsPerPage));
@@ -1265,7 +1288,7 @@ export function DocumentsView({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             data-testid="documents-search"
-            placeholder={mode === "processes" ? "Buscar procesos por código, título o responsable..." : "Buscar por código, título o responsable..."}
+            placeholder="Buscar por código, título o responsable..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             onKeyDown={(event) => { if (event.key === "Enter") onSearchChange(searchQuery); }}
@@ -1344,6 +1367,16 @@ export function DocumentsView({
                   </SelectContent>
                 </Select>
                 <span className="text-xs text-muted-foreground">documentos por página</span>
+                <Label className="text-xs text-muted-foreground ml-3">Tipología</Label>
+                <Select value={typologyFilter} onValueChange={(value) => setTypologyFilter(value as "all" | DocumentTypology)}>
+                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {typologyOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <span className="text-xs text-muted-foreground">{selectedIds.length} seleccionados</span>
             </div>
@@ -1356,6 +1389,7 @@ export function DocumentsView({
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Título</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Tipología</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Versión</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Firma</th>
@@ -1379,6 +1413,11 @@ export function DocumentsView({
                               <p className="text-sm font-medium text-foreground">{doc.title}</p>
                               <p className="text-xs text-muted-foreground">{doc.owner}</p>
                             </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center rounded-full bg-secondary px-2 py-1 text-xs text-foreground">
+                              {typologyLabelMap[doc.typology]}
+                            </span>
                           </td>
                           <td className="px-4 py-3"><span className="text-sm text-foreground">v{doc.version}</span></td>
                           <td className="px-4 py-3">
@@ -1482,6 +1521,7 @@ export function DocumentsView({
                   <p>Código: {selectedDocument.code}</p>
                   <p>Formato: {selectedDocument.format.toUpperCase()}</p>
                   <p>Categoría: {selectedDocument.category}</p>
+                  <p>Tipología: {typologyLabelMap[selectedDocument.typology]}</p>
                 </div>
                 <div>
                   <p>Autor: {selectedDocument.originalAuthor}</p>
@@ -1676,6 +1716,17 @@ export function DocumentsView({
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Tipología</Label>
+                  <Select value={newDocTypology} onValueChange={(value) => setNewDocTypology(value as DocumentTypology)}>
+                    <SelectTrigger data-testid="document-typology-select"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {typologyOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Descripción / alcance</Label>
@@ -1795,7 +1846,7 @@ export function DocumentsView({
                 <Input value={editDocTitle} onChange={(e) => setEditDocTitle(e.target.value)} />
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Categoría</Label>
                 <Select value={editDocCategory} onValueChange={setEditDocCategory}>
@@ -1806,6 +1857,17 @@ export function DocumentsView({
                     <SelectItem value="logistica">Logística</SelectItem>
                     <SelectItem value="rrhh">RRHH</SelectItem>
                     <SelectItem value="regulatory">Regulatory</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Tipología</Label>
+                <Select value={editDocTypology} onValueChange={(value) => setEditDocTypology(value as DocumentTypology)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {typologyOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
