@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run guard:no-demo-data && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "verify:has-role-rpc": "node scripts/verify-has-role-rpc.mjs"
+    "verify:has-role-rpc": "node scripts/verify-has-role-rpc.mjs",
+    "guard:no-demo-data": "node scripts/guard-no-demo-data.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

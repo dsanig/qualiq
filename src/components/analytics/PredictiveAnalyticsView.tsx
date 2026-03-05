@@ -35,6 +35,16 @@ interface PredictiveInsight {
   created_at: string;
 }
 
+interface PredictionDataValidation {
+  isSufficient: boolean;
+  reason?: string;
+  recordCount: number;
+  rangeDays: number;
+}
+
+const PREDICTION_MIN_RECORDS = 10;
+const PREDICTION_MIN_RANGE_DAYS = 30;
+
 const INSIGHT_TYPE_CONFIG = {
   pattern: { icon: BarChart3, label: "Patrón Detectado", color: "text-accent" },
   trend: { icon: TrendingUp, label: "Tendencia", color: "text-success" },
@@ -53,25 +63,78 @@ export function PredictiveAnalyticsView() {
   const [insights, setInsights] = useState<PredictiveInsight[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [lastValidation, setLastValidation] = useState<PredictionDataValidation | null>(null);
 
   useEffect(() => {
     fetchInsights();
-  }, []);
+  }, [profile?.company_id]);
 
   const fetchInsights = async () => {
     setIsLoading(true);
+    if (!profile?.company_id) {
+      setInsights([]);
+      setIsLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("predictive_insights")
       .select("*")
+      .eq("company_id", profile.company_id)
       .order("created_at", { ascending: false })
       .limit(20);
 
     if (error) {
       console.error("Error fetching insights:", error);
     } else {
-      setInsights((data || []) as unknown as PredictiveInsight[]);
+      setInsights((data ?? []) as unknown as PredictiveInsight[]);
     }
     setIsLoading(false);
+  };
+
+  const isDataSufficientForPrediction = (data: Array<{ created_at: string | null }>): PredictionDataValidation => {
+    const validDates = data
+      .map((item) => item.created_at)
+      .filter((date): date is string => Boolean(date))
+      .map((date) => new Date(date).getTime())
+      .filter((timestamp) => Number.isFinite(timestamp));
+
+    if (data.length < PREDICTION_MIN_RECORDS) {
+      return {
+        isSufficient: false,
+        reason: `Se requieren al menos ${PREDICTION_MIN_RECORDS} incidencias reales para analizar patrones.`,
+        recordCount: data.length,
+        rangeDays: 0,
+      };
+    }
+
+    if (validDates.length !== data.length) {
+      return {
+        isSufficient: false,
+        reason: "Hay incidencias con fechas inválidas y no se puede ejecutar un análisis confiable.",
+        recordCount: data.length,
+        rangeDays: 0,
+      };
+    }
+
+    const minDate = Math.min(...validDates);
+    const maxDate = Math.max(...validDates);
+    const rangeDays = Math.floor((maxDate - minDate) / (1000 * 60 * 60 * 24));
+
+    if (rangeDays < PREDICTION_MIN_RANGE_DAYS) {
+      return {
+        isSufficient: false,
+        reason: `Se requiere un histórico mínimo de ${PREDICTION_MIN_RANGE_DAYS} días para generar predicciones fiables.`,
+        recordCount: data.length,
+        rangeDays,
+      };
+    }
+
+    return {
+      isSufficient: true,
+      recordCount: data.length,
+      rangeDays,
+    };
   };
 
   const runAnalysis = async () => {
@@ -97,12 +160,38 @@ export function PredictiveAnalyticsView() {
       if (incidentsError) throw incidentsError;
 
       if (!incidentsData || incidentsData.length === 0) {
+        const validation = {
+          isSufficient: false,
+          reason: "No hay incidencias reales registradas en la empresa.",
+          recordCount: 0,
+          rangeDays: 0,
+        } satisfies PredictionDataValidation;
+        setLastValidation(validation);
         toast({
           title: "Sin datos para analizar",
-          description: "No hay incidencias reales registradas en la empresa.",
+          description: validation.reason,
           variant: "destructive",
         });
         return;
+      }
+
+      const validation = isDataSufficientForPrediction(incidentsData);
+      setLastValidation(validation);
+      if (!validation.isSufficient) {
+        toast({
+          title: "Datos insuficientes",
+          description: validation.reason,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (import.meta.env.DEV) {
+        console.info("[predictive-analytics] Fuente: incidencias", {
+          companyId: profile.company_id,
+          records: validation.recordCount,
+          rangeDays: validation.rangeDays,
+        });
       }
 
       const { error } = await supabase.functions.invoke("analyze-capa-patterns", {
@@ -230,9 +319,12 @@ export function PredictiveAnalyticsView() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Brain className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium text-foreground">Sin insights detectados</p>
+            <p className="text-lg font-medium text-foreground">No hay datos suficientes para generar análisis predictivo.</p>
             <p className="text-sm text-muted-foreground mt-1 text-center max-w-md">
-              Ejecuta un análisis para detectar patrones en tus incidencias, desviaciones y CAPAs
+              {lastValidation?.reason ?? "Carga datos reales o completa el registro de incidencias para habilitar este módulo."}
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 text-center max-w-md">
+              Carga datos reales o completa los pasos de registro de incidencias, con al menos {PREDICTION_MIN_RECORDS} registros y {PREDICTION_MIN_RANGE_DAYS} días de histórico.
             </p>
             <Button className="mt-4" onClick={runAnalysis} disabled={isAnalyzing}>
               {isAnalyzing ? "Analizando..." : "Ejecutar Primer Análisis"}
