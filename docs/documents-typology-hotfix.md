@@ -25,7 +25,7 @@ ORDER BY ordinal_position;
 
 Migración incluida en repo:
 
-- `supabase/migrations/20260306133000_fix_documents_typology_text_check.sql`
+- `supabase/migrations/20260305130500_add_documents_typology.sql`
 
 Opciones de despliegue:
 
@@ -62,7 +62,6 @@ La integridad queda protegida con `CHECK` y frontend alineado para enviar exacta
 
 Si el frontend se despliega antes que la migración y aparece el error de schema cache de `typology`:
 
-- Se reintenta guardar sin `typology`.
-- Se muestra toast indicando que se guardó sin tipología por actualización pendiente.
+- Se cancela el guardado y se muestra: `El sistema aún no está actualizado. Intenta más tarde.`
 
-Esto evita rotura total del flujo de creación/edición mientras termina el despliegue de BD.
+Esto evita guardar datos inconsistentes hasta que termine el despliegue de BD.

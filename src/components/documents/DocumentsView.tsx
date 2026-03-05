@@ -184,7 +184,10 @@ const fromDbTypologyToUi = (value: DocumentTypologyDb): DocumentTypology => dbTy
 const isMissingTypologyColumnError = (error: { message?: string; details?: string; hint?: string } | null) => {
   if (!error) return false;
   const text = `${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`;
-  return text.includes("Could not find the 'typology' column");
+  return (
+    text.includes("Could not find the 'typology' column") ||
+    text.includes("column documents.typology does not exist")
+  );
 };
 
 const typologyLabelMap: Record<DocumentTypology, string> = Object.fromEntries(
@@ -575,25 +578,12 @@ export function DocumentsView({
       console.log("UPDATE result", { data, error, status, count, rowCount: data?.length ?? 0 });
 
       if (isMissingTypologyColumnError(error)) {
-        const { data: fallbackData, error: retryError, status: fallbackStatus, count: fallbackCount } = await supabase.from("documents").update({
-          code: editDocCode.trim(),
-          title: editDocTitle.trim(),
-          category: editDocCategory.charAt(0).toUpperCase() + editDocCategory.slice(1),
-          status: editDocStatus as any,
-        }).eq("id", editingDocId).eq("company_id", profile?.company_id ?? "").select("id");
-        console.log("UPDATE result (fallback without typology)", {
-          data: fallbackData,
-          error: retryError,
-          status: fallbackStatus,
-          count: fallbackCount,
-          rowCount: fallbackData?.length ?? 0,
-        });
-        if (retryError) throw retryError;
-
         toast({
           title: "Tipología no disponible aún",
-          description: "Pendiente de actualización del sistema. Se guardó sin tipología.",
+          description: "El sistema aún no está actualizado. Intenta más tarde.",
+          variant: "destructive",
         });
+        return;
       } else if (error) {
         throw error;
       }
@@ -1032,23 +1022,14 @@ export function DocumentsView({
       console.log("CREATE result", { data, error: insertError, status, count });
 
       if (isMissingTypologyColumnError(insertError)) {
-        const { typology: _ignoredTypology, ...payloadWithoutTypology } = payload;
-        const { data: fallbackData, error: retryError, status: fallbackStatus, count: fallbackCount } = await supabase
-          .from("documents")
-          .insert(payloadWithoutTypology)
-          .select("id, typology");
-        console.log("CREATE result (fallback without typology)", {
-          data: fallbackData,
-          error: retryError,
-          status: fallbackStatus,
-          count: fallbackCount,
-        });
-        if (retryError) throw retryError;
+        await supabase.storage.from("documents").remove([filePath]);
 
         toast({
           title: "Tipología no disponible aún",
-          description: "Pendiente de actualización del sistema. Guardado sin tipología.",
+          description: "El sistema aún no está actualizado. Intenta más tarde.",
+          variant: "destructive",
         });
+        return;
       } else if (insertError) {
         throw insertError;
       }
