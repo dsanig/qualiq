@@ -63,7 +63,6 @@ interface Document {
   originalAuthor: string;
   lastModifiedBy: string;
   fileUrl: string;
-  currentVersionId?: string;
   description?: string;
 }
 
@@ -80,8 +79,6 @@ interface VersionRecord {
   version: number;
   file_url: string;
   changes_description: string | null;
-  change_summary?: string | null;
-  status?: "approved" | "draft" | "review" | "obsolete";
   created_at: string;
   created_by: string;
   creatorName?: string;
@@ -134,7 +131,6 @@ const statusOptions = [
   { value: "draft", label: "Borrador" },
   { value: "review", label: "En Revisión" },
   { value: "approved", label: "Aprobado" },
-  { value: "obsolete", label: "Obsoleto" },
 ];
 
 interface StatusChangeRecord {
@@ -271,35 +267,24 @@ export function DocumentsView({
   // Fetch firma responsibilities and signatures to compute signature status
   const fetchFirmaStatus = useCallback(async () => {
     if (!profile?.company_id) return;
-
-    const { data: activeVersions } = await (supabase as any)
-      .from("document_versions")
-      .select("id, document_id")
-      .neq("status", "obsolete");
-
-    const activeVersionIds = new Set((activeVersions || []).map((row: { id: string }) => row.id));
-
     // Get all firma responsibilities
     const { data: firmaResps } = await (supabase as any)
       .from("document_responsibilities")
-      .select("document_id, version_id, user_id, status")
+      .select("document_id, user_id, status")
       .eq("action_type", "firma");
-
+    
     // Get all signatures
     const { data: sigs } = await supabase
       .from("document_signatures")
-      .select("document_id, version_id, signed_by");
+      .select("document_id, signed_by");
 
-    const sigSet = new Set((sigs || [])
-      .filter((s: { version_id: string }) => activeVersionIds.has(s.version_id))
-      .map((s: { document_id: string; version_id: string; signed_by: string }) => `${s.document_id}:${s.version_id}:${s.signed_by}`));
+    const sigSet = new Set((sigs || []).map(s => `${s.document_id}:${s.signed_by}`));
 
     const statusMap: Record<string, { total: number; signed: number }> = {};
-    for (const r of (firmaResps as Array<{ document_id: string; version_id: string; user_id: string; status: string }> || [])) {
-      if (!activeVersionIds.has(r.version_id)) continue;
+    for (const r of (firmaResps as any[] || [])) {
       if (!statusMap[r.document_id]) statusMap[r.document_id] = { total: 0, signed: 0 };
       statusMap[r.document_id].total++;
-      if (r.status === "completed" || sigSet.has(`${r.document_id}:${r.version_id}:${r.user_id}`)) {
+      if (r.status === "completed" || sigSet.has(`${r.document_id}:${r.user_id}`)) {
         statusMap[r.document_id].signed++;
       }
     }
@@ -314,23 +299,6 @@ export function DocumentsView({
       .eq("company_id", profile.company_id)
       .order("created_at", { ascending: false });
     if (!error && data) {
-      const documentIds = data.map((doc) => doc.id);
-      const { data: versionRows } = documentIds.length
-        ? await (supabase as any)
-            .from("document_versions")
-            .select("id, document_id, version, status")
-            .in("document_id", documentIds)
-            .neq("status", "obsolete")
-            .order("version", { ascending: false })
-        : { data: [] };
-
-      const currentVersionByDocument = new Map<string, string>();
-      for (const row of (versionRows || []) as Array<{ id: string; document_id: string }>) {
-        if (!currentVersionByDocument.has(row.document_id)) {
-          currentVersionByDocument.set(row.document_id, row.id);
-        }
-      }
-
       const ownerUserIds = [...new Set(data.map((doc) => doc.owner_id).filter(Boolean))];
 
       const { data: ownersData } = ownerUserIds.length
@@ -364,7 +332,6 @@ export function DocumentsView({
         originalAuthor: ownerUserMap.get(d.owner_id) || d.owner_id,
         lastModifiedBy: ownerUserMap.get(d.owner_id) || d.owner_id,
         fileUrl: d.file_url,
-        currentVersionId: currentVersionByDocument.get(d.id),
       }));
       setDbDocuments(mapped);
     }
@@ -460,38 +427,6 @@ export function DocumentsView({
         }
       }
 
-      if (changeStatusTarget === "review") {
-        const { data: currentVersion } = await (supabase as any)
-          .from("document_versions")
-          .select("id")
-          .eq("document_id", selectedDocument.id)
-          .neq("status", "obsolete")
-          .order("version", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const { data: assignedResponsibilities } = currentVersion?.id
-          ? await (supabase as any)
-              .from("document_responsibilities")
-              .select("action_type")
-              .eq("document_id", selectedDocument.id)
-              .eq("version_id", currentVersion.id)
-          : { data: [] };
-
-        const assignedActionTypes = new Set((assignedResponsibilities || []).map((item: { action_type: string }) => item.action_type));
-        const requiredActionTypes = ["firma", "revision", "aprobacion"];
-        const missingActionTypes = requiredActionTypes.filter((action) => !assignedActionTypes.has(action));
-
-        if (missingActionTypes.length > 0) {
-          toast({
-            title: "Responsables incompletos",
-            description: "Debes asignar responsables de firma, revisión y aprobación antes de pasar a En revisión.",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-
       // Update document status
       const { error: updateError } = await supabase.from("documents").update({
         status: changeStatusTarget as any,
@@ -550,7 +485,7 @@ export function DocumentsView({
     setIsLoadingHistory(true);
     const { data, error } = await (supabase as any)
       .from("document_versions")
-      .select("id, version, file_url, changes_description, change_summary, status, created_at, created_by")
+      .select("id, version, file_url, changes_description, created_at, created_by")
       .eq("document_id", docId)
       .order("version", { ascending: false });
     if (!error && data) {
@@ -609,17 +544,6 @@ export function DocumentsView({
       toast({ title: "Archivo requerido", description: "Selecciona un archivo para actualizar la versión.", variant: "destructive" });
       return;
     }
-
-    const trimmedChanges = updateVersionChanges.trim();
-    if (trimmedChanges.length < 10 || trimmedChanges.length > 1000) {
-      toast({
-        title: "Descripción de cambios inválida",
-        description: "La descripción de cambios es obligatoria y debe tener entre 10 y 1000 caracteres.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsUpdatingVersion(true);
     try {
       const newVersion = selectedDocument.versionNum + 1;
@@ -631,66 +555,26 @@ export function DocumentsView({
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, updateVersionFile);
       if (uploadError) throw uploadError;
 
-      const { data: previousVersion, error: previousVersionError } = await (supabase as any)
-        .from("document_versions")
-        .select("id, version")
-        .eq("document_id", selectedDocument.id)
-        .neq("status", "obsolete")
-        .order("version", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (previousVersionError) throw previousVersionError;
+      // Save current version to history
+      await (supabase as any).from("document_versions").insert({
+        document_id: selectedDocument.id,
+        version: selectedDocument.versionNum,
+        file_url: selectedDocument.fileUrl,
+        changes_description: updateVersionChanges.trim() || null,
+        created_by: user.id,
+      });
 
-      const { error: obsoleteError } = await (supabase as any)
-        .from("document_versions")
-        .update({ status: "obsolete" })
-        .eq("document_id", selectedDocument.id)
-        .neq("status", "obsolete");
-      if (obsoleteError) throw obsoleteError;
-
-      const { data: insertedVersion, error: insertVersionError } = await (supabase as any)
-        .from("document_versions")
-        .insert({
-          document_id: selectedDocument.id,
-          version: newVersion,
-          file_url: filePath,
-          changes_description: trimmedChanges,
-          change_summary: trimmedChanges,
-          created_by: user.id,
-          status: "draft",
-        })
-        .select("id")
-        .single();
-      if (insertVersionError) throw insertVersionError;
-
-      if (previousVersion?.id) {
-        await (supabase as any)
-          .from("document_responsibilities")
-          .delete()
-          .eq("document_id", selectedDocument.id)
-          .eq("version_id", previousVersion.id);
-
-        await (supabase as any)
-          .from("document_signatures")
-          .delete()
-          .eq("document_id", selectedDocument.id)
-          .eq("version_id", previousVersion.id);
-      }
-
+      // Update document with new version
       const { error: updateError } = await supabase.from("documents").update({
         version: newVersion,
-        status: "draft",
         file_url: filePath,
         file_type: fileType,
       }).eq("id", selectedDocument.id);
       if (updateError) throw updateError;
 
-      setSelectedDocument((prev) => prev ? { ...prev, versionNum: newVersion, version: `${newVersion}.0`, currentVersionId: insertedVersion.id, status: "draft", fileUrl: filePath } : prev);
+      toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0` });
       setIsUpdateVersionOpen(false);
-      setIsResponsibilitiesOpen(true);
-      toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0. Asigna nuevos responsables para continuar.` });
       fetchDocuments();
-      fetchVersionHistory(selectedDocument.id);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -748,26 +632,10 @@ export function DocumentsView({
       });
       if (insertError) throw insertError;
 
-      const { data: initialVersion, error: initialVersionError } = await (supabase as any)
-        .from("document_versions")
-        .insert({
-          document_id: documentId,
-          version: 1,
-          file_url: filePath,
-          changes_description: "Versión inicial del documento.",
-          change_summary: "Versión inicial del documento.",
-          created_by: uploaderUser.id,
-          status: "draft",
-        })
-        .select("id")
-        .single();
-      if (initialVersionError) throw initialVersionError;
-
       // Insert responsibilities if any
       if (newDocResponsibilities.length > 0) {
         const respRows = newDocResponsibilities.map(r => ({
           document_id: documentId,
-          version_id: initialVersion.id,
           user_id: r.userId,
           action_type: r.actionType,
           due_date: r.dueDate,
@@ -929,29 +797,10 @@ export function DocumentsView({
 
   const canPerformAction = useCallback(async (userId: string, documentId: string, actionType: string) => {
     if (isSuperadmin) return true;
-
-    const { data: currentVersion, error: currentVersionError } = await (supabase as any)
-      .from("document_versions")
-      .select("id")
-      .eq("document_id", documentId)
-      .neq("status", "obsolete")
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (currentVersionError) {
-      throw currentVersionError;
-    }
-
-    if (!currentVersion?.id) {
-      return false;
-    }
-
     const { count, error } = await (supabase as any)
       .from("document_responsibilities")
       .select("id", { count: "exact", head: true })
       .eq("document_id", documentId)
-      .eq("version_id", currentVersion.id)
       .eq("user_id", userId)
       .eq("action_type", actionType);
 
@@ -1008,22 +857,15 @@ export function DocumentsView({
       return;
     }
 
-    const currentVersionId = selectedDocument.currentVersionId;
-    if (!currentVersionId) {
-      toast({ title: "Versión no encontrada", description: "No se encontró una versión activa para este documento.", variant: "destructive" });
-      return;
-    }
-
     const { error } = await supabase.from("document_signatures").upsert({
       document_id: selectedDocument.id,
-      version_id: currentVersionId,
       signed_by: user.id,
       signer_name: signerName.trim(),
       signer_email: user.email || null,
       signature_method: "autofirma_dnie",
       signature_data: signReason.trim() || null,
       signed_at: signedAt,
-    }, { onConflict: "document_id,version_id,signed_by" });
+    }, { onConflict: "document_id,signed_by" });
     if (error) {
       toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
       return;
@@ -1087,22 +929,15 @@ export function DocumentsView({
       return;
     }
 
-    const currentVersionId = selectedDocument.currentVersionId;
-    if (!currentVersionId) {
-      toast({ title: "Versión no encontrada", description: "No se encontró una versión activa para este documento.", variant: "destructive" });
-      return;
-    }
-
     const { error } = await supabase.from("document_signatures").upsert({
       document_id: selectedDocument.id,
-      version_id: currentVersionId,
       signed_by: user.id,
       signer_name: manualSignName.trim(),
       signer_email: user.email || null,
       signature_method: "nombre_completo",
       signature_data: manualSignReason.trim() || null,
       signed_at: signedAt,
-    }, { onConflict: "document_id,version_id,signed_by" });
+    }, { onConflict: "document_id,signed_by" });
     if (error) {
       toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
       return;
@@ -1648,7 +1483,6 @@ export function DocumentsView({
                     <SelectItem value="draft">Borrador</SelectItem>
                     <SelectItem value="review">En Revisión</SelectItem>
                     <SelectItem value="approved">Aprobado</SelectItem>
-                    <SelectItem value="obsolete">Obsoleto</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1676,20 +1510,13 @@ export function DocumentsView({
               <Input type="file" accept=".pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg,.webp" onChange={(e) => setUpdateVersionFile(e.target.files?.[0] || null)} />
             </div>
             <div className="space-y-2">
-              <Label>Descripción de cambios respecto a la versión anterior</Label>
-              <Textarea
-                placeholder="Describe los cambios realizados (mínimo 10 caracteres)..."
-                rows={4}
-                maxLength={1000}
-                value={updateVersionChanges}
-                onChange={(e) => setUpdateVersionChanges(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">{updateVersionChanges.trim().length}/1000 caracteres</p>
+              <Label>Descripción de cambios</Label>
+              <Textarea placeholder="Describe los cambios realizados..." rows={3} value={updateVersionChanges} onChange={(e) => setUpdateVersionChanges(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsUpdateVersionOpen(false)}>Cancelar</Button>
-            <Button variant="accent" onClick={handleUpdateVersion} disabled={isUpdatingVersion || !updateVersionFile || updateVersionChanges.trim().length < 10}>
+            <Button variant="accent" onClick={handleUpdateVersion} disabled={isUpdatingVersion || !updateVersionFile}>
               {isUpdatingVersion ? "Actualizando..." : "Actualizar versión"}
             </Button>
           </DialogFooter>
@@ -1718,31 +1545,25 @@ export function DocumentsView({
             )}
             {isLoadingHistory && <p className="text-center py-4">Cargando historial...</p>}
             {!isLoadingHistory && versionHistory.length === 0 && <p className="text-center py-4">No hay versiones anteriores registradas.</p>}
-            {versionHistory.map((v) => {
-              const isCurrent = selectedDocument?.versionNum === v.version;
-              const statusLabel = v.status ? (statusConfig[v.status]?.label ?? v.status) : (isCurrent ? "Actual" : "—");
-              const changesText = v.change_summary || v.changes_description;
-              return (
-                <div key={v.id} className="border border-border rounded-lg p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium text-foreground">v{v.version}.0 {isCurrent ? "(actual)" : ""}</p>
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadVersion(v.file_url, v.version, selectedDocument?.code || "doc")}>
-                        <Download className="w-3 h-3 mr-1" />Descargar
+            {versionHistory.map((v) => (
+              <div key={v.id} className="border border-border rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-foreground">v{v.version}.0</p>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="sm" onClick={() => handleDownloadVersion(v.file_url, v.version, selectedDocument?.code || "doc")}>
+                      <Download className="w-3 h-3 mr-1" />Descargar
+                    </Button>
+                    {isSuperadmin && (
+                      <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteVersion(v.id)}>
+                        <Trash2 className="w-3 h-3" />
                       </Button>
-                      {isSuperadmin && (
-                        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteVersion(v.id)}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      )}
-                    </div>
+                    )}
                   </div>
-                  <p className="text-xs mt-1">Estado: {statusLabel}</p>
-                  <p className="text-xs mt-1">Por {v.creatorName} el {new Date(v.created_at).toLocaleDateString("es-ES")}</p>
-                  {changesText && <p className="text-xs mt-1">Cambios respecto a la versión anterior: {changesText}</p>}
                 </div>
-              );
-            })}
+                <p className="text-xs mt-1">Por {v.creatorName} el {new Date(v.created_at).toLocaleDateString("es-ES")}</p>
+                {v.changes_description && <p className="text-xs mt-1">Cambios: {v.changes_description}</p>}
+              </div>
+            ))}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsHistoryOpen(false)}>Cerrar</Button>
@@ -1868,14 +1689,12 @@ export function DocumentsView({
         onOpenChange={setIsSignatureStatusOpen}
         documentId={selectedDocument?.id ?? null}
         documentCode={selectedDocument?.code}
-        versionId={selectedDocument?.currentVersionId}
       />
       {/* Responsibilities Dialog */}
       {selectedDocument && (
         <DocumentResponsibilities
           documentId={selectedDocument.id}
           documentCode={selectedDocument.code}
-          versionId={selectedDocument.currentVersionId}
           open={isResponsibilitiesOpen}
           onOpenChange={setIsResponsibilitiesOpen}
         />

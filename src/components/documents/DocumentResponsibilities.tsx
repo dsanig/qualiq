@@ -53,12 +53,11 @@ interface CompanyUser {
 interface DocumentResponsibilitiesProps {
   documentId: string;
   documentCode: string;
-  versionId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function DocumentResponsibilities({ documentId, documentCode, versionId, open, onOpenChange }: DocumentResponsibilitiesProps) {
+export function DocumentResponsibilities({ documentId, documentCode, open, onOpenChange }: DocumentResponsibilitiesProps) {
   const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,7 +75,6 @@ export function DocumentResponsibilities({ documentId, documentCode, versionId, 
       .from("document_responsibilities")
       .select("id, user_id, action_type, due_date, status, completed_at, created_at")
       .eq("document_id", documentId)
-      .eq("version_id", versionId)
       .order("created_at", { ascending: true });
 
     if (!error && data) {
@@ -92,7 +90,7 @@ export function DocumentResponsibilities({ documentId, documentCode, versionId, 
       })));
     }
     setIsLoading(false);
-  }, [documentId, versionId]);
+  }, [documentId]);
 
   const fetchCompanyUsers = useCallback(async () => {
     if (!profile?.company_id) return;
@@ -104,14 +102,14 @@ export function DocumentResponsibilities({ documentId, documentCode, versionId, 
   }, [profile?.company_id]);
 
   useEffect(() => {
-    if (open && versionId) {
+    if (open) {
       fetchResponsibilities();
       fetchCompanyUsers();
     }
-  }, [open, versionId, fetchResponsibilities, fetchCompanyUsers]);
+  }, [open, fetchResponsibilities, fetchCompanyUsers]);
 
   const handleAdd = async () => {
-    if (!selectedUserId || !selectedDueDate || !user || !versionId) {
+    if (!selectedUserId || !selectedDueDate || !user) {
       toast({ title: "Campos requeridos", description: "Selecciona usuario, acción y fecha límite.", variant: "destructive" });
       return;
     }
@@ -119,7 +117,6 @@ export function DocumentResponsibilities({ documentId, documentCode, versionId, 
     try {
       const { error } = await (supabase as any).from("document_responsibilities").insert({
         document_id: documentId,
-        version_id: versionId,
         user_id: selectedUserId,
         action_type: selectedActionType,
         due_date: selectedDueDate,
@@ -159,7 +156,7 @@ export function DocumentResponsibilities({ documentId, documentCode, versionId, 
             Responsables del documento
           </DialogTitle>
           <DialogDescription>
-            Asigna responsables con acciones y fechas límite para {documentCode} (versión activa).
+            Asigna responsables con acciones y fechas límite para {documentCode}.
           </DialogDescription>
         </DialogHeader>
 

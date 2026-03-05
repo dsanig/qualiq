@@ -31,7 +31,6 @@ interface DocumentSignatureStatusDialogProps {
   onOpenChange: (open: boolean) => void;
   documentId: string | null;
   documentCode?: string;
-  versionId?: string;
 }
 
 const formatMethod = (method?: string) => {
@@ -46,7 +45,6 @@ export function DocumentSignatureStatusDialog({
   onOpenChange,
   documentId,
   documentCode,
-  versionId,
 }: DocumentSignatureStatusDialogProps) {
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -63,7 +61,7 @@ export function DocumentSignatureStatusDialog({
 
   useEffect(() => {
     const load = async () => {
-      if (!open || !documentId || !versionId) return;
+      if (!open || !documentId) return;
       setIsLoading(true);
 
       const profilesQuery = supabase.from("profiles").select("user_id, full_name, email");
@@ -85,14 +83,12 @@ export function DocumentSignatureStatusDialog({
       const { data: responsibilitiesData } = await supabase
         .from("document_responsibilities")
         .select("user_id, action_type")
-        .eq("document_id", documentId)
-        .eq("version_id", versionId);
+        .eq("document_id", documentId);
 
       const { data: signaturesData, error: signaturesError } = await supabase
         .from("document_signatures")
         .select("signed_by, signed_at, signature_method, signature_data")
         .eq("document_id", documentId)
-        .eq("version_id", versionId)
         .order("signed_at", { ascending: false });
 
       if (signaturesError) {
@@ -150,7 +146,7 @@ export function DocumentSignatureStatusDialog({
     };
 
     void load();
-  }, [open, documentId, profile?.company_id, toast, versionId]);
+  }, [open, documentId, profile?.company_id, toast]);
 
   const hasResponsibilities = users.some((u) => u.isResponsible);
 
