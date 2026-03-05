@@ -200,6 +200,10 @@ export function DocumentsView({
   const [isUpdateVersionOpen, setIsUpdateVersionOpen] = useState(false);
   const [updateVersionFile, setUpdateVersionFile] = useState<File | null>(null);
   const [updateVersionChanges, setUpdateVersionChanges] = useState("");
+  const [updateVersionResponsibilities, setUpdateVersionResponsibilities] = useState<InlineResponsibility[]>([]);
+  const [updateRespUserId, setUpdateRespUserId] = useState("");
+  const [updateRespAction, setUpdateRespAction] = useState("revision");
+  const [updateRespDueDate, setUpdateRespDueDate] = useState("");
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
 
   // Version history
@@ -229,12 +233,12 @@ export function DocumentsView({
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Inline responsibilities for new document
   interface InlineResponsibility {
     userId: string;
     actionType: string;
     dueDate: string;
   }
+  // Inline responsibilities for new document
   const [newDocResponsibilities, setNewDocResponsibilities] = useState<InlineResponsibility[]>([]);
   const [newRespUserId, setNewRespUserId] = useState("");
   const [newRespAction, setNewRespAction] = useState("revision");
@@ -535,11 +539,38 @@ export function DocumentsView({
   };
 
   // --- Update version ---
-  const handleOpenUpdateVersion = (doc: Document) => {
+  const fetchDocumentResponsibilities = useCallback(async (docId: string): Promise<InlineResponsibility[]> => {
+    const { data, error } = await (supabase as any)
+      .from("document_responsibilities")
+      .select("user_id, action_type, due_date")
+      .eq("document_id", docId)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    return (data || []).map((r: { user_id: string; action_type: string; due_date: string }) => ({
+      userId: r.user_id,
+      actionType: r.action_type,
+      dueDate: r.due_date,
+    }));
+  }, []);
+
+  const handleOpenUpdateVersion = async (doc: Document) => {
     setSelectedDocument(doc);
     setUpdateVersionFile(null);
     setUpdateVersionChanges("");
+    setUpdateVersionResponsibilities([]);
+    setUpdateRespUserId("");
+    setUpdateRespAction("revision");
+    setUpdateRespDueDate("");
     setIsUpdateVersionOpen(true);
+
+    try {
+      const currentResponsibilities = await fetchDocumentResponsibilities(doc.id);
+      setUpdateVersionResponsibilities(currentResponsibilities);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   const handleUpdateVersion = async () => {
@@ -559,31 +590,57 @@ export function DocumentsView({
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, updateVersionFile);
       if (uploadError) throw uploadError;
 
-      // Save current version to history
-      await (supabase as any).from("document_versions").insert({
-        document_id: selectedDocument.id,
-        version: selectedDocument.versionNum,
-        file_url: selectedDocument.fileUrl,
-        changes_description: updateVersionChanges.trim() || null,
-        created_by: user.id,
-      });
+      const cleanedResponsibilities = updateVersionResponsibilities
+        .filter((r) => r.userId && r.actionType && r.dueDate)
+        .map((r) => ({
+          responsible_user_id: r.userId,
+          action_type: r.actionType,
+          due_date: r.dueDate,
+        }));
 
-      // Update document with new version
-      const { error: updateError } = await supabase.from("documents").update({
-        version: newVersion,
-        file_url: filePath,
-        file_type: fileType,
-      }).eq("id", selectedDocument.id);
+      if (cleanedResponsibilities.length === 0) {
+        throw new Error("Debes asignar al menos un responsable para crear la nueva versión.");
+      }
+
+      const { error: rpcError } = await (supabase as any).rpc("create_new_document_version", {
+        _document_id: selectedDocument.id,
+        _file_path: filePath,
+        _change_summary: updateVersionChanges.trim() || null,
+        _responsibilities: cleanedResponsibilities,
+      });
+      if (rpcError) throw rpcError;
+
+      const { error: updateError } = await supabase.from("documents").update({ file_type: fileType }).eq("id", selectedDocument.id);
       if (updateError) throw updateError;
 
       toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0` });
       setIsUpdateVersionOpen(false);
       fetchDocuments();
+      fetchFirmaStatus();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setIsUpdatingVersion(false);
     }
+  };
+
+  const handleAddUpdateResponsibility = () => {
+    if (!updateRespUserId || !updateRespDueDate) {
+      toast({ title: "Campos requeridos", description: "Selecciona usuario, acción y fecha límite.", variant: "destructive" });
+      return;
+    }
+
+    setUpdateVersionResponsibilities((prev) => [
+      ...prev,
+      { userId: updateRespUserId, actionType: updateRespAction, dueDate: updateRespDueDate },
+    ]);
+    setUpdateRespUserId("");
+    setUpdateRespAction("revision");
+    setUpdateRespDueDate("");
+  };
+
+  const handleRemoveUpdateResponsibility = (index: number) => {
+    setUpdateVersionResponsibilities((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleUploadDocument = async () => {
@@ -1630,10 +1687,76 @@ export function DocumentsView({
               <Label>Descripción de cambios</Label>
               <Textarea placeholder="Describe los cambios realizados..." rows={3} value={updateVersionChanges} onChange={(e) => setUpdateVersionChanges(e.target.value)} />
             </div>
+
+            <div className="space-y-3 border border-border rounded-lg p-4 bg-secondary/10">
+              <p className="text-sm font-medium text-foreground">Responsables de la nueva versión</p>
+              <p className="text-xs text-muted-foreground">Se cargan automáticamente desde la versión actual, pero puedes editarlos antes de guardar.</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Usuario</Label>
+                  <Select value={updateRespUserId} onValueChange={setUpdateRespUserId}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectContent>
+                      {companyUsers.map(u => (
+                        <SelectItem key={u.user_id} value={u.user_id}>
+                          {u.full_name || u.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Acción</Label>
+                  <Select value={updateRespAction} onValueChange={setUpdateRespAction}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="firma">Firma</SelectItem>
+                      <SelectItem value="aprobacion">Aprobación</SelectItem>
+                      <SelectItem value="revision">Revisión</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Fecha límite</Label>
+                  <Input type="date" value={updateRespDueDate} onChange={(e) => setUpdateRespDueDate(e.target.value)} />
+                </div>
+              </div>
+
+              <Button size="sm" type="button" onClick={handleAddUpdateResponsibility}>
+                <Plus className="w-3.5 h-3.5 mr-1" /> Añadir responsable
+              </Button>
+
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {updateVersionResponsibilities.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No hay responsables asignados.</p>
+                ) : (
+                  updateVersionResponsibilities.map((responsibility, index) => {
+                    const userLabel = companyUsers.find((u) => u.user_id === responsibility.userId);
+                    return (
+                      <div key={`${responsibility.userId}-${responsibility.actionType}-${index}`} className="flex items-center justify-between border border-border rounded-md px-3 py-2">
+                        <div className="text-xs text-foreground">
+                          {(userLabel?.full_name || userLabel?.email || responsibility.userId)} · {responsibility.actionType} · {responsibility.dueDate}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          type="button"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => handleRemoveUpdateResponsibility(index)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsUpdateVersionOpen(false)}>Cancelar</Button>
-            <Button variant="accent" onClick={handleUpdateVersion} disabled={isUpdatingVersion || !updateVersionFile}>
+            <Button variant="accent" onClick={handleUpdateVersion} disabled={isUpdatingVersion || !updateVersionFile || updateVersionResponsibilities.length === 0}>
               {isUpdatingVersion ? "Actualizando..." : "Actualizar versión"}
             </Button>
           </DialogFooter>
