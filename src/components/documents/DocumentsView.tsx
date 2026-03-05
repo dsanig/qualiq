@@ -47,6 +47,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
 
 type DocumentTypology = "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro";
+type DocumentTypologyDb = "proceso" | "pnt" | "documento" | "normativa" | "otro";
 
 interface Document {
   id: string;
@@ -143,17 +144,42 @@ const typologyNormalizeMap: Record<string, DocumentTypology> = {
   Otro: "Otro",
 };
 
+const uiTypologyToDbMap: Record<DocumentTypology, DocumentTypologyDb> = {
+  Proceso: "proceso",
+  PNT: "pnt",
+  Documento: "documento",
+  Normativa: "normativa",
+  Otro: "otro",
+};
+
+const dbTypologyToUiMap: Record<DocumentTypologyDb, DocumentTypology> = {
+  proceso: "Proceso",
+  pnt: "PNT",
+  documento: "Documento",
+  normativa: "Normativa",
+  otro: "Otro",
+};
+
 const normalizeTypology = (value: string | null | undefined): DocumentTypology => {
   if (!value?.trim()) return "Documento";
 
   const normalizedValue = value.trim();
+  const lowerCased = normalizedValue.toLowerCase() as DocumentTypologyDb;
+
+  if (lowerCased in dbTypologyToUiMap) {
+    return fromDbTypologyToUi(lowerCased);
+  }
 
   return (
     typologyNormalizeMap[normalizedValue] ??
-    typologyNormalizeMap[normalizedValue.toLowerCase()] ??
+    typologyNormalizeMap[lowerCased] ??
     "Documento"
   );
 };
+
+const toDbTypology = (value: DocumentTypology): DocumentTypologyDb => uiTypologyToDbMap[value] ?? "documento";
+
+const fromDbTypologyToUi = (value: DocumentTypologyDb): DocumentTypology => dbTypologyToUiMap[value] ?? "Documento";
 
 const isMissingTypologyColumnError = (error: { message?: string; details?: string; hint?: string } | null) => {
   if (!error) return false;
@@ -388,7 +414,7 @@ export function DocumentsView({
       .order("created_at", { ascending: false });
 
     if (filters.documentTypology !== "all") {
-      query = query.eq("typology", filters.documentTypology);
+      query = query.eq("typology", toDbTypology(filters.documentTypology));
     }
 
     const { data, error } = await query;
@@ -529,20 +555,39 @@ export function DocumentsView({
     if (!editingDocId) return;
     setIsEditSaving(true);
     try {
-      const { error } = await supabase.from("documents").update({
+      const updatePayload = {
         code: editDocCode.trim(),
         title: editDocTitle.trim(),
         category: editDocCategory.charAt(0).toUpperCase() + editDocCategory.slice(1),
-        typology: editDocTypology,
+        typology: toDbTypology(editDocTypology),
         status: editDocStatus as any,
-      }).eq("id", editingDocId);
+      };
+
+      console.log("UPDATE payload", updatePayload);
+
+      const { data, error, status, count } = await supabase
+        .from("documents")
+        .update(updatePayload)
+        .eq("id", editingDocId)
+        .eq("company_id", profile?.company_id ?? "")
+        .select("id, typology");
+
+      console.log("UPDATE result", { data, error, status, count, rowCount: data?.length ?? 0 });
+
       if (isMissingTypologyColumnError(error)) {
-        const { error: retryError } = await supabase.from("documents").update({
+        const { data: fallbackData, error: retryError, status: fallbackStatus, count: fallbackCount } = await supabase.from("documents").update({
           code: editDocCode.trim(),
           title: editDocTitle.trim(),
           category: editDocCategory.charAt(0).toUpperCase() + editDocCategory.slice(1),
           status: editDocStatus as any,
-        }).eq("id", editingDocId);
+        }).eq("id", editingDocId).eq("company_id", profile?.company_id ?? "").select("id");
+        console.log("UPDATE result (fallback without typology)", {
+          data: fallbackData,
+          error: retryError,
+          status: fallbackStatus,
+          count: fallbackCount,
+          rowCount: fallbackData?.length ?? 0,
+        });
         if (retryError) throw retryError;
 
         toast({
@@ -552,6 +597,21 @@ export function DocumentsView({
       } else if (error) {
         throw error;
       }
+
+      if (!isMissingTypologyColumnError(error) && (data?.length ?? 0) === 0) {
+        console.error("[documents] update without affected rows", {
+          documentId: editingDocId,
+          userId: user?.id,
+          companyId: profile?.company_id,
+        });
+        toast({
+          title: "Sin cambios",
+          description: "No se pudo actualizar el documento (sin permisos o id inválido)",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({ title: "Documento actualizado" });
       setIsEditOpen(false);
       fetchDocuments();
@@ -906,6 +966,10 @@ export function DocumentsView({
       toast({ title: "Archivo requerido", description: "Selecciona un archivo para continuar.", variant: "destructive" });
       return;
     }
+    if (!newDocTypology) {
+      toast({ title: "Tipología requerida", description: "Selecciona una tipología para guardar el documento.", variant: "destructive" });
+      return;
+    }
     if (!user || !profile?.company_id) {
       toast({ title: "Error", description: "Debes iniciar sesión.", variant: "destructive" });
       return;
@@ -949,7 +1013,7 @@ export function DocumentsView({
         code: newDocCode.trim(),
         title: newDocTitle.trim(),
         category: newDocCategory.charAt(0).toUpperCase() + newDocCategory.slice(1),
-        typology: newDocTypology || "Documento",
+        typology: toDbTypology(newDocTypology || "Documento"),
         company_id: profile.company_id,
         owner_id: uploaderUser.id,
         file_type: fileType,
@@ -957,11 +1021,28 @@ export function DocumentsView({
         status: "draft" as const,
       };
 
-      const { error: insertError } = await supabase.from("documents").insert(payload);
+      console.log("typology selected", newDocTypology);
+      console.log("CREATE payload", payload);
+
+      const { data, error: insertError, status, count } = await supabase
+        .from("documents")
+        .insert(payload)
+        .select("id, typology");
+
+      console.log("CREATE result", { data, error: insertError, status, count });
 
       if (isMissingTypologyColumnError(insertError)) {
         const { typology: _ignoredTypology, ...payloadWithoutTypology } = payload;
-        const { error: retryError } = await supabase.from("documents").insert(payloadWithoutTypology);
+        const { data: fallbackData, error: retryError, status: fallbackStatus, count: fallbackCount } = await supabase
+          .from("documents")
+          .insert(payloadWithoutTypology)
+          .select("id, typology");
+        console.log("CREATE result (fallback without typology)", {
+          data: fallbackData,
+          error: retryError,
+          status: fallbackStatus,
+          count: fallbackCount,
+        });
         if (retryError) throw retryError;
 
         toast({
@@ -970,6 +1051,13 @@ export function DocumentsView({
         });
       } else if (insertError) {
         throw insertError;
+      }
+
+      if (!isMissingTypologyColumnError(insertError) && data?.[0]?.typology !== payload.typology) {
+        console.warn("[documents] typology mismatch after insert", {
+          expectedTypology: payload.typology,
+          persistedTypology: data?.[0]?.typology,
+        });
       }
 
       // Insert responsibilities if any
