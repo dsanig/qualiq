@@ -6,6 +6,12 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 if (import.meta.env.DEV && SUPABASE_URL) {
+  try {
+    console.log("SUPABASE_HOST", new URL(import.meta.env.VITE_SUPABASE_URL).host);
+  } catch {
+    console.log("SUPABASE_HOST", "invalid-url");
+  }
+
   const projectRef = (() => {
     try {
       return new URL(SUPABASE_URL).hostname.split('.')[0] ?? 'desconocido';
