@@ -132,6 +132,11 @@ const Index = () => {
     setActiveModule("incidents");
   };
 
+  const handleNavigateToDocument = (documentCode: string) => {
+    setModuleSearchQueries((prev) => ({ ...prev, documents: documentCode }));
+    setActiveModule("documents");
+  };
+
   const renderModule = () => {
     switch (activeModule) {
       case "dashboard":
@@ -140,6 +145,7 @@ const Index = () => {
             onQuickAction={handleQuickAction}
             onViewPendingActions={handleViewPendingActions}
             onViewIncidents={handleViewIncidents}
+            onNavigateToDocument={handleNavigateToDocument}
           />
         );
       case "documents":

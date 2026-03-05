@@ -15,6 +15,7 @@ interface PendingAction {
   isOverdue: boolean;
   source: "capa" | "document";
   documentCode?: string;
+  documentId?: string;
 }
 
 const typeIcons: Record<string, typeof CheckCircle2> = {
@@ -37,9 +38,10 @@ const typeLabels: Record<string, string> = {
 
 interface PendingActionsProps {
   onViewAll: () => void;
+  onNavigateToDocument?: (documentCode: string) => void;
 }
 
-export function PendingActions({ onViewAll }: PendingActionsProps) {
+export function PendingActions({ onViewAll, onNavigateToDocument }: PendingActionsProps) {
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
@@ -89,6 +91,7 @@ export function PendingActions({ onViewAll }: PendingActionsProps) {
               isOverdue: r.due_date ? new Date(r.due_date) < now : false,
               source: "document" as const,
               documentCode: doc?.code,
+              documentId: r.document_id,
             };
           });
         }
@@ -137,6 +140,11 @@ export function PendingActions({ onViewAll }: PendingActionsProps) {
                     ? "border-destructive/30 bg-destructive/5 hover:bg-destructive/10"
                     : "border-border hover:bg-secondary/50"
                 )}
+                onClick={() => {
+                  if (action.source === "document" && action.documentCode && onNavigateToDocument) {
+                    onNavigateToDocument(action.documentCode);
+                  }
+                }}
               >
                 <div className="flex items-start gap-3">
                   <Icon className={cn("w-4 h-4 mt-0.5", action.isOverdue ? "text-destructive" : "text-muted-foreground")} />

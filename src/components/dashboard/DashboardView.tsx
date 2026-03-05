@@ -10,6 +10,7 @@ interface DashboardViewProps {
   onQuickAction: (action: string) => void;
   onViewPendingActions: () => void;
   onViewIncidents: () => void;
+  onNavigateToDocument?: (documentCode: string) => void;
 }
 
 interface DashboardStats {
@@ -21,7 +22,7 @@ interface DashboardStats {
   approvedDocsPct: string;
 }
 
-export function DashboardView({ onQuickAction, onViewPendingActions, onViewIncidents }: DashboardViewProps) {
+export function DashboardView({ onQuickAction, onViewPendingActions, onViewIncidents, onNavigateToDocument }: DashboardViewProps) {
   const [stats, setStats] = useState<DashboardStats>({
     totalDocs: 0,
     docsInReview: 0,
@@ -114,7 +115,7 @@ export function DashboardView({ onQuickAction, onViewPendingActions, onViewIncid
 
       {/* Bottom Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PendingActions onViewAll={onViewPendingActions} />
+        <PendingActions onViewAll={onViewPendingActions} onNavigateToDocument={onNavigateToDocument} />
         
         {/* Quick Actions */}
         <div className="bg-card rounded-lg border border-border p-6">

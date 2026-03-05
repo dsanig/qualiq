@@ -16,6 +16,7 @@ import {
   X,
   ArrowRightLeft,
   UserCheck,
+  PenTool,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -234,8 +235,11 @@ export function DocumentsView({
   const [newRespDueDate, setNewRespDueDate] = useState("");
   const [companyUsers, setCompanyUsers] = useState<{ user_id: string; full_name: string | null; email: string }[]>([]);
 
-  // Real documents from database
+   // Real documents from database
   const [dbDocuments, setDbDocuments] = useState<Document[]>([]);
+
+  // Signature status per document: { docId: { totalSigners, signedCount } }
+  const [firmaStatus, setFirmaStatus] = useState<Record<string, { total: number; signed: number }>>({});
 
   // Fetch signatures from DB
   const fetchSignatures = useCallback(async () => {
@@ -255,6 +259,33 @@ export function DocumentsView({
       }
       setSignedDocuments(mapped);
     }
+  }, [profile?.company_id]);
+
+  // Fetch firma responsibilities and signatures to compute signature status
+  const fetchFirmaStatus = useCallback(async () => {
+    if (!profile?.company_id) return;
+    // Get all firma responsibilities
+    const { data: firmaResps } = await (supabase as any)
+      .from("document_responsibilities")
+      .select("document_id, user_id, status")
+      .eq("action_type", "firma");
+    
+    // Get all signatures
+    const { data: sigs } = await supabase
+      .from("document_signatures")
+      .select("document_id, signed_by");
+
+    const sigSet = new Set((sigs || []).map(s => `${s.document_id}:${s.signed_by}`));
+
+    const statusMap: Record<string, { total: number; signed: number }> = {};
+    for (const r of (firmaResps as any[] || [])) {
+      if (!statusMap[r.document_id]) statusMap[r.document_id] = { total: 0, signed: 0 };
+      statusMap[r.document_id].total++;
+      if (r.status === "completed" || sigSet.has(`${r.document_id}:${r.user_id}`)) {
+        statusMap[r.document_id].signed++;
+      }
+    }
+    setFirmaStatus(statusMap);
   }, [profile?.company_id]);
 
   const fetchDocuments = useCallback(async () => {
@@ -313,7 +344,8 @@ export function DocumentsView({
     fetchDocuments();
     fetchSignatures();
     fetchCompanyUsers();
-  }, [fetchDocuments, fetchSignatures, fetchCompanyUsers]);
+    fetchFirmaStatus();
+  }, [fetchDocuments, fetchSignatures, fetchCompanyUsers, fetchFirmaStatus]);
 
   useEffect(() => {
     void refreshPermissions();
@@ -796,6 +828,7 @@ export function DocumentsView({
     }));
     setSignStatus("completed");
     toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado.` });
+    fetchFirmaStatus();
   };
 
   const handleSignedFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -852,6 +885,15 @@ export function DocumentsView({
     }));
     toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado con nombre completo.` });
     setIsManualSignOpen(false);
+    fetchFirmaStatus();
+  };
+
+  const getSignatureStatusLabel = (docId: string): { label: string; class: string; icon: typeof PenTool } | null => {
+    const fs = firmaStatus[docId];
+    if (!fs || fs.total === 0) return null;
+    if (fs.signed >= fs.total) return { label: "Firmado", class: "text-success", icon: CheckCircle };
+    if (fs.signed > 0) return { label: "Parcialmente firmado", class: "text-warning", icon: Clock };
+    return { label: "Pendiente de firma", class: "text-muted-foreground", icon: PenTool };
   };
 
   return (
@@ -955,6 +997,7 @@ export function DocumentsView({
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Título</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Versión</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Firma</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actualizado</th>
                     <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</th>
                   </tr>
@@ -983,6 +1026,19 @@ export function DocumentsView({
                               {status.label}
                             </span>
                           </td>
+                          <td className="px-4 py-3">
+                            {(() => {
+                              const sigStatus = getSignatureStatusLabel(doc.id);
+                              if (!sigStatus) return <span className="text-xs text-muted-foreground">—</span>;
+                              const SigIcon = sigStatus.icon;
+                              return (
+                                <span className={cn("inline-flex items-center gap-1.5 text-sm", sigStatus.class)}>
+                                  <SigIcon className="w-3.5 h-3.5" />
+                                  {sigStatus.label}
+                                </span>
+                              );
+                            })()}
+                          </td>
                           <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{doc.lastUpdated}</span></td>
                           <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                             <DocumentActionsMenu
@@ -1006,7 +1062,7 @@ export function DocumentsView({
                         </tr>
                         {expandedDocumentId === doc.id && (
                           <tr className="bg-secondary/20">
-                            <td colSpan={7} className="px-4 py-4">
+                            <td colSpan={8} className="px-4 py-4">
                               <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-muted-foreground">
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Formato</p><p className="text-sm font-medium text-foreground">{doc.format.toUpperCase()}</p></div>
@@ -1014,7 +1070,7 @@ export function DocumentsView({
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Versión actual</p><p className="text-sm font-medium text-foreground">v{doc.version}</p></div>
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Última modificación</p><p className="text-sm font-medium text-foreground">{doc.lastUpdated}</p></div>
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Modificado por</p><p className="text-sm font-medium text-foreground">{doc.lastModifiedBy}</p></div>
-                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Firma</p><p className="text-sm font-medium text-foreground">{signedDocuments[doc.id] ? "Firmado" : "Pendiente"}</p></div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Firma</p><p className="text-sm font-medium text-foreground">{getSignatureStatusLabel(doc.id)?.label ?? "Sin responsables"}</p></div>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
