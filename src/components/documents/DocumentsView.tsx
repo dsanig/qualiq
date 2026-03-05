@@ -173,6 +173,9 @@ export function DocumentsView({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isOwnersOpen, setIsOwnersOpen] = useState(false);
   const [isSignOpen, setIsSignOpen] = useState(false);
+  const [isManualSignOpen, setIsManualSignOpen] = useState(false);
+  const [manualSignName, setManualSignName] = useState("");
+  const [manualSignReason, setManualSignReason] = useState("");
   const [signStatus, setSignStatus] = useState<"idle" | "waiting" | "completed">("idle");
   const [signReason, setSignReason] = useState("");
   const [signerName, setSignerName] = useState("");
@@ -816,6 +819,41 @@ export function DocumentsView({
     toast({ title: "Sin archivo", description: "Este documento no tiene un archivo asociado.", variant: "destructive" });
   };
 
+  const handleOpenManualSign = (doc: Document) => {
+    setSelectedDocument(doc);
+    setManualSignName(profile?.full_name || "");
+    setManualSignReason("");
+    setIsManualSignOpen(true);
+  };
+
+  const handleCompleteManualSign = async () => {
+    if (!selectedDocument || !user) return;
+    if (!manualSignName.trim()) {
+      toast({ title: "Nombre requerido", description: "Escribe tu nombre completo para firmar.", variant: "destructive" });
+      return;
+    }
+    const signedAt = new Date().toISOString();
+    const { error } = await supabase.from("document_signatures").insert({
+      document_id: selectedDocument.id,
+      signed_by: user.id,
+      signer_name: manualSignName.trim(),
+      signer_email: user.email || null,
+      signature_method: "nombre_completo",
+      signature_data: manualSignReason.trim() || null,
+      signed_at: signedAt,
+    });
+    if (error) {
+      toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
+      return;
+    }
+    setSignedDocuments((prev) => ({
+      ...prev,
+      [selectedDocument.id]: { signedAt, signerName: manualSignName.trim(), reason: manualSignReason.trim() || undefined },
+    }));
+    toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado con nombre completo.` });
+    setIsManualSignOpen(false);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header Actions */}
@@ -956,6 +994,7 @@ export function DocumentsView({
                               onViewOwners={() => handleOpenOwners(doc)}
                               onDownload={() => handleDownload(doc)}
                                onSign={() => handleOpenSign(doc)}
+                               onSignManual={() => handleOpenManualSign(doc)}
                                onChangeStatus={() => handleOpenChangeStatus(doc)}
                                onManageResponsibilities={() => { setSelectedDocument(doc); setIsResponsibilitiesOpen(true); }}
                               onShare={() => handleAction("Compartir", doc.code)}
@@ -1103,6 +1142,47 @@ export function DocumentsView({
               <Button variant="accent" onClick={handleStartSigning} disabled={signStatus !== "idle"}>Iniciar firma con DNIe</Button>
               {signStatus === "waiting" && <Button variant="default" onClick={() => handleCompleteSigning()} disabled={!signerName.trim()}>Confirmar firma</Button>}
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Sign Dialog */}
+      <Dialog open={isManualSignOpen} onOpenChange={setIsManualSignOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Firmar con nombre completo</DialogTitle>
+            <DialogDescription>Firma el documento escribiendo tu nombre completo.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-2">
+              <p className="text-sm font-medium text-foreground">Documento seleccionado</p>
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">{selectedDocument?.title ?? "Documento"}</p>
+                <p>Código: {selectedDocument?.code ?? "N/D"} · Versión: v{selectedDocument?.version ?? "N/D"}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Nombre completo del firmante *</Label>
+              <Input
+                placeholder="Escribe tu nombre y apellidos completos"
+                value={manualSignName}
+                onChange={(e) => setManualSignName(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Al escribir tu nombre completo confirmas que aceptas firmar este documento.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Motivo / comentario (opcional)</Label>
+              <Textarea
+                placeholder="Añade el motivo de la firma"
+                rows={2}
+                value={manualSignReason}
+                onChange={(e) => setManualSignReason(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsManualSignOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCompleteManualSign} disabled={!manualSignName.trim()}>Firmar documento</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

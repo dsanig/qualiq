@@ -36,6 +36,7 @@ interface DocumentActionsMenuProps {
   onView?: () => void;
   onDelete?: () => void;
   onSign?: () => void;
+  onSignManual?: () => void;
   onChangeStatus?: () => void;
   onManageResponsibilities?: () => void;
 }
@@ -53,6 +54,7 @@ export function DocumentActionsMenu({
   onView,
   onDelete,
   onSign,
+  onSignManual,
   onChangeStatus,
   onManageResponsibilities,
 }: DocumentActionsMenuProps) {
@@ -97,6 +99,10 @@ export function DocumentActionsMenu({
         <DropdownMenuItem onClick={onSign} className="cursor-pointer">
           <PenTool className="w-4 h-4 mr-2" />
           Firmar con DNIe
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onSignManual} className="cursor-pointer">
+          <Pencil className="w-4 h-4 mr-2" />
+          Firmar con nombre
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onShare} className="cursor-pointer">
           <Share2 className="w-4 h-4 mr-2" />
