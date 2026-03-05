@@ -78,6 +78,7 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange }: Fi
                 <SelectItem value="review">En revisión</SelectItem>
                 <SelectItem value="draft">Borrador</SelectItem>
                 <SelectItem value="obsolete">Obsoleto</SelectItem>
+                <SelectItem value="archived">Archivado</SelectItem>
               </SelectContent>
             </Select>
           </div>

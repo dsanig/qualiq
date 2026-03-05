@@ -4,7 +4,6 @@ import {
   History, 
   Users, 
   Download, 
-  Archive, 
   Share2, 
   Lock, 
   Unlock, 
@@ -30,7 +29,6 @@ interface DocumentActionsMenuProps {
   onViewHistory?: () => void;
   onViewOwners?: () => void;
   onDownload?: () => void;
-  onArchive?: () => void;
   onShare?: () => void;
   onToggleLock?: () => void;
   onView?: () => void;
@@ -49,7 +47,6 @@ export function DocumentActionsMenu({
   onViewHistory,
   onViewOwners,
   onDownload,
-  onArchive,
   onShare,
   onToggleLock,
   onView,
@@ -127,10 +124,6 @@ export function DocumentActionsMenu({
               Bloquear
             </>
           )}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onArchive} className="cursor-pointer">
-          <Archive className="w-4 h-4 mr-2" />
-          Archivar
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onDelete} className="cursor-pointer text-destructive focus:text-destructive">

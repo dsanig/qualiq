@@ -54,7 +54,7 @@ interface Document {
   categoryId: string;
   version: string;
   versionNum: number;
-  status: "approved" | "draft" | "review" | "obsolete";
+  status: "approved" | "draft" | "review" | "obsolete" | "archived";
   lastUpdated: string;
   owner: string;
   ownerId: string;
@@ -125,6 +125,7 @@ const statusConfig = {
   draft: { label: "Borrador", icon: Clock, class: "text-muted-foreground" },
   review: { label: "En Revisión", icon: AlertCircle, class: "text-warning" },
   obsolete: { label: "Obsoleto", icon: AlertCircle, class: "text-destructive" },
+  archived: { label: "Archivado", icon: AlertCircle, class: "text-muted-foreground" },
 };
 
 const statusOptions = [
@@ -1196,9 +1197,8 @@ export function DocumentsView({
                                onSignManual={() => handleOpenManualSign(doc)}
                               onViewSignatureStatus={() => handleOpenSignatureStatus(doc)}
                                onChangeStatus={() => handleOpenChangeStatus(doc)}
-                               onManageResponsibilities={() => { setSelectedDocument(doc); setIsResponsibilitiesOpen(true); }}
+                              onManageResponsibilities={() => { setSelectedDocument(doc); setIsResponsibilitiesOpen(true); }}
                               onShare={() => handleAction("Compartir", doc.code)}
-                              onArchive={() => handleAction("Archivar", doc.code)}
                               onToggleLock={() => handleAction("Bloquear/Desbloquear", doc.code)}
                               onDelete={() => handleRequestDelete(doc)}
                             />
