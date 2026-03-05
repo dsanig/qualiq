@@ -110,9 +110,6 @@ const normalizeDocumentFileType = (fileType?: string): Document["format"] => {
   return "pdf";
 };
 
-const DOCUMENT_SIGNATURE_CONFLICT_TARGET = "document_id,signed_by";
-
-
 const categoryOptions = [
   { id: "all", label: "Todos" },
   { id: "calidad", label: "Calidad" },
@@ -167,6 +164,40 @@ export function DocumentsView({
   isNewDocumentOpen,
   onNewDocumentOpenChange,
 }: DocumentsViewProps) {
+  const saveDocumentSignature = useCallback(async (payload: {
+    document_id: string;
+    signed_by: string;
+    signer_name: string;
+    signer_email: string | null;
+    signature_method: "autofirma_dnie" | "nombre_completo";
+    signature_data: string | null;
+    signed_at: string;
+  }) => {
+    const { data: updatedRows, error: updateError } = await supabase
+      .from("document_signatures")
+      .update(payload)
+      .eq("document_id", payload.document_id)
+      .eq("signed_by", payload.signed_by)
+      .select("id")
+      .limit(1);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    if ((updatedRows?.length || 0) > 0) {
+      return;
+    }
+
+    const { error: insertError } = await supabase
+      .from("document_signatures")
+      .insert(payload);
+
+    if (insertError) {
+      throw insertError;
+    }
+  }, []);
+
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -997,7 +1028,8 @@ export function DocumentsView({
       return;
     }
 
-    const { error } = await supabase.from("document_signatures").upsert({
+    try {
+      await saveDocumentSignature({
       document_id: selectedDocument.id,
       signed_by: user.id,
       signer_name: signerName.trim(),
@@ -1005,9 +1037,10 @@ export function DocumentsView({
       signature_method: "autofirma_dnie",
       signature_data: signReason.trim() || null,
       signed_at: signedAt,
-    }, { onConflict: DOCUMENT_SIGNATURE_CONFLICT_TARGET });
-    if (error) {
-      toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo registrar la firma.";
+      toast({ title: "Error al registrar firma", description: message, variant: "destructive" });
       return;
     }
     setSignedDocuments((prev) => ({
@@ -1069,7 +1102,8 @@ export function DocumentsView({
       return;
     }
 
-    const { error } = await supabase.from("document_signatures").upsert({
+    try {
+      await saveDocumentSignature({
       document_id: selectedDocument.id,
       signed_by: user.id,
       signer_name: manualSignName.trim(),
@@ -1077,9 +1111,10 @@ export function DocumentsView({
       signature_method: "nombre_completo",
       signature_data: manualSignReason.trim() || null,
       signed_at: signedAt,
-    }, { onConflict: DOCUMENT_SIGNATURE_CONFLICT_TARGET });
-    if (error) {
-      toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo registrar la firma.";
+      toast({ title: "Error al registrar firma", description: message, variant: "destructive" });
       return;
     }
     setSignedDocuments((prev) => ({
