@@ -642,7 +642,56 @@ export function DocumentsView({
         _responsibilities: cleanedResponsibilities,
       };
 
+      const fallbackToClientVersionUpdate = async () => {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError || !authData.user) throw authError ?? new Error("No se pudo obtener el usuario autenticado.");
+
+        const actorId = authData.user.id;
+        const nextVersion = selectedDocument.versionNum + 1;
+
+        const { error: versionInsertError } = await (supabase as any).from("document_versions").insert({
+          document_id: selectedDocument.id,
+          version: selectedDocument.versionNum,
+          file_url: selectedDocument.fileUrl,
+          changes_description: updateVersionChanges.trim() || null,
+          created_by: actorId,
+        });
+        if (versionInsertError) throw versionInsertError;
+
+        const { error: docUpdateError } = await (supabase as any)
+          .from("documents")
+          .update({
+            version: nextVersion,
+            file_url: filePath,
+            file_type: fileType,
+            status: "draft",
+          })
+          .eq("id", selectedDocument.id);
+        if (docUpdateError) throw docUpdateError;
+
+        const { error: deleteRespError } = await (supabase as any)
+          .from("document_responsibilities")
+          .delete()
+          .eq("document_id", selectedDocument.id);
+        if (deleteRespError) throw deleteRespError;
+
+        const fallbackResponsibilities = cleanedResponsibilities.map((responsibility) => ({
+          document_id: selectedDocument.id,
+          user_id: responsibility.responsible_user_id,
+          action_type: responsibility.action_type,
+          due_date: responsibility.due_date,
+          created_by: actorId,
+        }));
+
+        const { error: respInsertError } = await (supabase as any)
+          .from("document_responsibilities")
+          .insert(fallbackResponsibilities);
+        if (respInsertError) throw respInsertError;
+      };
+
       if (import.meta.env.DEV) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        console.log("SUPABASE_URL_HOST", new URL(supabaseUrl).host);
         const { data: authData, error: authError } = await supabase.auth.getUser();
         const payloadTypes = Object.fromEntries(
           Object.entries(createVersionArgs).map(([key, value]) => [
@@ -671,7 +720,20 @@ export function DocumentsView({
 
       const { error: rpcError } = await (supabase as any).rpc("create_new_document_version", createVersionArgs);
 
-      if (rpcError) throw rpcError;
+      if (rpcError) {
+        const isMissingRpc = rpcError.message?.includes("Could not find the function public.create_new_document_version")
+          || rpcError.message?.includes("schema cache");
+
+        if (!isMissingRpc) throw rpcError;
+
+        console.warn("[documents:update-version] RPC missing: check Supabase project/env. Falling back to client flow.", {
+          errorCode: rpcError.code,
+          errorMessage: rpcError.message,
+        });
+
+        // TODO: Remove this fallback after confirming RPC is deployed in the same Supabase project used by the app.
+        await fallbackToClientVersionUpdate();
+      }
 
       const { error: updateError } = await supabase.from("documents").update({ file_type: fileType }).eq("id", selectedDocument.id);
       if (updateError) throw updateError;
