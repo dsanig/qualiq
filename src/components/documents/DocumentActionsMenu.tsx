@@ -39,6 +39,7 @@ interface DocumentActionsMenuProps {
   onSignManual?: () => void;
   onChangeStatus?: () => void;
   onManageResponsibilities?: () => void;
+  onViewSignatureStatus?: () => void;
 }
 
 export function DocumentActionsMenu({
@@ -57,6 +58,7 @@ export function DocumentActionsMenu({
   onSignManual,
   onChangeStatus,
   onManageResponsibilities,
+  onViewSignatureStatus,
 }: DocumentActionsMenuProps) {
   return (
     <DropdownMenu>
@@ -103,6 +105,10 @@ export function DocumentActionsMenu({
         <DropdownMenuItem onClick={onSignManual} className="cursor-pointer">
           <Pencil className="w-4 h-4 mr-2" />
           Firmar con nombre
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onViewSignatureStatus} className="cursor-pointer">
+          <UserCheck className="w-4 h-4 mr-2" />
+          Estado de firma
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onShare} className="cursor-pointer">
           <Share2 className="w-4 h-4 mr-2" />

@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { DocumentActionsMenu } from "./DocumentActionsMenu";
 import { DocumentResponsibilities } from "./DocumentResponsibilities";
+import { DocumentSignatureStatusDialog } from "./DocumentSignatureStatusDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -215,6 +216,7 @@ export function DocumentsView({
   
   // Responsibilities state
   const [isResponsibilitiesOpen, setIsResponsibilitiesOpen] = useState(false);
+  const [isSignatureStatusOpen, setIsSignatureStatusOpen] = useState(false);
   // New document form state
   const [newDocCode, setNewDocCode] = useState("");
   const [newDocTitle, setNewDocTitle] = useState("");
@@ -243,10 +245,11 @@ export function DocumentsView({
 
   // Fetch signatures from DB
   const fetchSignatures = useCallback(async () => {
-    if (!profile?.company_id) return;
+    if (!profile?.company_id || !user) return;
     const { data } = await supabase
       .from("document_signatures")
-      .select("*");
+      .select("*")
+      .eq("signed_by", user.id);
     if (data) {
       const mapped: Record<string, SignedDocument> = {};
       for (const sig of data) {
@@ -259,7 +262,7 @@ export function DocumentsView({
       }
       setSignedDocuments(mapped);
     }
-  }, [profile?.company_id]);
+  }, [profile?.company_id, user]);
 
   // Fetch firma responsibilities and signatures to compute signature status
   const fetchFirmaStatus = useCallback(async () => {
@@ -809,7 +812,7 @@ export function DocumentsView({
       return;
     }
     const signedAt = new Date().toISOString();
-    const { error } = await supabase.from("document_signatures").insert({
+    const { error } = await supabase.from("document_signatures").upsert({
       document_id: selectedDocument.id,
       signed_by: user.id,
       signer_name: signerName.trim(),
@@ -817,7 +820,7 @@ export function DocumentsView({
       signature_method: "autofirma_dnie",
       signature_data: signReason.trim() || null,
       signed_at: signedAt,
-    });
+    }, { onConflict: "document_id,signed_by" });
     if (error) {
       toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
       return;
@@ -859,6 +862,11 @@ export function DocumentsView({
     setIsManualSignOpen(true);
   };
 
+  const handleOpenSignatureStatus = (doc: Document) => {
+    setSelectedDocument(doc);
+    setIsSignatureStatusOpen(true);
+  };
+
   const handleCompleteManualSign = async () => {
     if (!selectedDocument || !user) return;
     if (!manualSignName.trim()) {
@@ -866,7 +874,7 @@ export function DocumentsView({
       return;
     }
     const signedAt = new Date().toISOString();
-    const { error } = await supabase.from("document_signatures").insert({
+    const { error } = await supabase.from("document_signatures").upsert({
       document_id: selectedDocument.id,
       signed_by: user.id,
       signer_name: manualSignName.trim(),
@@ -874,7 +882,7 @@ export function DocumentsView({
       signature_method: "nombre_completo",
       signature_data: manualSignReason.trim() || null,
       signed_at: signedAt,
-    });
+    }, { onConflict: "document_id,signed_by" });
     if (error) {
       toast({ title: "Error al registrar firma", description: error.message, variant: "destructive" });
       return;
@@ -1051,6 +1059,7 @@ export function DocumentsView({
                               onDownload={() => handleDownload(doc)}
                                onSign={() => handleOpenSign(doc)}
                                onSignManual={() => handleOpenManualSign(doc)}
+                              onViewSignatureStatus={() => handleOpenSignatureStatus(doc)}
                                onChangeStatus={() => handleOpenChangeStatus(doc)}
                                onManageResponsibilities={() => { setSelectedDocument(doc); setIsResponsibilitiesOpen(true); }}
                               onShare={() => handleAction("Compartir", doc.code)}
@@ -1619,6 +1628,13 @@ export function DocumentsView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DocumentSignatureStatusDialog
+        open={isSignatureStatusOpen}
+        onOpenChange={setIsSignatureStatusOpen}
+        documentId={selectedDocument?.id ?? null}
+        documentCode={selectedDocument?.code}
+      />
       {/* Responsibilities Dialog */}
       {selectedDocument && (
         <DocumentResponsibilities
