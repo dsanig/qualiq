@@ -11,7 +11,8 @@ import {
   Loader2,
   RefreshCw,
   CheckCircle,
-  Target
+  Target,
+  FilePlus2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +33,9 @@ interface PredictiveInsight {
   suggested_actions: string[] | null;
   confidence_score: number | null;
   is_acknowledged: boolean;
+  read_at?: string | null;
+  read_by?: string | null;
+  source?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -44,6 +48,7 @@ interface PredictionDataValidation {
 
 const PREDICTION_MIN_RECORDS = 10;
 const PREDICTION_MIN_RANGE_DAYS = 30;
+const PREDICTION_LOOKBACK_DAYS = 90;
 
 const INSIGHT_TYPE_CONFIG = {
   pattern: { icon: BarChart3, label: "Patrón Detectado", color: "text-accent" },
@@ -58,7 +63,11 @@ const SEVERITY_CONFIG = {
   low: { bg: "bg-accent/10", border: "border-accent/30", badge: "outline" as const },
 };
 
-export function PredictiveAnalyticsView() {
+interface PredictiveAnalyticsViewProps {
+  onCreateIncidentFromInsight: (prefill: { title: string; description: string; sourceInsightId: string }) => void;
+}
+
+export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: PredictiveAnalyticsViewProps) {
   const { profile } = useAuth();
   const [insights, setInsights] = useState<PredictiveInsight[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,8 +88,9 @@ export function PredictiveAnalyticsView() {
 
     const { data, error } = await supabase
       .from("predictive_insights")
-      .select("*")
+       .select("*")
       .eq("company_id", profile.company_id)
+      .is("read_at", null)
       .order("created_at", { ascending: false })
       .limit(20);
 
@@ -154,6 +164,7 @@ export function PredictiveAnalyticsView() {
         .from("incidencias")
         .select("id, incidencia_type, status, title, description, created_at, deadline")
         .eq("company_id", profile.company_id)
+        .gte("created_at", new Date(Date.now() - PREDICTION_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString())
         .order("created_at", { ascending: false })
         .limit(500);
 
@@ -162,7 +173,7 @@ export function PredictiveAnalyticsView() {
       if (!incidentsData || incidentsData.length === 0) {
         const validation = {
           isSufficient: false,
-          reason: "No hay incidencias reales registradas en la empresa.",
+          reason: `No hay incidencias reales registradas en los últimos ${PREDICTION_LOOKBACK_DAYS} días para la empresa.`,
           recordCount: 0,
           rangeDays: 0,
         } satisfies PredictionDataValidation;
@@ -191,6 +202,7 @@ export function PredictiveAnalyticsView() {
           companyId: profile.company_id,
           records: validation.recordCount,
           rangeDays: validation.rangeDays,
+          lookbackDays: PREDICTION_LOOKBACK_DAYS,
         });
       }
 
@@ -221,27 +233,54 @@ export function PredictiveAnalyticsView() {
     setIsAnalyzing(false);
   };
 
-  const acknowledgeInsight = async (insightId: string) => {
-    await supabase
-      .from("predictive_insights")
-      .update({
-        is_acknowledged: true,
-        acknowledged_at: new Date().toISOString(),
-      })
-      .eq("id", insightId);
+  const markInsightAsRead = async (insightId: string) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("predictive_insights")
+        .update({
+          read_at: new Date().toISOString(),
+          read_by: userData.user?.id ?? null,
+          is_acknowledged: true,
+          acknowledged_at: new Date().toISOString(),
+          acknowledged_by: userData.user?.id ?? null,
+        })
+        .eq("id", insightId)
+        .eq("company_id", profile?.company_id ?? "");
 
-    setInsights(insights.map((i) => 
-      i.id === insightId ? { ...i, is_acknowledged: true } : i
-    ));
+      if (error) throw error;
 
-    toast({
-      title: "Insight reconocido",
-      description: "El insight ha sido marcado como revisado",
+      setInsights((prev) => prev.filter((i) => i.id !== insightId));
+
+      toast({
+        title: "Insight marcado como leído",
+        description: "El insight se ha eliminado del listado.",
+      });
+
+      fetchInsights();
+    } catch (error) {
+      console.error("Error marking insight as read:", error);
+      toast({
+        title: "No se ha podido marcar como leído",
+        description: "Inténtalo de nuevo en unos segundos.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateIncident = (insight: PredictiveInsight) => {
+    const sourceBlock = `\n\nOrigen del insight CAPA:\n- ID Insight: ${insight.id}\n- Tipo: ${insight.insight_type}\n- Severidad: ${insight.severity}`;
+
+    onCreateIncidentFromInsight({
+      title: insight.title,
+      description: `${insight.description}${sourceBlock}`,
+      sourceInsightId: insight.id,
     });
   };
 
-  const unacknowledgedCount = insights.filter((i) => !i.is_acknowledged).length;
-  const highSeverityCount = insights.filter((i) => i.severity === "high" && !i.is_acknowledged).length;
+  const unreadInsights = insights.filter((i) => !i.read_at);
+  const unacknowledgedCount = unreadInsights.length;
+  const highSeverityCount = unreadInsights.filter((i) => i.severity === "high").length;
 
   return (
     <div className="space-y-6">
@@ -341,7 +380,7 @@ export function PredictiveAnalyticsView() {
             return (
               <Card 
                 key={insight.id} 
-                className={`${severityConfig.bg} border ${severityConfig.border} ${insight.is_acknowledged ? "opacity-60" : ""}`}
+                className={`${severityConfig.bg} border ${severityConfig.border}`}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -362,16 +401,24 @@ export function PredictiveAnalyticsView() {
                         <CardTitle className="text-base">{insight.title}</CardTitle>
                       </div>
                     </div>
-                    {!insight.is_acknowledged && (
-                      <Button 
-                        variant="ghost" 
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
                         size="sm"
-                        onClick={() => acknowledgeInsight(insight.id)}
+                        onClick={() => handleCreateIncident(insight)}
+                      >
+                        <FilePlus2 className="w-4 h-4 mr-1" />
+                        Crear incidencia
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => markInsightAsRead(insight.id)}
                       >
                         <CheckCircle className="w-4 h-4 mr-1" />
-                        Marcar como revisado
+                        Marcar como leído
                       </Button>
-                    )}
+                    </div>
                   </div>
                   <CardDescription className="ml-12">
                     {new Date(insight.created_at).toLocaleDateString("es-ES", {
