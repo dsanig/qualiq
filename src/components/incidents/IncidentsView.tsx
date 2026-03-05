@@ -104,6 +104,9 @@ export function IncidentsView({
   const { toast } = useToast();
   const { canEditContent } = usePermissions();
 
+  const isMissingSourceInsightColumnError = (message: string) =>
+    /does not exist/i.test(message) && /source_insight_id/i.test(message);
+
   const isPermissionError = (message: string, code?: string, status?: number) =>
     code === "42501" || status === 401 || status === 403 ||
     /permission|rls|policy|forbidden|not authorized|violates row level security/i.test(message);
@@ -126,8 +129,31 @@ export function IncidentsView({
     setPermissionDenied(false);
 
     try {
+      const incidentsSelectWithInsight = "id,title,description,incidencia_type,audit_id,responsible_id,status,created_at,created_by,deadline,resolution_notes,source_insight_id";
+      const incidentsSelectFallback = "id,title,description,incidencia_type,audit_id,responsible_id,status,created_at,created_by,deadline,resolution_notes";
+
+      const incidentsPromise = (async () => {
+        const withInsight = await (supabase as any)
+          .from("incidencias")
+          .select(incidentsSelectWithInsight)
+          .order("created_at", { ascending: false });
+
+        if (withInsight.error && isMissingSourceInsightColumnError(withInsight.error.message)) {
+          if (import.meta.env.DEV) {
+            console.info("[IncidentsView] Schema mismatch: source_insight_id missing; using fallback select");
+          }
+
+          return (supabase as any)
+            .from("incidencias")
+            .select(incidentsSelectFallback)
+            .order("created_at", { ascending: false });
+        }
+
+        return withInsight;
+      })();
+
       const [{ data: incidenciasData, error: incidenciasError }, { data: auditsData, error: auditsError }, { data: usersData, error: usersError }] = await Promise.all([
-        (supabase as any).from("incidencias").select("id,title,description,incidencia_type,audit_id,responsible_id,status,created_at,created_by,deadline,resolution_notes,source_insight_id").order("created_at", { ascending: false }),
+        incidentsPromise,
         (supabase as any).from("audits").select("id,title").order("created_at", { ascending: false }),
         supabase.from("profiles").select("user_id,full_name,email"),
       ]);
@@ -214,7 +240,7 @@ export function IncidentsView({
   const createIncident = async () => {
     const userId = (await supabase.auth.getUser()).data.user?.id;
     const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", userId ?? "").maybeSingle();
-    const { data: inserted, error } = await (supabase as any).from("incidencias").insert({
+    const baseIncidentPayload = {
       title: form.title, description: form.description || null, incidencia_type: form.incidencia_type,
       audit_id: form.audit_id === "none" ? null : form.audit_id,
       responsible_id: form.responsible_id === "none" ? null : form.responsible_id,
@@ -222,8 +248,35 @@ export function IncidentsView({
       created_by: userId,
       deadline: form.deadline ? format(form.deadline, "yyyy-MM-dd") : null,
       resolution_notes: form.resolution_notes || null,
-      source_insight_id: sourceInsightId,
-    }).select("id").single();
+    };
+
+    const insertWithSource = () =>
+      (supabase as any)
+        .from("incidencias")
+        .insert({
+          ...baseIncidentPayload,
+          source_insight_id: sourceInsightId,
+        })
+        .select("id")
+        .single();
+
+    const insertWithoutSource = () =>
+      (supabase as any)
+        .from("incidencias")
+        .insert(baseIncidentPayload)
+        .select("id")
+        .single();
+
+    const insertResponse = sourceInsightId ? await insertWithSource() : await insertWithoutSource();
+
+    const { data: inserted, error } = sourceInsightId && insertResponse.error && isMissingSourceInsightColumnError(insertResponse.error.message)
+      ? await insertWithoutSource()
+      : insertResponse;
+
+    if (sourceInsightId && insertResponse.error && isMissingSourceInsightColumnError(insertResponse.error.message) && import.meta.env.DEV) {
+      console.info("[IncidentsView] Schema mismatch: source_insight_id missing; creating incident without source linkage");
+    }
+
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (inserted && newAttachments.length > 0) await uploadAttachments(inserted.id);
     toast({ title: "Incidencia creada" });
