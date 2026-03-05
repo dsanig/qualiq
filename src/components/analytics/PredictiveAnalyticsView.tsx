@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Brain, 
   TrendingUp, 
@@ -43,12 +44,45 @@ interface PredictionDataValidation {
   isSufficient: boolean;
   reason?: string;
   recordCount: number;
-  rangeDays: number;
+  windowLabel: string;
 }
 
-const PREDICTION_MIN_RECORDS = 10;
-const PREDICTION_MIN_RANGE_DAYS = 30;
-const PREDICTION_LOOKBACK_DAYS = 90;
+interface IncidentForAnalysis {
+  id: string;
+  incidencia_type?: string;
+  status: string | null;
+  title?: string;
+  description?: string | null;
+  created_at: string | null;
+  deadline?: string | null;
+}
+
+type AnalysisWindow = "current" | "1w" | "2w" | "1m" | "3m" | "6m" | "1y";
+
+const ANALYSIS_WINDOW_OPTIONS: Array<{ value: AnalysisWindow; label: string; days?: number }> = [
+  { value: "current", label: "Actual" },
+  { value: "1w", label: "1 semana", days: 7 },
+  { value: "2w", label: "2 semanas", days: 14 },
+  { value: "1m", label: "1 mes", days: 30 },
+  { value: "3m", label: "3 meses", days: 90 },
+  { value: "6m", label: "6 meses", days: 180 },
+  { value: "1y", label: "1 año", days: 365 },
+];
+
+const DEFAULT_ANALYSIS_WINDOW: AnalysisWindow = "1m";
+const STORAGE_WINDOW_KEY = "predictive-analysis-window";
+const MIN_RECORDS_BY_WINDOW: Record<AnalysisWindow, number> = {
+  current: 3,
+  "1w": 10,
+  "2w": 10,
+  "1m": 10,
+  "3m": 10,
+  "6m": 10,
+  "1y": 10,
+};
+
+const OPEN_STATUS_VALUES = ["open", "in_progress", "pending_approval", "abierta", "abierto", "pendiente"];
+const CLOSED_STATUS_VALUES = ["closed", "cerrada", "cerrado", "resolved", "resuelta"];
 
 const INSIGHT_TYPE_CONFIG = {
   pattern: { icon: BarChart3, label: "Patrón Detectado", color: "text-accent" },
@@ -70,13 +104,81 @@ interface PredictiveAnalyticsViewProps {
 export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: PredictiveAnalyticsViewProps) {
   const { profile } = useAuth();
   const [insights, setInsights] = useState<PredictiveInsight[]>([]);
+  const [windowInsights, setWindowInsights] = useState<PredictiveInsight[]>([]);
+  const [analysisWindow, setAnalysisWindow] = useState<AnalysisWindow>(DEFAULT_ANALYSIS_WINDOW);
+  const [incidentsForWindow, setIncidentsForWindow] = useState<IncidentForAnalysis[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lastValidation, setLastValidation] = useState<PredictionDataValidation | null>(null);
 
+  const windowConfig = useMemo(
+    () => ANALYSIS_WINDOW_OPTIONS.find((option) => option.value === analysisWindow) ?? ANALYSIS_WINDOW_OPTIONS[3],
+    [analysisWindow],
+  );
+
+  useEffect(() => {
+    const savedWindow = localStorage.getItem(STORAGE_WINDOW_KEY) as AnalysisWindow | null;
+    if (savedWindow && ANALYSIS_WINDOW_OPTIONS.some((option) => option.value === savedWindow)) {
+      setAnalysisWindow(savedWindow);
+    }
+  }, []);
+
   useEffect(() => {
     fetchInsights();
-  }, [profile?.company_id]);
+  }, [profile?.company_id, analysisWindow]);
+
+  const getWindowStart = (selectedWindow: AnalysisWindow) => {
+    const selected = ANALYSIS_WINDOW_OPTIONS.find((option) => option.value === selectedWindow);
+    if (!selected?.days) return null;
+    return new Date(Date.now() - selected.days * 24 * 60 * 60 * 1000);
+  };
+
+  const isIncidentOpen = (status?: string | null) => {
+    const normalized = (status ?? "").toLowerCase();
+    if (OPEN_STATUS_VALUES.includes(normalized)) return true;
+    if (CLOSED_STATUS_VALUES.includes(normalized)) return false;
+    return normalized !== "closed";
+  };
+
+  const getIncidentsForWindow = async (selectedWindow: AnalysisWindow): Promise<IncidentForAnalysis[]> => {
+    if (!profile?.company_id) return [];
+
+    const periodStart = getWindowStart(selectedWindow);
+    const lowerBound = periodStart ? new Date(periodStart.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString() : undefined;
+
+    const { data, error } = await supabase
+      .from("incidencias")
+      .select("id, incidencia_type, status, title, description, created_at, deadline")
+      .eq("company_id", profile.company_id)
+      .order("created_at", { ascending: false })
+      .limit(2000)
+      .gte("created_at", lowerBound ?? "1970-01-01T00:00:00.000Z");
+
+    if (error) throw error;
+
+    const incidents = (data ?? []).filter((incident) => {
+      if (selectedWindow === "current") {
+        return isIncidentOpen(incident.status);
+      }
+
+      if (!periodStart) return true;
+
+      const openedAt = new Date(incident.created_at);
+      if (!Number.isFinite(openedAt.getTime())) return false;
+
+      /**
+       * Interpretación implementada: una incidencia cuenta si su intervalo de apertura
+       * se solapa con la ventana [windowStart, now].
+       * Como la tabla no expone closed_at/resolved_at, usamos status como proxy:
+       * - Abierta: end = now
+       * - Cerrada: end = created_at (aproximación conservadora)
+       */
+      const closedAtProxy = isIncidentOpen(incident.status) ? new Date() : openedAt;
+      return openedAt <= new Date() && closedAtProxy >= periodStart;
+    });
+
+    return incidents;
+  };
 
   const fetchInsights = async () => {
     setIsLoading(true);
@@ -85,6 +187,8 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       setIsLoading(false);
       return;
     }
+
+    const windowStart = getWindowStart(analysisWindow);
 
     const { data, error } = await supabase
       .from("predictive_insights")
@@ -97,54 +201,58 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
     if (error) {
       console.error("Error fetching insights:", error);
     } else {
-      setInsights((data ?? []) as unknown as PredictiveInsight[]);
+      const unreadInsights = (data ?? []) as unknown as PredictiveInsight[];
+      setInsights(unreadInsights);
+      setWindowInsights(
+        windowStart
+          ? unreadInsights.filter((insight) => new Date(insight.created_at) >= windowStart)
+          : unreadInsights,
+      );
     }
+
+    try {
+      const incidents = await getIncidentsForWindow(analysisWindow);
+      setIncidentsForWindow(incidents);
+      setLastValidation(isDataSufficientForPrediction(incidents, analysisWindow));
+    } catch (incidentError) {
+      console.error("Error fetching incidents for predictive analytics:", incidentError);
+      setIncidentsForWindow([]);
+      setLastValidation(null);
+    }
+
     setIsLoading(false);
   };
 
-  const isDataSufficientForPrediction = (data: Array<{ created_at: string | null }>): PredictionDataValidation => {
-    const validDates = data
-      .map((item) => item.created_at)
-      .filter((date): date is string => Boolean(date))
-      .map((date) => new Date(date).getTime())
-      .filter((timestamp) => Number.isFinite(timestamp));
+  const isDataSufficientForPrediction = (
+    data: Array<{ created_at: string | null }>,
+    selectedWindow: AnalysisWindow,
+  ): PredictionDataValidation => {
+    const minRequiredRecords = MIN_RECORDS_BY_WINDOW[selectedWindow];
+    const selectedLabel = ANALYSIS_WINDOW_OPTIONS.find((option) => option.value === selectedWindow)?.label ?? "ventana seleccionada";
 
-    if (data.length < PREDICTION_MIN_RECORDS) {
+    if (data.length < minRequiredRecords) {
       return {
         isSufficient: false,
-        reason: `Se requieren al menos ${PREDICTION_MIN_RECORDS} incidencias reales para analizar patrones.`,
+        reason:
+          selectedWindow === "current"
+            ? `Se requieren al menos ${minRequiredRecords} incidencias abiertas actualmente para analizar patrones.`
+            : `Se requieren al menos ${minRequiredRecords} incidencias dentro de la ventana ${selectedLabel}.`,
         recordCount: data.length,
-        rangeDays: 0,
-      };
-    }
-
-    if (validDates.length !== data.length) {
-      return {
-        isSufficient: false,
-        reason: "Hay incidencias con fechas inválidas y no se puede ejecutar un análisis confiable.",
-        recordCount: data.length,
-        rangeDays: 0,
-      };
-    }
-
-    const minDate = Math.min(...validDates);
-    const maxDate = Math.max(...validDates);
-    const rangeDays = Math.floor((maxDate - minDate) / (1000 * 60 * 60 * 24));
-
-    if (rangeDays < PREDICTION_MIN_RANGE_DAYS) {
-      return {
-        isSufficient: false,
-        reason: `Se requiere un histórico mínimo de ${PREDICTION_MIN_RANGE_DAYS} días para generar predicciones fiables.`,
-        recordCount: data.length,
-        rangeDays,
+        windowLabel: selectedLabel,
       };
     }
 
     return {
       isSufficient: true,
       recordCount: data.length,
-      rangeDays,
+      windowLabel: selectedLabel,
     };
+  };
+
+  const handleWindowChange = (value: string) => {
+    const nextWindow = value as AnalysisWindow;
+    setAnalysisWindow(nextWindow);
+    localStorage.setItem(STORAGE_WINDOW_KEY, nextWindow);
   };
 
   const runAnalysis = async () => {
@@ -160,22 +268,14 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
     setIsAnalyzing(true);
 
     try {
-      const { data: incidentsData, error: incidentsError } = await supabase
-        .from("incidencias")
-        .select("id, incidencia_type, status, title, description, created_at, deadline")
-        .eq("company_id", profile.company_id)
-        .gte("created_at", new Date(Date.now() - PREDICTION_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString())
-        .order("created_at", { ascending: false })
-        .limit(500);
-
-      if (incidentsError) throw incidentsError;
+      const incidentsData = await getIncidentsForWindow(analysisWindow);
 
       if (!incidentsData || incidentsData.length === 0) {
         const validation = {
           isSufficient: false,
-          reason: `No hay incidencias reales registradas en los últimos ${PREDICTION_LOOKBACK_DAYS} días para la empresa.`,
+          reason: `No hay incidencias disponibles para la ventana ${windowConfig.label}.`,
           recordCount: 0,
-          rangeDays: 0,
+          windowLabel: windowConfig.label,
         } satisfies PredictionDataValidation;
         setLastValidation(validation);
         toast({
@@ -186,7 +286,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         return;
       }
 
-      const validation = isDataSufficientForPrediction(incidentsData);
+      const validation = isDataSufficientForPrediction(incidentsData, analysisWindow);
       setLastValidation(validation);
       if (!validation.isSufficient) {
         toast({
@@ -201,8 +301,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         console.info("[predictive-analytics] Fuente: incidencias", {
           companyId: profile.company_id,
           records: validation.recordCount,
-          rangeDays: validation.rangeDays,
-          lookbackDays: PREDICTION_LOOKBACK_DAYS,
+          window: analysisWindow,
         });
       }
 
@@ -210,6 +309,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         body: {
           companyId: profile.company_id,
           incidentsData,
+          analysisWindow,
         },
       });
 
@@ -278,9 +378,11 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
     });
   };
 
-  const unreadInsights = insights.filter((i) => !i.read_at);
-  const unacknowledgedCount = unreadInsights.length;
-  const highSeverityCount = unreadInsights.filter((i) => i.severity === "high").length;
+  const unreadWindowInsights = windowInsights.filter((i) => !i.read_at);
+  const unacknowledgedCount = unreadWindowInsights.length;
+  const highSeverityCount = unreadWindowInsights.filter((i) => i.severity === "high").length;
+  const currentValidation = lastValidation ?? isDataSufficientForPrediction(incidentsForWindow, analysisWindow);
+  const canRunAnalysis = currentValidation.isSufficient && !isAnalyzing;
 
   return (
     <div className="space-y-6">
@@ -291,7 +393,18 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
             Detecta patrones y previene incidencias antes de que ocurran
           </p>
         </div>
-        <Button onClick={runAnalysis} disabled={isAnalyzing}>
+        <div className="flex items-center gap-2">
+          <Select value={analysisWindow} onValueChange={handleWindowChange}>
+            <SelectTrigger className="w-[170px]">
+              <SelectValue placeholder="Ventana temporal" />
+            </SelectTrigger>
+            <SelectContent>
+              {ANALYSIS_WINDOW_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={runAnalysis} disabled={!canRunAnalysis} title={!canRunAnalysis ? currentValidation.reason : undefined}>
           {isAnalyzing ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -303,7 +416,8 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
               Ejecutar Análisis
             </>
           )}
-        </Button>
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -315,7 +429,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
                 <Brain className="w-6 h-6 text-accent" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{insights.length}</p>
+                <p className="text-2xl font-bold text-foreground">{windowInsights.length}</p>
                 <p className="text-sm text-muted-foreground">Insights Totales</p>
               </div>
             </div>
@@ -354,25 +468,25 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
-      ) : insights.length === 0 ? (
+      ) : windowInsights.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Brain className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium text-foreground">No hay datos suficientes para generar análisis predictivo.</p>
+            <p className="text-lg font-medium text-foreground">No hay datos suficientes para generar análisis para: {windowConfig.label}.</p>
             <p className="text-sm text-muted-foreground mt-1 text-center max-w-md">
-              {lastValidation?.reason ?? "Carga datos reales o completa el registro de incidencias para habilitar este módulo."}
+              {currentValidation.reason ?? "Registra más incidencias o amplía la ventana temporal."}
             </p>
             <p className="text-xs text-muted-foreground mt-2 text-center max-w-md">
-              Carga datos reales o completa los pasos de registro de incidencias, con al menos {PREDICTION_MIN_RECORDS} registros y {PREDICTION_MIN_RANGE_DAYS} días de histórico.
+              Registra más incidencias o amplía la ventana temporal para habilitar este módulo.
             </p>
-            <Button className="mt-4" onClick={runAnalysis} disabled={isAnalyzing}>
+            <Button className="mt-4" onClick={runAnalysis} disabled={!canRunAnalysis}>
               {isAnalyzing ? "Analizando..." : "Ejecutar Primer Análisis"}
             </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
-          {insights.map((insight) => {
+          {windowInsights.map((insight) => {
             const typeConfig = INSIGHT_TYPE_CONFIG[insight.insight_type as keyof typeof INSIGHT_TYPE_CONFIG] || INSIGHT_TYPE_CONFIG.pattern;
             const severityConfig = SEVERITY_CONFIG[insight.severity as keyof typeof SEVERITY_CONFIG] || SEVERITY_CONFIG.medium;
             const Icon = typeConfig.icon;
