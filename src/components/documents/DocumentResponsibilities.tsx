@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Trash2, CheckCircle, Clock, Users } from "lucide-react";
+import { Plus, Trash2, Clock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,20 +134,6 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
     }
   };
 
-  const handleComplete = async (id: string) => {
-    try {
-      const { error } = await (supabase as any).from("document_responsibilities").update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-      }).eq("id", id);
-      if (error) throw error;
-      toast({ title: "Acción completada" });
-      fetchResponsibilities();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  };
-
   const handleDelete = async (id: string) => {
     try {
       const { error } = await (supabase as any).from("document_responsibilities").delete().eq("id", id);
@@ -264,11 +250,6 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
                   </div>
                   {canEditContent && (
                     <div className="flex gap-1">
-                      {!isCompleted && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={() => handleComplete(r.id)}>
-                          <CheckCircle className="w-4 h-4" />
-                        </Button>
-                      )}
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(r.id)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
