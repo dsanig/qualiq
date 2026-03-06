@@ -94,18 +94,22 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [{ data: auditsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }] = await Promise.all([
+      const [{ data: auditsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: incData }, { data: linksData }] = await Promise.all([
         (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id").order("created_at", { ascending: false }),
         (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
         (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline"),
         (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
         (supabase as any).from("profiles").select("id,full_name,email"),
+        (supabase as any).from("incidencias").select("id,title,status"),
+        (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
       ]);
       setAudits((auditsData ?? []) as Audit[]);
       setCapaPlans((capaData ?? []) as CapaPlan[]);
       setNonConformities((ncData ?? []) as NonConformity[]);
       setActions((actionData ?? []) as ActionItem[]);
       setUsers((usersData ?? []) as Profile[]);
+      setIncidencias((incData ?? []) as IncidenciaRef[]);
+      setCapaIncidenciaLinks((linksData ?? []) as CapaIncidenciaLink[]);
       if (!selectedAuditId && auditsData?.[0]?.id) setSelectedAuditId(auditsData[0].id);
     } finally {
       setIsLoading(false);
