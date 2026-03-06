@@ -402,7 +402,7 @@ export function DocumentsView({
       .order("created_at", { ascending: false });
 
     if (filters.documentTypology !== "all") {
-      query = query.eq("typology", toDbTypology(filters.documentTypology));
+      query = query.eq("typology", filters.documentTypology as string);
     }
 
     const { data, error } = await query;
@@ -547,7 +547,7 @@ export function DocumentsView({
         code: editDocCode.trim(),
         title: editDocTitle.trim(),
         category: editDocCategory.charAt(0).toUpperCase() + editDocCategory.slice(1),
-        typology: toDbTypology(editDocTypology),
+        typology: editDocTypology,
         status: editDocStatus as any,
       };
 
@@ -988,7 +988,7 @@ export function DocumentsView({
         code: newDocCode.trim(),
         title: newDocTitle.trim(),
         category: newDocCategory.charAt(0).toUpperCase() + newDocCategory.slice(1),
-        typology: toDbTypology(newDocTypology || "Documento"),
+        typology: newDocTypology || "Documento",
         company_id: profile.company_id,
         owner_id: uploaderUser.id,
         file_type: fileType,
