@@ -47,7 +47,6 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
 
 type DocumentTypology = "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro";
-type DocumentTypologyDb = "proceso" | "pnt" | "documento" | "normativa" | "otro";
 
 interface Document {
   id: string;
