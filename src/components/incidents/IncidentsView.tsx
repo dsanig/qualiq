@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
+import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js";
 import type { FiltersState } from "@/components/filters/FilterModal";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
@@ -423,36 +424,96 @@ export function IncidentsView({
     if (!incidentPendingDelete || !canDeleteIncidencia || isDeleting) return;
     if (deleteConfirmationText !== "ELIMINAR") return;
 
+    const pendingIncidentId = incidentPendingDelete.id;
+
     setIsDeleting(true);
-    const { error } = await supabase.functions.invoke("delete-incidencia", {
-      body: {
-        incidenciaId: incidentPendingDelete.id,
-        confirmationText: deleteConfirmationText,
-      },
-    });
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        console.error("[IncidentsView] Missing/invalid session when deleting incidencia", {
+          incidenciaId: pendingIncidentId,
+          sessionError,
+        });
+        toast({
+          title: "No se pudo eliminar la incidencia",
+          description: "Sesión no válida. Vuelva a iniciar sesión.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-    setIsDeleting(false);
-
-    if (error) {
-      const message = error.message?.includes("No autorizado")
-        ? "No autorizado: solo el Superadmin puede eliminar incidencias."
-        : error.message || "No se pudo eliminar la incidencia";
-      toast({
-        title: "No se pudo eliminar la incidencia",
-        description: message,
-        variant: "destructive",
+      const {
+        data: deleteResult,
+        error,
+      } = await supabase.functions.invoke<{ success?: boolean; message?: string }>("delete-incidencia", {
+        body: {
+          incidenciaId: pendingIncidentId,
+          confirmationText: deleteConfirmationText,
+        },
       });
-      return;
-    }
 
-    toast({ title: "Incidencia eliminada correctamente" });
-    setIncidentPendingDelete(null);
-    setDeleteConfirmationText("");
-    if (editingIncident?.id === incidentPendingDelete.id) {
-      setIsEditOpen(false);
-      setEditingIncident(null);
+      if (error) {
+        let message = error.message || "No se pudo eliminar la incidencia.";
+
+        if (error instanceof FunctionsHttpError) {
+          let backendPayload: { message?: string; error?: string } | null = null;
+          try {
+            backendPayload = await error.context.json();
+          } catch {
+            backendPayload = null;
+          }
+
+          const backendMessage = backendPayload?.message ?? backendPayload?.error;
+          message = backendMessage || message;
+
+          if (error.context.status === 401) {
+            message = "Sesión no válida. Vuelva a iniciar sesión.";
+          } else if (error.context.status === 403) {
+            message = "No autorizado: solo el Superadmin puede eliminar incidencias.";
+          } else if (error.context.status === 404) {
+            message = "La función segura de eliminación no está disponible.";
+          } else if (error.context.status === 409) {
+            message = backendMessage || "No se puede eliminar la incidencia porque tiene registros relacionados.";
+          } else if (error.context.status >= 500) {
+            message = "Se produjo un error interno al eliminar la incidencia.";
+          }
+        } else if (error instanceof FunctionsFetchError || error instanceof FunctionsRelayError) {
+          message = "No se pudo conectar con la función segura de eliminación. Verifique su sesión o la configuración de Supabase.";
+        }
+
+        console.error("[IncidentsView] Error deleting incidencia", {
+          incidenciaId: pendingIncidentId,
+          error,
+        });
+
+        toast({
+          title: "No se pudo eliminar la incidencia",
+          description: message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!deleteResult?.success) {
+        toast({
+          title: "No se pudo eliminar la incidencia",
+          description: deleteResult?.message || "La función de eliminación respondió con un estado no válido.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: deleteResult.message || "Incidencia eliminada correctamente" });
+      setIncidentPendingDelete(null);
+      setDeleteConfirmationText("");
+      if (editingIncident?.id === pendingIncidentId) {
+        setIsEditOpen(false);
+        setEditingIncident(null);
+      }
+      await loadData();
+    } finally {
+      setIsDeleting(false);
     }
-    await loadData();
   };
 
   const isDeadlineClose = (deadline: string | null) => {
