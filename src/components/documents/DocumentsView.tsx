@@ -244,6 +244,14 @@ export function DocumentsView({
     }
 
     if ((updatedRows?.length || 0) > 0) {
+      // Also mark the responsibility as completed
+      await supabase
+        .from("document_responsibilities")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("document_id", payload.document_id)
+        .eq("user_id", payload.signed_by)
+        .eq("action_type", "firma")
+        .eq("status", "pending");
       return;
     }
 
@@ -254,6 +262,15 @@ export function DocumentsView({
     if (insertError) {
       throw insertError;
     }
+
+    // Mark the corresponding firma responsibility as completed
+    await supabase
+      .from("document_responsibilities")
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .eq("document_id", payload.document_id)
+      .eq("user_id", payload.signed_by)
+      .eq("action_type", "firma")
+      .eq("status", "pending");
   }, []);
 
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);

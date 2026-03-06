@@ -80,20 +80,45 @@ export function PendingActions({ onViewAll, onNavigateToDocument }: PendingActio
           const { data: docs } = await supabase.from("documents").select("id, code, title").in("id", docIds);
           const docMap = new Map((docs || []).map(d => [d.id, d]));
 
-          docActions = (respData as any[]).map((r) => {
-            const doc = docMap.get(r.document_id);
-            return {
-              id: r.id,
-              description: `${typeLabels[r.action_type] || r.action_type}: ${doc?.title || doc?.code || "Documento"}`,
-              action_type: r.action_type,
-              due_date: r.due_date,
-              status: r.status,
-              isOverdue: r.due_date ? new Date(r.due_date) < now : false,
-              source: "document" as const,
-              documentCode: doc?.code,
-              documentId: r.document_id,
-            };
-          });
+          // Check which firma responsibilities already have a signature recorded
+          const firmaResps = (respData as any[]).filter(r => r.action_type === "firma");
+          const firmaDocIds = [...new Set(firmaResps.map(r => r.document_id))];
+          let signedSet = new Set<string>();
+
+          if (firmaDocIds.length > 0) {
+            const { data: sigs } = await supabase
+              .from("document_signatures")
+              .select("document_id, signed_by")
+              .eq("signed_by", user.id)
+              .in("document_id", firmaDocIds);
+
+            for (const sig of (sigs || [])) {
+              signedSet.add(`${sig.document_id}:${sig.signed_by}`);
+            }
+          }
+
+          docActions = (respData as any[])
+            .filter((r) => {
+              // Exclude firma responsibilities that already have a signature
+              if (r.action_type === "firma" && signedSet.has(`${r.document_id}:${user.id}`)) {
+                return false;
+              }
+              return true;
+            })
+            .map((r) => {
+              const doc = docMap.get(r.document_id);
+              return {
+                id: r.id,
+                description: `${typeLabels[r.action_type] || r.action_type}: ${doc?.title || doc?.code || "Documento"}`,
+                action_type: r.action_type,
+                due_date: r.due_date,
+                status: r.status,
+                isOverdue: r.due_date ? new Date(r.due_date) < now : false,
+                source: "document" as const,
+                documentCode: doc?.code,
+                documentId: r.document_id,
+              };
+            });
         }
       }
 
