@@ -8,7 +8,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
-import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js";
 import type { FiltersState } from "@/components/filters/FilterModal";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
@@ -448,47 +447,15 @@ export function IncidentsView({
       } = await supabase.functions.invoke<{ success?: boolean; message?: string }>("delete-incidencia", {
         body: {
           incidenciaId: pendingIncidentId,
-          confirmationText: deleteConfirmationText,
         },
       });
 
       if (error) {
-        let message = error.message || "Error eliminando la incidencia";
-
-        if (error instanceof FunctionsHttpError) {
-          let backendPayload: { message?: string; error?: string } | null = null;
-          try {
-            backendPayload = await error.context.json();
-          } catch {
-            backendPayload = null;
-          }
-
-          const backendMessage = backendPayload?.message ?? backendPayload?.error;
-          message = backendMessage || message;
-
-          if (error.context.status === 401) {
-            message = "Sesión no válida. Vuelva a iniciar sesión.";
-          } else if (error.context.status === 403) {
-            message = "No autorizado: solo el Superadmin puede eliminar incidencias.";
-          } else if (error.context.status === 404) {
-            message = "La función segura de eliminación no está disponible.";
-          } else if (error.context.status === 409) {
-            message = backendMessage || "No se puede eliminar la incidencia porque tiene registros relacionados.";
-          } else if (error.context.status >= 500) {
-            message = "Se produjo un error interno al eliminar la incidencia.";
-          }
-        } else if (error instanceof FunctionsFetchError || error instanceof FunctionsRelayError) {
-          message = error.message || "Error eliminando la incidencia";
-        }
-
-        console.error("Delete incidencia error", {
-          incidenciaId: pendingIncidentId,
-          error,
-        });
+        console.error("Delete incidencia error:", error);
 
         toast({
           title: "No se pudo eliminar la incidencia",
-          description: message,
+          description: error.message,
           variant: "destructive",
         });
         return;
