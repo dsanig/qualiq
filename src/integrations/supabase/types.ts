@@ -582,6 +582,7 @@ export type Database = {
           owner_id: string
           status: Database["public"]["Enums"]["document_status"]
           title: string
+          typology: string
           updated_at: string
           version: number
         }
@@ -599,6 +600,7 @@ export type Database = {
           owner_id: string
           status?: Database["public"]["Enums"]["document_status"]
           title: string
+          typology?: string
           updated_at?: string
           version?: number
         }
@@ -616,6 +618,7 @@ export type Database = {
           owner_id?: string
           status?: Database["public"]["Enums"]["document_status"]
           title?: string
+          typology?: string
           updated_at?: string
           version?: number
         }
