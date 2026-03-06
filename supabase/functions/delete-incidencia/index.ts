@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 interface DeleteIncidenciaPayload {
@@ -11,24 +12,33 @@ interface DeleteIncidenciaPayload {
   confirmationText?: string;
 }
 
+const jsonResponse = (status: number, payload: { success: boolean; message: string }) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Método no permitido." }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return jsonResponse(405, {
+      success: false,
+      message: "Método no permitido.",
     });
   }
 
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "No autorizado." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return jsonResponse(401, {
+        success: false,
+        message: "Sesión no válida. Vuelva a iniciar sesión.",
       });
     }
 
@@ -37,7 +47,15 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Variables de entorno de Supabase incompletas.");
+      console.error("[delete-incidencia] Missing Supabase environment variables", {
+        hasUrl: Boolean(SUPABASE_URL),
+        hasAnonKey: Boolean(SUPABASE_ANON_KEY),
+        hasServiceRole: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      });
+      return jsonResponse(500, {
+        success: false,
+        message: "Error interno al eliminar la incidencia.",
+      });
     }
 
     const token = authHeader.replace("Bearer ", "").trim();
@@ -45,40 +63,55 @@ serve(async (req) => {
     const { data: { user: caller }, error: authError } = await anonClient.auth.getUser(token);
 
     if (authError || !caller) {
-      return new Response(JSON.stringify({ error: "Token inválido o expirado." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return jsonResponse(401, {
+        success: false,
+        message: "Sesión no válida. Vuelva a iniciar sesión.",
       });
     }
 
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: callerProfile } = await serviceClient
+    const { data: callerProfile, error: profileError } = await serviceClient
       .from("profiles")
       .select("is_superadmin,email")
       .eq("user_id", caller.id)
       .maybeSingle();
 
+    if (profileError) {
+      console.error("[delete-incidencia] Failed loading caller profile", profileError);
+      return jsonResponse(500, {
+        success: false,
+        message: "Error interno al eliminar la incidencia.",
+      });
+    }
+
     if (!callerProfile?.is_superadmin) {
-      return new Response(JSON.stringify({ error: "No autorizado: solo el Superadmin puede eliminar incidencias." }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return jsonResponse(403, {
+        success: false,
+        message: "No autorizado: solo el Superadmin puede eliminar incidencias.",
       });
     }
 
     const { incidenciaId, confirmationText } = await req.json() as DeleteIncidenciaPayload;
 
     if (!incidenciaId) {
-      return new Response(JSON.stringify({ error: "incidenciaId es obligatorio." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return jsonResponse(400, {
+        success: false,
+        message: "Falta el identificador de la incidencia.",
+      });
+    }
+
+    if (!isUuid(incidenciaId)) {
+      return jsonResponse(400, {
+        success: false,
+        message: "El identificador de la incidencia no es válido.",
       });
     }
 
     if (confirmationText !== "ELIMINAR") {
-      return new Response(JSON.stringify({ error: "Confirmación inválida. Debe escribir ELIMINAR." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return jsonResponse(400, {
+        success: false,
+        message: "Confirmación inválida. Debe escribir ELIMINAR.",
       });
     }
 
@@ -89,37 +122,48 @@ serve(async (req) => {
       .maybeSingle();
 
     if (incidentError) {
-      return new Response(JSON.stringify({ error: incidentError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      console.error("[delete-incidencia] Failed loading incidencia", incidentError);
+      return jsonResponse(500, {
+        success: false,
+        message: "Error interno al eliminar la incidencia.",
       });
     }
 
     if (!incident) {
-      return new Response(JSON.stringify({ error: "Incidencia no encontrada." }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return jsonResponse(404, {
+        success: false,
+        message: "Incidencia no encontrada.",
       });
     }
 
     const [attachmentsCount, capaLinksCount] = await Promise.all([
-      serviceClient.from("incidencia_attachments").select("id", { count: "exact", head: true }).eq("incidencia_id", incidenciaId),
-      serviceClient.from("incidencia_capa_plans").select("incidencia_id", { count: "exact", head: true }).eq("incidencia_id", incidenciaId),
+      serviceClient
+        .from("incidencia_attachments")
+        .select("id", { count: "exact", head: true })
+        .eq("incidencia_id", incidenciaId),
+      serviceClient
+        .from("incidencia_capa_plans")
+        .select("incidencia_id", { count: "exact", head: true })
+        .eq("incidencia_id", incidenciaId),
     ]);
 
     if (attachmentsCount.error || capaLinksCount.error) {
-      return new Response(JSON.stringify({ error: attachmentsCount.error?.message ?? capaLinksCount.error?.message ?? "No se pudo validar dependencias." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      console.error("[delete-incidencia] Dependency check failed", {
+        attachmentsError: attachmentsCount.error,
+        capaLinksError: capaLinksCount.error,
+      });
+      return jsonResponse(500, {
+        success: false,
+        message: "Error interno al eliminar la incidencia.",
       });
     }
 
     const hasDependencies = (attachmentsCount.count ?? 0) > 0 || (capaLinksCount.count ?? 0) > 0;
 
     if (hasDependencies) {
-      return new Response(JSON.stringify({ error: "No se puede eliminar la incidencia porque tiene registros relacionados." }), {
-        status: 409,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return jsonResponse(409, {
+        success: false,
+        message: "No se puede eliminar la incidencia porque tiene registros relacionados.",
       });
     }
 
@@ -129,9 +173,10 @@ serve(async (req) => {
       .eq("id", incidenciaId);
 
     if (deleteError) {
-      return new Response(JSON.stringify({ error: deleteError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      console.error("[delete-incidencia] Delete failed", deleteError);
+      return jsonResponse(500, {
+        success: false,
+        message: "Error interno al eliminar la incidencia.",
       });
     }
 
@@ -147,21 +192,22 @@ serve(async (req) => {
       });
 
     if (auditError) {
-      return new Response(JSON.stringify({ error: auditError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      console.error("[delete-incidencia] Audit insert failed", auditError);
+      return jsonResponse(500, {
+        success: false,
+        message: "Error interno al eliminar la incidencia.",
       });
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return jsonResponse(200, {
+      success: true,
+      message: "Incidencia eliminada correctamente",
     });
   } catch (error) {
     console.error("[delete-incidencia] error", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Error interno." }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return jsonResponse(500, {
+      success: false,
+      message: "Error interno al eliminar la incidencia.",
     });
   }
 });
