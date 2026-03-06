@@ -523,6 +523,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
             {auditCapaPlans.map((capa) => {
               const ncCount = nonConformities.filter((nc) => nc.capa_plan_id === capa.id).length;
               const actCount = actions.filter((a) => nonConformities.some((nc) => nc.capa_plan_id === capa.id && nc.id === a.non_conformity_id)).length;
+              const linkedIncs = getLinkedIncidencias(capa.id);
               return (
                 <div
                   key={capa.id}
@@ -531,14 +532,35 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                 >
                   <div className="flex items-center justify-between">
                     <p className="font-medium">{capa.title || "Plan CAPA"}</p>
-                    {canEditContent && (
-                      <button onClick={(e) => { e.stopPropagation(); openEditCapa(capa); }} className="text-muted-foreground hover:text-foreground">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {canEditContent && (
+                        <button onClick={(e) => { e.stopPropagation(); setLinkingCapaPlanId(capa.id); setLinkIncidenciaOpen(true); }} className="text-muted-foreground hover:text-foreground" title="Vincular incidencias">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {canEditContent && (
+                        <button onClick={(e) => { e.stopPropagation(); openEditCapa(capa); }} className="text-muted-foreground hover:text-foreground">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {capa.responsible_id && <p className="text-xs text-muted-foreground">Responsable: {getUserName(capa.responsible_id)}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">{ncCount} NC · {actCount} acciones</p>
+                  <p className="text-xs text-muted-foreground mt-1">{ncCount} NC · {actCount} acciones · {linkedIncs.length} incidencias</p>
+                  {linkedIncs.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {linkedIncs.map((inc) => (
+                        <span key={inc.id} className="inline-flex items-center gap-1 text-xs bg-destructive/10 text-destructive rounded-full px-1.5 py-0.5">
+                          {inc.title}
+                          {canEditContent && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); unlinkIncidencia(capa.id, inc.id); }} className="hover:text-foreground">
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {capa.description && <p className="text-xs text-muted-foreground mt-1 truncate">{capa.description}</p>}
                 </div>
               );
