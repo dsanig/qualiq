@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Clock, Filter, Link as LinkIcon, Plus, Search, Pencil, X, CalendarIcon, ClipboardList } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Filter, Link as LinkIcon, Plus, Search, Pencil, X, CalendarIcon, ClipboardList, Trash2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -105,7 +106,12 @@ export function IncidentsView({
   const [existingAttachments, setExistingAttachments] = useState<AttachmentInfo[]>([]);
   const [sourceInsightId, setSourceInsightId] = useState<string | null>(null);
   const { toast } = useToast();
-  const { canEditContent } = usePermissions();
+  const { canEditContent, isSuperadmin } = usePermissions();
+  const [incidentPendingDelete, setIncidentPendingDelete] = useState<Incident | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const canDeleteIncidencia = isSuperadmin;
 
   const handleCapaPlanToggle = (planId: string) => {
     setSelectedCapaPlanIds((prev) =>
@@ -407,6 +413,48 @@ export function IncidentsView({
 
   const allAttachments = [...existingAttachments, ...newAttachments];
 
+  const promptDeleteIncident = (incident: Incident) => {
+    if (!canDeleteIncidencia) return;
+    setIncidentPendingDelete(incident);
+    setDeleteConfirmationText("");
+  };
+
+  const handleDeleteIncident = async () => {
+    if (!incidentPendingDelete || !canDeleteIncidencia || isDeleting) return;
+    if (deleteConfirmationText !== "ELIMINAR") return;
+
+    setIsDeleting(true);
+    const { error } = await supabase.functions.invoke("delete-incidencia", {
+      body: {
+        incidenciaId: incidentPendingDelete.id,
+        confirmationText: deleteConfirmationText,
+      },
+    });
+
+    setIsDeleting(false);
+
+    if (error) {
+      const message = error.message?.includes("No autorizado")
+        ? "No autorizado: solo el Superadmin puede eliminar incidencias."
+        : error.message || "No se pudo eliminar la incidencia";
+      toast({
+        title: "No se pudo eliminar la incidencia",
+        description: message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: "Incidencia eliminada correctamente" });
+    setIncidentPendingDelete(null);
+    setDeleteConfirmationText("");
+    if (editingIncident?.id === incidentPendingDelete.id) {
+      setIsEditOpen(false);
+      setEditingIncident(null);
+    }
+    await loadData();
+  };
+
   const isDeadlineClose = (deadline: string | null) => {
     if (!deadline) return false;
     const d = new Date(deadline);
@@ -491,6 +539,20 @@ export function IncidentsView({
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs flex items-center gap-1 ${status.color}`}><StatusIcon className="h-3 w-3" />{status.label}</span>
+                    {canDeleteIncidencia && (
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          promptDeleteIncident(incident);
+                        }}
+                        aria-label={`Eliminar incidencia ${incident.title}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     {canEditContent && <Pencil className="h-3.5 w-3.5 text-muted-foreground" />}
                   </div>
                 </div>
@@ -568,14 +630,68 @@ export function IncidentsView({
             onCapaPlanToggle={canEditContent ? handleCapaPlanToggle : undefined}
           />
           <DialogFooter>
-            {canEditContent ? (
-              <Button onClick={updateIncident}>Guardar cambios</Button>
-            ) : (
-              <p className="text-sm text-muted-foreground">Solo lectura</p>
-            )}
+            <div className="w-full flex items-center justify-between gap-2">
+              {canDeleteIncidencia && editingIncident ? (
+                <Button variant="destructive" onClick={() => promptDeleteIncident(editingIncident)}>
+                  <Trash2 className="w-4 h-4 mr-1" />Eliminar
+                </Button>
+              ) : <span />}
+              {canEditContent ? (
+                <Button onClick={updateIncident}>Guardar cambios</Button>
+              ) : (
+                <p className="text-sm text-muted-foreground">Solo lectura</p>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={Boolean(incidentPendingDelete)} onOpenChange={(open) => {
+        if (!open && !isDeleting) {
+          setIncidentPendingDelete(null);
+          setDeleteConfirmationText("");
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+            <AlertDialogDescription>
+              Está a punto de eliminar esta incidencia de forma permanente. Esta acción no se puede deshacer. ¿Desea continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {incidentPendingDelete && (
+            <div className="space-y-3">
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                <p className="font-medium text-destructive flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Incidencia: {incidentPendingDelete.title}</p>
+                <p className="text-muted-foreground mt-1">Solo el Superadmin puede realizar esta acción irreversible.</p>
+                <p className="text-muted-foreground mt-1">Esta incidencia puede estar relacionada con no conformidades, acciones correctivas o auditorías.</p>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-sm text-muted-foreground">Escriba ELIMINAR para confirmar la eliminación de esta incidencia.</p>
+                <Input
+                  value={deleteConfirmationText}
+                  onChange={(event) => setDeleteConfirmationText(event.target.value)}
+                  placeholder="ELIMINAR"
+                  disabled={isDeleting}
+                />
+              </div>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteIncident();
+              }}
+              disabled={isDeleting || deleteConfirmationText !== "ELIMINAR"}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Eliminando..." : "Eliminar incidencia"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
