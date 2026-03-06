@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Paperclip, Pencil } from "lucide-react";
+import { Plus, Paperclip, Pencil, AlertCircle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,8 @@ type CapaPlan = { id: string; audit_id: string; title: string | null; descriptio
 type NonConformity = { id: string; capa_plan_id: string; title: string; description: string | null; severity: string | null; root_cause: string | null; status: string; deadline: string | null };
 type ActionItem = { id: string; non_conformity_id: string; action_type: "corrective" | "preventive" | "immediate"; description: string; responsible_id: string | null; due_date: string | null; status: string };
 type Profile = { id: string; full_name: string | null; email: string | null };
+type IncidenciaRef = { id: string; title: string; status: string };
+type CapaIncidenciaLink = { capa_plan_id: string; incidencia_id: string };
 
 interface AuditManagementViewProps {
   searchQuery?: string;
@@ -34,8 +36,12 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
+  const [incidencias, setIncidencias] = useState<IncidenciaRef[]>([]);
+  const [capaIncidenciaLinks, setCapaIncidenciaLinks] = useState<CapaIncidenciaLink[]>([]);
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
   const [selectedCapaPlanId, setSelectedCapaPlanId] = useState<string | null>(null);
+  const [linkIncidenciaOpen, setLinkIncidenciaOpen] = useState(false);
+  const [linkingCapaPlanId, setLinkingCapaPlanId] = useState<string | null>(null);
   const { canEditContent } = usePermissions();
 
   // Dialog states
@@ -88,18 +94,22 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [{ data: auditsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }] = await Promise.all([
+      const [{ data: auditsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: incData }, { data: linksData }] = await Promise.all([
         (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id").order("created_at", { ascending: false }),
         (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
         (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline"),
         (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
         (supabase as any).from("profiles").select("id,full_name,email"),
+        (supabase as any).from("incidencias").select("id,title,status"),
+        (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
       ]);
       setAudits((auditsData ?? []) as Audit[]);
       setCapaPlans((capaData ?? []) as CapaPlan[]);
       setNonConformities((ncData ?? []) as NonConformity[]);
       setActions((actionData ?? []) as ActionItem[]);
       setUsers((usersData ?? []) as Profile[]);
+      setIncidencias((incData ?? []) as IncidenciaRef[]);
+      setCapaIncidenciaLinks((linksData ?? []) as CapaIncidenciaLink[]);
       if (!selectedAuditId && auditsData?.[0]?.id) setSelectedAuditId(auditsData[0].id);
     } finally {
       setIsLoading(false);
@@ -313,6 +323,36 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     setEditActionOpen(true);
   };
 
+  const getLinkedIncidencias = (capaId: string) => {
+    const linkedIds = capaIncidenciaLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.incidencia_id);
+    return incidencias.filter((i) => linkedIds.includes(i.id));
+  };
+
+  const getUnlinkedIncidencias = (capaId: string) => {
+    const linkedIds = capaIncidenciaLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.incidencia_id);
+    return incidencias.filter((i) => !linkedIds.includes(i.id));
+  };
+
+  const linkIncidencia = async (capaId: string, incidenciaId: string) => {
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    const { error } = await (supabase as any).from("incidencia_capa_plans").insert({
+      incidencia_id: incidenciaId, capa_plan_id: capaId, created_by: userId,
+    });
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Incidencia vinculada" });
+    await loadData();
+  };
+
+  const unlinkIncidencia = async (capaId: string, incidenciaId: string) => {
+    const { error } = await (supabase as any).from("incidencia_capa_plans")
+      .delete()
+      .eq("capa_plan_id", capaId)
+      .eq("incidencia_id", incidenciaId);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Incidencia desvinculada" });
+    await loadData();
+  };
+
   const openEditCapa = (capa: CapaPlan) => {
     setEditingCapa(capa);
     setCapaForm({ title: capa.title ?? "", description: capa.description ?? "", responsible_id: capa.responsible_id ?? "" });
@@ -483,6 +523,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
             {auditCapaPlans.map((capa) => {
               const ncCount = nonConformities.filter((nc) => nc.capa_plan_id === capa.id).length;
               const actCount = actions.filter((a) => nonConformities.some((nc) => nc.capa_plan_id === capa.id && nc.id === a.non_conformity_id)).length;
+              const linkedIncs = getLinkedIncidencias(capa.id);
               return (
                 <div
                   key={capa.id}
@@ -491,14 +532,35 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                 >
                   <div className="flex items-center justify-between">
                     <p className="font-medium">{capa.title || "Plan CAPA"}</p>
-                    {canEditContent && (
-                      <button onClick={(e) => { e.stopPropagation(); openEditCapa(capa); }} className="text-muted-foreground hover:text-foreground">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {canEditContent && (
+                        <button onClick={(e) => { e.stopPropagation(); setLinkingCapaPlanId(capa.id); setLinkIncidenciaOpen(true); }} className="text-muted-foreground hover:text-foreground" title="Vincular incidencias">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {canEditContent && (
+                        <button onClick={(e) => { e.stopPropagation(); openEditCapa(capa); }} className="text-muted-foreground hover:text-foreground">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {capa.responsible_id && <p className="text-xs text-muted-foreground">Responsable: {getUserName(capa.responsible_id)}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">{ncCount} NC · {actCount} acciones</p>
+                  <p className="text-xs text-muted-foreground mt-1">{ncCount} NC · {actCount} acciones · {linkedIncs.length} incidencias</p>
+                  {linkedIncs.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {linkedIncs.map((inc) => (
+                        <span key={inc.id} className="inline-flex items-center gap-1 text-xs bg-destructive/10 text-destructive rounded-full px-1.5 py-0.5">
+                          {inc.title}
+                          {canEditContent && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); unlinkIncidencia(capa.id, inc.id); }} className="hover:text-foreground">
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {capa.description && <p className="text-xs text-muted-foreground mt-1 truncate">{capa.description}</p>}
                 </div>
               );
@@ -627,6 +689,35 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
           {renderActionFields(false)}
           <DialogFooter>
             {canEditContent ? <Button onClick={updateAction}>Guardar cambios</Button> : <p className="text-sm text-muted-foreground">Solo lectura</p>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Incidencia Dialog */}
+      <Dialog open={linkIncidenciaOpen} onOpenChange={(o) => { setLinkIncidenciaOpen(o); if (!o) setLinkingCapaPlanId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vincular incidencias</DialogTitle>
+            <DialogDescription>Selecciona incidencias para asociar a este plan CAPA.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-60 overflow-y-auto space-y-1">
+            {linkingCapaPlanId && getUnlinkedIncidencias(linkingCapaPlanId).length === 0 && (
+              <p className="text-sm text-muted-foreground py-4 text-center">No hay incidencias disponibles para vincular.</p>
+            )}
+            {linkingCapaPlanId && getUnlinkedIncidencias(linkingCapaPlanId).map((inc) => (
+              <div key={inc.id} className="flex items-center justify-between rounded border p-2 hover:bg-muted/50">
+                <div>
+                  <p className="text-sm font-medium">{inc.title}</p>
+                  <p className="text-xs text-muted-foreground">{inc.status}</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => { if (linkingCapaPlanId) linkIncidencia(linkingCapaPlanId, inc.id); }}>
+                  Vincular
+                </Button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkIncidenciaOpen(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

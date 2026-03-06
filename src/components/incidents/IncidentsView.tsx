@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Clock, Filter, Link as LinkIcon, Plus, Search, Pencil, X, CalendarIcon } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Filter, Link as LinkIcon, Plus, Search, Pencil, X, CalendarIcon, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import type { FiltersState } from "@/components/filters/FilterModal";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
-import { IncidentFormFields, type IncidentFormData } from "./IncidentFormFields";
+import { IncidentFormFields, type IncidentFormData, type CapaPlanRef } from "./IncidentFormFields";
 import { format } from "date-fns";
 
 type IncidentType = "incidencia" | "reclamacion" | "desviacion" | "otra";
@@ -92,6 +92,9 @@ export function IncidentsView({
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [audits, setAudits] = useState<AuditRef[]>([]);
   const [users, setUsers] = useState<UserRef[]>([]);
+  const [capaPlans, setCapaPlans] = useState<CapaPlanRef[]>([]);
+  const [incidentCapaLinks, setIncidentCapaLinks] = useState<Record<string, string[]>>({});
+  const [selectedCapaPlanIds, setSelectedCapaPlanIds] = useState<string[]>([]);
   const [form, setForm] = useState<IncidentFormData>(defaultForm(initialIncidentType));
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -103,6 +106,12 @@ export function IncidentsView({
   const [sourceInsightId, setSourceInsightId] = useState<string | null>(null);
   const { toast } = useToast();
   const { canEditContent } = usePermissions();
+
+  const handleCapaPlanToggle = (planId: string) => {
+    setSelectedCapaPlanIds((prev) =>
+      prev.includes(planId) ? prev.filter((id) => id !== planId) : [...prev, planId]
+    );
+  };
 
   const isMissingSourceInsightColumnError = (message: string) =>
     /does not exist/i.test(message) && /source_insight_id/i.test(message);
@@ -152,10 +161,12 @@ export function IncidentsView({
         return withInsight;
       })();
 
-      const [{ data: incidenciasData, error: incidenciasError }, { data: auditsData, error: auditsError }, { data: usersData, error: usersError }] = await Promise.all([
+      const [{ data: incidenciasData, error: incidenciasError }, { data: auditsData, error: auditsError }, { data: usersData, error: usersError }, { data: capaData }, { data: linksData }] = await Promise.all([
         incidentsPromise,
         (supabase as any).from("audits").select("id,title").order("created_at", { ascending: false }),
         supabase.from("profiles").select("user_id,full_name,email"),
+        (supabase as any).from("capa_plans").select("id,title,audit_id"),
+        (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
       ]);
 
       if (incidenciasError) {
@@ -176,9 +187,26 @@ export function IncidentsView({
         ? usersData.map((u) => ({ id: u.user_id, full_name: u.full_name, email: u.email })).filter((u): u is UserRef => typeof u.id === "string" && u.id.trim().length > 0)
         : [];
 
+      // Build CAPA plan refs with audit titles
+      const auditMap = new Map(safeAudits.map((a) => [a.id, a.title]));
+      const safeCapa: CapaPlanRef[] = Array.isArray(capaData)
+        ? (capaData as any[]).map((c) => ({ id: c.id, title: c.title, auditTitle: auditMap.get(c.audit_id) ?? null }))
+        : [];
+
+      // Build links map: incidencia_id -> capa_plan_id[]
+      const linksMap: Record<string, string[]> = {};
+      if (Array.isArray(linksData)) {
+        for (const link of linksData as any[]) {
+          if (!linksMap[link.incidencia_id]) linksMap[link.incidencia_id] = [];
+          linksMap[link.incidencia_id].push(link.capa_plan_id);
+        }
+      }
+
       setIncidents(safeIncidents);
       setAudits(safeAudits);
       setUsers(safeUsers);
+      setCapaPlans(safeCapa);
+      setIncidentCapaLinks(linksMap);
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudieron cargar las incidencias.";
       const denied = isPermissionError(message);
@@ -279,10 +307,24 @@ export function IncidentsView({
 
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (inserted && newAttachments.length > 0) await uploadAttachments(inserted.id);
+
+    // Save CAPA plan links
+    if (inserted && selectedCapaPlanIds.length > 0) {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      await (supabase as any).from("incidencia_capa_plans").insert(
+        selectedCapaPlanIds.map((planId) => ({
+          incidencia_id: inserted.id,
+          capa_plan_id: planId,
+          created_by: userId,
+        }))
+      );
+    }
+
     toast({ title: "Incidencia creada" });
     onNewIncidentOpenChange(false);
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
+    setSelectedCapaPlanIds([]);
     setSourceInsightId(null);
     await loadData();
   };
@@ -305,8 +347,29 @@ export function IncidentsView({
       resolution_notes: incident.resolution_notes ?? "",
     });
     setNewAttachments([]);
+    setSelectedCapaPlanIds(incidentCapaLinks[incident.id] ?? []);
     void loadExistingAttachments(incident.id);
     setIsEditOpen(true);
+  };
+
+  const syncCapaLinks = async (incidenciaId: string) => {
+    const existingLinks = incidentCapaLinks[incidenciaId] ?? [];
+    const toAdd = selectedCapaPlanIds.filter((id) => !existingLinks.includes(id));
+    const toRemove = existingLinks.filter((id) => !selectedCapaPlanIds.includes(id));
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+
+    if (toRemove.length > 0) {
+      await (supabase as any)
+        .from("incidencia_capa_plans")
+        .delete()
+        .eq("incidencia_id", incidenciaId)
+        .in("capa_plan_id", toRemove);
+    }
+    if (toAdd.length > 0) {
+      await (supabase as any).from("incidencia_capa_plans").insert(
+        toAdd.map((planId) => ({ incidencia_id: incidenciaId, capa_plan_id: planId, created_by: userId }))
+      );
+    }
   };
 
   const updateIncident = async () => {
@@ -321,12 +384,14 @@ export function IncidentsView({
     }).eq("id", editingIncident.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (newAttachments.length > 0) await uploadAttachments(editingIncident.id);
+    await syncCapaLinks(editingIncident.id);
     toast({ title: "Incidencia actualizada" });
     setIsEditOpen(false);
     setEditingIncident(null);
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
     setExistingAttachments([]);
+    setSelectedCapaPlanIds([]);
     setSourceInsightId(null);
     await loadData();
   };
@@ -395,6 +460,9 @@ export function IncidentsView({
             const responsibleName = getUserName(incident.responsible_id);
             const deadlineOverdue = incident.status !== "closed" && isOverdue(incident.deadline);
             const deadlineClose = incident.status !== "closed" && isDeadlineClose(incident.deadline);
+            const linkedCapas = (incidentCapaLinks[incident.id] ?? [])
+              .map((id) => capaPlans.find((p) => p.id === id))
+              .filter(Boolean);
             return (
               <div key={incident.id} className="rounded border p-3 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => openEdit(incident)}>
                 <div className="flex items-start justify-between gap-3">
@@ -403,6 +471,16 @@ export function IncidentsView({
                     <p className="text-sm text-muted-foreground">{typeLabels[incident.incidencia_type] ?? "Incidencia"} • {formatIncidentDate(incident.created_at)}</p>
                     {auditTitle && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><LinkIcon className="h-3 w-3" />Auditoría: {auditTitle}</p>}
                     {responsibleName && <p className="text-xs text-muted-foreground mt-0.5">Responsable: {responsibleName}</p>}
+                    {linkedCapas.length > 0 && (
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        <ClipboardList className="h-3 w-3 text-muted-foreground" />
+                        {linkedCapas.map((plan) => (
+                          <span key={plan!.id} className="text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
+                            {plan!.title || "Plan CAPA"}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {incident.deadline && (
                       <p className={`text-xs mt-0.5 flex items-center gap-1 ${deadlineOverdue ? "text-destructive font-medium" : deadlineClose ? "text-warning" : "text-muted-foreground"}`}>
                         <CalendarIcon className="h-3 w-3" />
@@ -437,7 +515,7 @@ export function IncidentsView({
       </Card>
 
       {/* New incident dialog */}
-      <Dialog open={isNewIncidentOpen} onOpenChange={(open) => { onNewIncidentOpenChange(open); if (!open) { setNewAttachments([]); setForm(defaultForm(initialIncidentType)); setSourceInsightId(null); } }}>
+      <Dialog open={isNewIncidentOpen} onOpenChange={(open) => { onNewIncidentOpenChange(open); if (!open) { setNewAttachments([]); setSelectedCapaPlanIds([]); setForm(defaultForm(initialIncidentType)); setSourceInsightId(null); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nueva incidencia</DialogTitle>
@@ -451,13 +529,16 @@ export function IncidentsView({
             attachments={newAttachments}
             onAddFiles={handleAddFiles}
             onRemoveAttachment={handleRemoveNewAttachment}
+            capaPlans={capaPlans}
+            selectedCapaPlanIds={selectedCapaPlanIds}
+            onCapaPlanToggle={handleCapaPlanToggle}
           />
           <DialogFooter><Button onClick={createIncident}>Crear incidencia</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit incident dialog */}
-      <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingIncident(null); setNewAttachments([]); setExistingAttachments([]); } }}>
+      <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingIncident(null); setNewAttachments([]); setExistingAttachments([]); setSelectedCapaPlanIds([]); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar incidencia</DialogTitle>
@@ -477,12 +558,14 @@ export function IncidentsView({
             onAddFiles={canEditContent ? handleAddFiles : undefined}
             onRemoveAttachment={canEditContent ? (idx) => {
               if (idx < existingAttachments.length) {
-                // existing attachment - just remove from view (could add DB delete)
                 setExistingAttachments((prev) => prev.filter((_, i) => i !== idx));
               } else {
                 handleRemoveNewAttachment(idx - existingAttachments.length);
               }
             } : undefined}
+            capaPlans={capaPlans}
+            selectedCapaPlanIds={selectedCapaPlanIds}
+            onCapaPlanToggle={canEditContent ? handleCapaPlanToggle : undefined}
           />
           <DialogFooter>
             {canEditContent ? (

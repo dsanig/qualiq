@@ -673,6 +673,45 @@ export type Database = {
           },
         ]
       }
+      incidencia_capa_plans: {
+        Row: {
+          capa_plan_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          incidencia_id: string
+        }
+        Insert: {
+          capa_plan_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          incidencia_id: string
+        }
+        Update: {
+          capa_plan_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          incidencia_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidencia_capa_plans_capa_plan_id_fkey"
+            columns: ["capa_plan_id"]
+            isOneToOne: false
+            referencedRelation: "capa_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidencia_capa_plans_incidencia_id_fkey"
+            columns: ["incidencia_id"]
+            isOneToOne: false
+            referencedRelation: "incidencias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incidencias: {
         Row: {
           audit_id: string | null
