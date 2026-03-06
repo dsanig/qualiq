@@ -555,7 +555,7 @@ export function DocumentsView({
 
       const { data, error, status, count } = await supabase
         .from("documents")
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq("id", editingDocId)
         .eq("company_id", profile?.company_id ?? "")
         .select("id, typology");
