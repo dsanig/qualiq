@@ -692,6 +692,35 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Link Incidencia Dialog */}
+      <Dialog open={linkIncidenciaOpen} onOpenChange={(o) => { setLinkIncidenciaOpen(o); if (!o) setLinkingCapaPlanId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vincular incidencias</DialogTitle>
+            <DialogDescription>Selecciona incidencias para asociar a este plan CAPA.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-60 overflow-y-auto space-y-1">
+            {linkingCapaPlanId && getUnlinkedIncidencias(linkingCapaPlanId).length === 0 && (
+              <p className="text-sm text-muted-foreground py-4 text-center">No hay incidencias disponibles para vincular.</p>
+            )}
+            {linkingCapaPlanId && getUnlinkedIncidencias(linkingCapaPlanId).map((inc) => (
+              <div key={inc.id} className="flex items-center justify-between rounded border p-2 hover:bg-muted/50">
+                <div>
+                  <p className="text-sm font-medium">{inc.title}</p>
+                  <p className="text-xs text-muted-foreground">{inc.status}</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => { if (linkingCapaPlanId) linkIncidencia(linkingCapaPlanId, inc.id); }}>
+                  Vincular
+                </Button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkIncidenciaOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
