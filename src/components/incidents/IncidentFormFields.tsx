@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { CalendarIcon, Paperclip, Trash2 } from "lucide-react";
+import { CalendarIcon, Paperclip, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,12 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
 type IncidentType = "incidencia" | "reclamacion" | "desviacion" | "otra";
 
 interface AuditRef { id: string; title: string; }
 interface UserRef { id: string; full_name: string | null; email: string | null; }
+export interface CapaPlanRef { id: string; title: string | null; auditTitle: string | null; }
 
 export interface IncidentFormData {
   title: string;
@@ -41,11 +43,15 @@ interface IncidentFormFieldsProps {
   attachments?: AttachmentInfo[];
   onAddFiles?: (files: FileList) => void;
   onRemoveAttachment?: (index: number) => void;
+  capaPlans?: CapaPlanRef[];
+  selectedCapaPlanIds?: string[];
+  onCapaPlanToggle?: (planId: string) => void;
 }
 
 export function IncidentFormFields({
   form, onFormChange, audits, users, isEditing,
   attachments = [], onAddFiles, onRemoveAttachment,
+  capaPlans = [], selectedCapaPlanIds = [], onCapaPlanToggle,
 }: IncidentFormFieldsProps) {
   const showResolutionNotes = isEditing && form.status === "closed";
 
@@ -75,6 +81,42 @@ export function IncidentFormFields({
           </SelectContent>
         </Select>
       </div>
+
+      {/* CAPA Plans multi-select */}
+      {capaPlans.length > 0 && onCapaPlanToggle && (
+        <div>
+          <Label>Planes CAPA asociados</Label>
+          {selectedCapaPlanIds.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1 mb-2">
+              {selectedCapaPlanIds.map((id) => {
+                const plan = capaPlans.find((p) => p.id === id);
+                return (
+                  <span key={id} className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                    {plan?.title || "Plan CAPA"}
+                    <button type="button" onClick={() => onCapaPlanToggle(id)} className="hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <div className="max-h-32 overflow-y-auto border rounded p-2 space-y-1">
+            {capaPlans.map((plan) => (
+              <label key={plan.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
+                <Checkbox
+                  checked={selectedCapaPlanIds.includes(plan.id)}
+                  onCheckedChange={() => onCapaPlanToggle(plan.id)}
+                />
+                <span className="truncate">
+                  {plan.title || "Plan CAPA"}{plan.auditTitle ? ` — ${plan.auditTitle}` : ""}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div>
         <Label>Responsable</Label>
         <Select value={form.responsible_id} onValueChange={(v) => onFormChange((p) => ({ ...p, responsible_id: v }))}>
