@@ -460,6 +460,9 @@ export function IncidentsView({
             const responsibleName = getUserName(incident.responsible_id);
             const deadlineOverdue = incident.status !== "closed" && isOverdue(incident.deadline);
             const deadlineClose = incident.status !== "closed" && isDeadlineClose(incident.deadline);
+            const linkedCapas = (incidentCapaLinks[incident.id] ?? [])
+              .map((id) => capaPlans.find((p) => p.id === id))
+              .filter(Boolean);
             return (
               <div key={incident.id} className="rounded border p-3 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => openEdit(incident)}>
                 <div className="flex items-start justify-between gap-3">
@@ -468,6 +471,16 @@ export function IncidentsView({
                     <p className="text-sm text-muted-foreground">{typeLabels[incident.incidencia_type] ?? "Incidencia"} • {formatIncidentDate(incident.created_at)}</p>
                     {auditTitle && <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><LinkIcon className="h-3 w-3" />Auditoría: {auditTitle}</p>}
                     {responsibleName && <p className="text-xs text-muted-foreground mt-0.5">Responsable: {responsibleName}</p>}
+                    {linkedCapas.length > 0 && (
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        <ClipboardList className="h-3 w-3 text-muted-foreground" />
+                        {linkedCapas.map((plan) => (
+                          <span key={plan!.id} className="text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">
+                            {plan!.title || "Plan CAPA"}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {incident.deadline && (
                       <p className={`text-xs mt-0.5 flex items-center gap-1 ${deadlineOverdue ? "text-destructive font-medium" : deadlineClose ? "text-warning" : "text-muted-foreground"}`}>
                         <CalendarIcon className="h-3 w-3" />
