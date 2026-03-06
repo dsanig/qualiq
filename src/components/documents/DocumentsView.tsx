@@ -143,42 +143,28 @@ const typologyNormalizeMap: Record<string, DocumentTypology> = {
   Otro: "Otro",
 };
 
-const uiTypologyToDbMap: Record<DocumentTypology, DocumentTypologyDb> = {
-  Proceso: "proceso",
-  PNT: "pnt",
-  Documento: "documento",
-  Normativa: "normativa",
-  Otro: "otro",
-};
-
-const dbTypologyToUiMap: Record<DocumentTypologyDb, DocumentTypology> = {
-  proceso: "Proceso",
-  pnt: "PNT",
-  documento: "Documento",
-  normativa: "Normativa",
-  otro: "Otro",
-};
-
 const normalizeTypology = (value: string | null | undefined): DocumentTypology => {
   if (!value?.trim()) return "Documento";
 
   const normalizedValue = value.trim();
-  const lowerCased = normalizedValue.toLowerCase() as DocumentTypologyDb;
-
-  if (lowerCased in dbTypologyToUiMap) {
-    return fromDbTypologyToUi(lowerCased);
+  
+  // Direct match
+  if (typologyNormalizeMap[normalizedValue]) {
+    return typologyNormalizeMap[normalizedValue];
   }
 
-  return (
-    typologyNormalizeMap[normalizedValue] ??
-    typologyNormalizeMap[lowerCased] ??
-    "Documento"
-  );
+  // Case-insensitive match
+  const lowerCased = normalizedValue.toLowerCase();
+  const ciMap: Record<string, DocumentTypology> = {
+    proceso: "Proceso",
+    pnt: "PNT",
+    documento: "Documento",
+    normativa: "Normativa",
+    otro: "Otro",
+  };
+
+  return ciMap[lowerCased] ?? "Documento";
 };
-
-const toDbTypology = (value: DocumentTypology): DocumentTypologyDb => uiTypologyToDbMap[value] ?? "documento";
-
-const fromDbTypologyToUi = (value: DocumentTypologyDb): DocumentTypology => dbTypologyToUiMap[value] ?? "Documento";
 
 const isMissingTypologyColumnError = (error: { message?: string; details?: string; hint?: string } | null) => {
   if (!error) return false;
