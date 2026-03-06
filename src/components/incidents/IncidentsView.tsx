@@ -347,8 +347,29 @@ export function IncidentsView({
       resolution_notes: incident.resolution_notes ?? "",
     });
     setNewAttachments([]);
+    setSelectedCapaPlanIds(incidentCapaLinks[incident.id] ?? []);
     void loadExistingAttachments(incident.id);
     setIsEditOpen(true);
+  };
+
+  const syncCapaLinks = async (incidenciaId: string) => {
+    const existingLinks = incidentCapaLinks[incidenciaId] ?? [];
+    const toAdd = selectedCapaPlanIds.filter((id) => !existingLinks.includes(id));
+    const toRemove = existingLinks.filter((id) => !selectedCapaPlanIds.includes(id));
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+
+    if (toRemove.length > 0) {
+      await (supabase as any)
+        .from("incidencia_capa_plans")
+        .delete()
+        .eq("incidencia_id", incidenciaId)
+        .in("capa_plan_id", toRemove);
+    }
+    if (toAdd.length > 0) {
+      await (supabase as any).from("incidencia_capa_plans").insert(
+        toAdd.map((planId) => ({ incidencia_id: incidenciaId, capa_plan_id: planId, created_by: userId }))
+      );
+    }
   };
 
   const updateIncident = async () => {
@@ -362,6 +383,8 @@ export function IncidentsView({
       resolution_notes: form.resolution_notes || null,
     }).eq("id", editingIncident.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    if (newAttachments.length > 0) await uploadAttachments(editingIncident.id);
+    await syncCapaLinks(editingIncident.id);
     if (newAttachments.length > 0) await uploadAttachments(editingIncident.id);
     toast({ title: "Incidencia actualizada" });
     setIsEditOpen(false);
