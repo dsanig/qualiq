@@ -16,6 +16,8 @@ type CapaPlan = { id: string; audit_id: string; title: string | null; descriptio
 type NonConformity = { id: string; capa_plan_id: string; title: string; description: string | null; severity: string | null; root_cause: string | null; status: string; deadline: string | null };
 type ActionItem = { id: string; non_conformity_id: string; action_type: "corrective" | "preventive" | "immediate"; description: string; responsible_id: string | null; due_date: string | null; status: string };
 type Profile = { id: string; full_name: string | null; email: string | null };
+type IncidenciaRef = { id: string; title: string; status: string };
+type CapaIncidenciaLink = { capa_plan_id: string; incidencia_id: string };
 
 interface AuditManagementViewProps {
   searchQuery?: string;
