@@ -515,7 +515,7 @@ export function IncidentsView({
       </Card>
 
       {/* New incident dialog */}
-      <Dialog open={isNewIncidentOpen} onOpenChange={(open) => { onNewIncidentOpenChange(open); if (!open) { setNewAttachments([]); setForm(defaultForm(initialIncidentType)); setSourceInsightId(null); } }}>
+      <Dialog open={isNewIncidentOpen} onOpenChange={(open) => { onNewIncidentOpenChange(open); if (!open) { setNewAttachments([]); setSelectedCapaPlanIds([]); setForm(defaultForm(initialIncidentType)); setSourceInsightId(null); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nueva incidencia</DialogTitle>
@@ -529,6 +529,9 @@ export function IncidentsView({
             attachments={newAttachments}
             onAddFiles={handleAddFiles}
             onRemoveAttachment={handleRemoveNewAttachment}
+            capaPlans={capaPlans}
+            selectedCapaPlanIds={selectedCapaPlanIds}
+            onCapaPlanToggle={handleCapaPlanToggle}
           />
           <DialogFooter><Button onClick={createIncident}>Crear incidencia</Button></DialogFooter>
         </DialogContent>
