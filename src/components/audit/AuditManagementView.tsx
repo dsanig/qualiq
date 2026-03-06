@@ -36,8 +36,12 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
+  const [incidencias, setIncidencias] = useState<IncidenciaRef[]>([]);
+  const [capaIncidenciaLinks, setCapaIncidenciaLinks] = useState<CapaIncidenciaLink[]>([]);
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
   const [selectedCapaPlanId, setSelectedCapaPlanId] = useState<string | null>(null);
+  const [linkIncidenciaOpen, setLinkIncidenciaOpen] = useState(false);
+  const [linkingCapaPlanId, setLinkingCapaPlanId] = useState<string | null>(null);
   const { canEditContent } = usePermissions();
 
   // Dialog states
