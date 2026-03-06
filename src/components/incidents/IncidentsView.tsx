@@ -92,6 +92,9 @@ export function IncidentsView({
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [audits, setAudits] = useState<AuditRef[]>([]);
   const [users, setUsers] = useState<UserRef[]>([]);
+  const [capaPlans, setCapaPlans] = useState<CapaPlanRef[]>([]);
+  const [incidentCapaLinks, setIncidentCapaLinks] = useState<Record<string, string[]>>({});
+  const [selectedCapaPlanIds, setSelectedCapaPlanIds] = useState<string[]>([]);
   const [form, setForm] = useState<IncidentFormData>(defaultForm(initialIncidentType));
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -103,6 +106,12 @@ export function IncidentsView({
   const [sourceInsightId, setSourceInsightId] = useState<string | null>(null);
   const { toast } = useToast();
   const { canEditContent } = usePermissions();
+
+  const handleCapaPlanToggle = (planId: string) => {
+    setSelectedCapaPlanIds((prev) =>
+      prev.includes(planId) ? prev.filter((id) => id !== planId) : [...prev, planId]
+    );
+  };
 
   const isMissingSourceInsightColumnError = (message: string) =>
     /does not exist/i.test(message) && /source_insight_id/i.test(message);
