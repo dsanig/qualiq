@@ -453,7 +453,7 @@ export function IncidentsView({
       });
 
       if (error) {
-        let message = error.message || "No se pudo eliminar la incidencia.";
+        let message = error.message || "Error eliminando la incidencia";
 
         if (error instanceof FunctionsHttpError) {
           let backendPayload: { message?: string; error?: string } | null = null;
@@ -478,10 +478,10 @@ export function IncidentsView({
             message = "Se produjo un error interno al eliminar la incidencia.";
           }
         } else if (error instanceof FunctionsFetchError || error instanceof FunctionsRelayError) {
-          message = "No se pudo conectar con la función segura de eliminación. Verifique su sesión o la configuración de Supabase.";
+          message = error.message || "Error eliminando la incidencia";
         }
 
-        console.error("[IncidentsView] Error deleting incidencia", {
+        console.error("Delete incidencia error", {
           incidenciaId: pendingIncidentId,
           error,
         });

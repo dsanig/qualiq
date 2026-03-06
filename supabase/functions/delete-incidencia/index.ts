@@ -73,7 +73,7 @@ serve(async (req) => {
 
     const { data: callerProfile, error: profileError } = await serviceClient
       .from("profiles")
-      .select("is_superadmin,email")
+      .select("is_superadmin,role,email")
       .eq("user_id", caller.id)
       .maybeSingle();
 
@@ -85,7 +85,7 @@ serve(async (req) => {
       });
     }
 
-    if (!callerProfile?.is_superadmin) {
+    if (!callerProfile?.is_superadmin && callerProfile?.role !== "superadmin") {
       return jsonResponse(403, {
         success: false,
         message: "No autorizado: solo el Superadmin puede eliminar incidencias.",
