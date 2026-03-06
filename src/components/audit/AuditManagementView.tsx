@@ -323,6 +323,36 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     setEditActionOpen(true);
   };
 
+  const getLinkedIncidencias = (capaId: string) => {
+    const linkedIds = capaIncidenciaLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.incidencia_id);
+    return incidencias.filter((i) => linkedIds.includes(i.id));
+  };
+
+  const getUnlinkedIncidencias = (capaId: string) => {
+    const linkedIds = capaIncidenciaLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.incidencia_id);
+    return incidencias.filter((i) => !linkedIds.includes(i.id));
+  };
+
+  const linkIncidencia = async (capaId: string, incidenciaId: string) => {
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    const { error } = await (supabase as any).from("incidencia_capa_plans").insert({
+      incidencia_id: incidenciaId, capa_plan_id: capaId, created_by: userId,
+    });
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Incidencia vinculada" });
+    await loadData();
+  };
+
+  const unlinkIncidencia = async (capaId: string, incidenciaId: string) => {
+    const { error } = await (supabase as any).from("incidencia_capa_plans")
+      .delete()
+      .eq("capa_plan_id", capaId)
+      .eq("incidencia_id", incidenciaId);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Incidencia desvinculada" });
+    await loadData();
+  };
+
   const openEditCapa = (capa: CapaPlan) => {
     setEditingCapa(capa);
     setCapaForm({ title: capa.title ?? "", description: capa.description ?? "", responsible_id: capa.responsible_id ?? "" });
