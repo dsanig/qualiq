@@ -1019,7 +1019,7 @@ export function DocumentsView({
         throw insertError;
       }
 
-      if (!isMissingTypologyColumnError(insertError) && data?.[0]?.typology !== payload.typology) {
+      if (!isMissingTypologyColumnError(insertError) && (data as any)?.[0]?.typology !== payload.typology) {
         console.warn("[documents] typology mismatch after insert", {
           expectedTypology: payload.typology,
           persistedTypology: data?.[0]?.typology,
