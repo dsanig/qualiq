@@ -207,7 +207,81 @@ export function CompanyView() {
     }
   }, [debugUserCreation]);
 
+  const createUserBySuperadmin = async (createUserPayload: {
+    email: string;
+    password: string;
+    full_name: string;
+    role: string;
+  }) => {
+    if (!isSuperadmin) {
+      throw new Error("Unauthorized: only superadmin can create users");
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error("No se encontró una sesión autenticada activa.");
+    }
+
+    const functionName = "admin-create-user";
+    const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`;
+    const rawResponse = await fetch(functionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(createUserPayload),
+    });
+
+    const rawBodyText = await rawResponse.text();
+    let parsedBody: unknown = null;
+    if (rawBodyText) {
+      try {
+        parsedBody = JSON.parse(rawBodyText);
+      } catch {
+        parsedBody = rawBodyText;
+      }
+    }
+
+    if (debugUserCreation) {
+      console.info("[company-users] function response", {
+        functionName,
+        hasAuthorizationHeader: true,
+        status: rawResponse.status,
+        rawBodyText,
+        body: parsedBody,
+      });
+    }
+
+    if (!rawResponse.ok) {
+      let specificMessage = "No se pudo crear el usuario.";
+      if (parsedBody && typeof parsedBody === "object") {
+        const maybeError = (parsedBody as { error?: { message?: string } | string }).error;
+        if (typeof maybeError === "string") {
+          specificMessage = maybeError;
+        } else if (maybeError && typeof maybeError === "object" && typeof maybeError.message === "string") {
+          specificMessage = maybeError.message;
+        }
+      }
+
+      throw new Error(specificMessage);
+    }
+  };
+
   const handleCreateUser = async () => {
+    if (!isSuperadmin) {
+      toast({
+        title: "Acceso no autorizado",
+        description: "Solo el superadministrador puede crear usuarios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!createForm.email || !createForm.password) {
       toast({
         title: "Campos obligatorios",
@@ -265,72 +339,19 @@ export function CompanyView() {
       });
     }
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
+    try {
+      await createUserBySuperadmin(createUserPayload);
+    } catch (error) {
       setIsSubmitting(false);
       toast({
-        title: "Sesión inválida",
-        description: "No se encontró una sesión autenticada activa.",
+        title: "No se pudo crear el usuario",
+        description: error instanceof Error ? error.message : "No se pudo crear el usuario.",
         variant: "destructive",
       });
       return;
-    }
-
-    const functionName = "admin-create-user";
-    const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`;
-    const rawResponse = await fetch(functionUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify(createUserPayload),
-    });
-
-    const rawBodyText = await rawResponse.text();
-    let parsedBody: unknown = null;
-    if (rawBodyText) {
-      try {
-        parsedBody = JSON.parse(rawBodyText);
-      } catch {
-        parsedBody = rawBodyText;
-      }
-    }
-
-    if (debugUserCreation) {
-      console.info("[company-users] function response", {
-        functionName,
-        hasAuthorizationHeader: true,
-        status: rawResponse.status,
-        rawBodyText,
-        body: parsedBody,
-      });
     }
 
     setIsSubmitting(false);
-
-    if (!rawResponse.ok) {
-      let specificMessage = "No se pudo crear el usuario.";
-      if (parsedBody && typeof parsedBody === "object") {
-        const maybeError = (parsedBody as { error?: { message?: string } | string }).error;
-        if (typeof maybeError === "string") {
-          specificMessage = maybeError;
-        } else if (maybeError && typeof maybeError === "object" && typeof maybeError.message === "string") {
-          specificMessage = maybeError.message;
-        }
-      }
-
-      toast({
-        title: "No se pudo crear el usuario",
-        description: specificMessage,
-        variant: "destructive",
-      });
-      return;
-    }
 
     toast({
       title: "Usuario creado",
@@ -517,16 +538,18 @@ export function CompanyView() {
                 <h3 className="font-semibold text-foreground">Usuarios</h3>
                 <p className="text-sm text-muted-foreground">Gestiona accesos, roles y licencias.</p>
               </div>
-              <Button
-                variant="accent"
-                onClick={() => {
-                  setIsUserDialogOpen(true);
-                }}
-                data-testid="create-user-button"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Crear usuario
-              </Button>
+              {isSuperadmin && (
+                <Button
+                  variant="accent"
+                  onClick={() => {
+                    setIsUserDialogOpen(true);
+                  }}
+                  data-testid="create-user-button"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Crear usuario
+                </Button>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -577,7 +600,7 @@ export function CompanyView() {
         )}
       </Tabs>
 
-      <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+      {isSuperadmin && (<Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
         <DialogContent className="sm:max-w-lg" data-testid="create-user-modal">
           <DialogHeader>
             <DialogTitle>Crear usuario</DialogTitle>
@@ -655,7 +678,7 @@ export function CompanyView() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog>)}
 
       <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
         <DialogContent className="sm:max-w-md" data-testid="change-password-modal">

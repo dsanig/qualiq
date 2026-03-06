@@ -7,6 +7,7 @@ port = 54321
 [auth]
 enabled = true
 site_url = "https://lovable.dev"
+enable_signup = false
 
 [functions.chat]
 verify_jwt = false

@@ -11,13 +11,9 @@ import { z } from "zod";
 const emailSchema = z.string().email("Email inválido");
 const passwordSchema = z.string().min(6, "La contraseña debe tener al menos 6 caracteres");
 
-type AuthMode = "login" | "signup";
-
 export default function Auth() {
-  const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -90,56 +86,6 @@ export default function Auth() {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    setIsLoading(true);
-    try {
-      const redirectUrl = `${window.location.origin}/`;
-
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName || email.split("@")[0],
-          },
-        },
-      });
-
-      if (error) {
-        if (error.message.includes("already registered")) {
-          toast({
-            title: "Usuario existente",
-            description: "Este email ya está registrado. Por favor, inicie sesión.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Error de registro",
-            description: error.message,
-            variant: "destructive",
-          });
-        }
-      } else {
-        toast({
-          title: "¡Registro exitoso!",
-          description: "Cuenta creada correctamente. Ya puede acceder.",
-        });
-      }
-    } catch {
-      toast({
-        title: "Error",
-        description: "Ha ocurrido un error inesperado",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
@@ -155,26 +101,13 @@ export default function Auth() {
 
         <div className="bg-card rounded-xl border border-border p-8 shadow-lg">
           <h1 className="text-2xl font-bold text-foreground text-center mb-2">
-            {mode === "login" ? "Iniciar Sesión" : "Crear Cuenta"}
+            Iniciar Sesión
           </h1>
           <p className="text-muted-foreground text-center mb-6">
-            {mode === "login" ? "Acceda a su plataforma de cumplimiento" : "Regístrese para comenzar"}
+            Acceda a su plataforma de cumplimiento
           </p>
 
-          <form onSubmit={mode === "login" ? handleLogin : handleSignup} className="space-y-4">
-            {mode === "signup" && (
-              <div>
-                <Label htmlFor="fullName">Nombre Completo</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Su nombre"
-                  className="mt-1"
-                />
-              </div>
-            )}
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <Label htmlFor="email">Email</Label>
               <Input
@@ -212,27 +145,9 @@ export default function Auth() {
             </div>
             <Button type="submit" variant="accent" className="w-full" disabled={isLoading} data-testid="auth-submit">
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {mode === "login" ? "Iniciar Sesión" : "Crear Cuenta"}
+              Iniciar Sesión
             </Button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-border text-center">
-            {mode === "login" ? (
-              <p className="text-sm text-muted-foreground">
-                ¿No tiene cuenta?{" "}
-                <button onClick={() => setMode("signup")} className="text-accent hover:underline font-medium">
-                  Regístrese
-                </button>
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                ¿Ya tiene cuenta?{" "}
-                <button onClick={() => setMode("login")} className="text-accent hover:underline font-medium">
-                  Iniciar Sesión
-                </button>
-              </p>
-            )}
-          </div>
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
