@@ -307,10 +307,24 @@ export function IncidentsView({
 
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (inserted && newAttachments.length > 0) await uploadAttachments(inserted.id);
+
+    // Save CAPA plan links
+    if (inserted && selectedCapaPlanIds.length > 0) {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      await (supabase as any).from("incidencia_capa_plans").insert(
+        selectedCapaPlanIds.map((planId) => ({
+          incidencia_id: inserted.id,
+          capa_plan_id: planId,
+          created_by: userId,
+        }))
+      );
+    }
+
     toast({ title: "Incidencia creada" });
     onNewIncidentOpenChange(false);
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
+    setSelectedCapaPlanIds([]);
     setSourceInsightId(null);
     await loadData();
   };
