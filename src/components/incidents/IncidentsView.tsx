@@ -538,7 +538,7 @@ export function IncidentsView({
       </Dialog>
 
       {/* Edit incident dialog */}
-      <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingIncident(null); setNewAttachments([]); setExistingAttachments([]); } }}>
+      <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingIncident(null); setNewAttachments([]); setExistingAttachments([]); setSelectedCapaPlanIds([]); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar incidencia</DialogTitle>
@@ -558,12 +558,14 @@ export function IncidentsView({
             onAddFiles={canEditContent ? handleAddFiles : undefined}
             onRemoveAttachment={canEditContent ? (idx) => {
               if (idx < existingAttachments.length) {
-                // existing attachment - just remove from view (could add DB delete)
                 setExistingAttachments((prev) => prev.filter((_, i) => i !== idx));
               } else {
                 handleRemoveNewAttachment(idx - existingAttachments.length);
               }
             } : undefined}
+            capaPlans={capaPlans}
+            selectedCapaPlanIds={selectedCapaPlanIds}
+            onCapaPlanToggle={canEditContent ? handleCapaPlanToggle : undefined}
           />
           <DialogFooter>
             {canEditContent ? (
