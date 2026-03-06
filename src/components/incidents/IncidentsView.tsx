@@ -385,13 +385,13 @@ export function IncidentsView({
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (newAttachments.length > 0) await uploadAttachments(editingIncident.id);
     await syncCapaLinks(editingIncident.id);
-    if (newAttachments.length > 0) await uploadAttachments(editingIncident.id);
     toast({ title: "Incidencia actualizada" });
     setIsEditOpen(false);
     setEditingIncident(null);
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
     setExistingAttachments([]);
+    setSelectedCapaPlanIds([]);
     setSourceInsightId(null);
     await loadData();
   };
