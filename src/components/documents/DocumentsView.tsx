@@ -1001,7 +1001,7 @@ export function DocumentsView({
 
       const { data, error: insertError, status, count } = await supabase
         .from("documents")
-        .insert(payload)
+        .insert(payload as any)
         .select("id, typology");
 
       console.log("CREATE result", { data, error: insertError, status, count });
