@@ -47,7 +47,6 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
 
 type DocumentTypology = "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro";
-type DocumentTypologyDb = "proceso" | "pnt" | "documento" | "normativa" | "otro";
 
 interface Document {
   id: string;
@@ -144,42 +143,28 @@ const typologyNormalizeMap: Record<string, DocumentTypology> = {
   Otro: "Otro",
 };
 
-const uiTypologyToDbMap: Record<DocumentTypology, DocumentTypologyDb> = {
-  Proceso: "proceso",
-  PNT: "pnt",
-  Documento: "documento",
-  Normativa: "normativa",
-  Otro: "otro",
-};
-
-const dbTypologyToUiMap: Record<DocumentTypologyDb, DocumentTypology> = {
-  proceso: "Proceso",
-  pnt: "PNT",
-  documento: "Documento",
-  normativa: "Normativa",
-  otro: "Otro",
-};
-
 const normalizeTypology = (value: string | null | undefined): DocumentTypology => {
   if (!value?.trim()) return "Documento";
 
   const normalizedValue = value.trim();
-  const lowerCased = normalizedValue.toLowerCase() as DocumentTypologyDb;
-
-  if (lowerCased in dbTypologyToUiMap) {
-    return fromDbTypologyToUi(lowerCased);
+  
+  // Direct match
+  if (typologyNormalizeMap[normalizedValue]) {
+    return typologyNormalizeMap[normalizedValue];
   }
 
-  return (
-    typologyNormalizeMap[normalizedValue] ??
-    typologyNormalizeMap[lowerCased] ??
-    "Documento"
-  );
+  // Case-insensitive match
+  const lowerCased = normalizedValue.toLowerCase();
+  const ciMap: Record<string, DocumentTypology> = {
+    proceso: "Proceso",
+    pnt: "PNT",
+    documento: "Documento",
+    normativa: "Normativa",
+    otro: "Otro",
+  };
+
+  return ciMap[lowerCased] ?? "Documento";
 };
-
-const toDbTypology = (value: DocumentTypology): DocumentTypologyDb => uiTypologyToDbMap[value] ?? "documento";
-
-const fromDbTypologyToUi = (value: DocumentTypologyDb): DocumentTypology => dbTypologyToUiMap[value] ?? "Documento";
 
 const isMissingTypologyColumnError = (error: { message?: string; details?: string; hint?: string } | null) => {
   if (!error) return false;
@@ -417,7 +402,7 @@ export function DocumentsView({
       .order("created_at", { ascending: false });
 
     if (filters.documentTypology !== "all") {
-      query = query.eq("typology", toDbTypology(filters.documentTypology));
+      query = query.eq("typology", filters.documentTypology as string);
     }
 
     const { data, error } = await query;
@@ -562,7 +547,7 @@ export function DocumentsView({
         code: editDocCode.trim(),
         title: editDocTitle.trim(),
         category: editDocCategory.charAt(0).toUpperCase() + editDocCategory.slice(1),
-        typology: toDbTypology(editDocTypology),
+        typology: editDocTypology,
         status: editDocStatus as any,
       };
 
@@ -570,7 +555,7 @@ export function DocumentsView({
 
       const { data, error, status, count } = await supabase
         .from("documents")
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq("id", editingDocId)
         .eq("company_id", profile?.company_id ?? "")
         .select("id, typology");
@@ -1003,7 +988,7 @@ export function DocumentsView({
         code: newDocCode.trim(),
         title: newDocTitle.trim(),
         category: newDocCategory.charAt(0).toUpperCase() + newDocCategory.slice(1),
-        typology: toDbTypology(newDocTypology || "Documento"),
+        typology: newDocTypology || "Documento",
         company_id: profile.company_id,
         owner_id: uploaderUser.id,
         file_type: fileType,
@@ -1016,7 +1001,7 @@ export function DocumentsView({
 
       const { data, error: insertError, status, count } = await supabase
         .from("documents")
-        .insert(payload)
+        .insert(payload as any)
         .select("id, typology");
 
       console.log("CREATE result", { data, error: insertError, status, count });
@@ -1034,7 +1019,7 @@ export function DocumentsView({
         throw insertError;
       }
 
-      if (!isMissingTypologyColumnError(insertError) && data?.[0]?.typology !== payload.typology) {
+      if (!isMissingTypologyColumnError(insertError) && (data as any)?.[0]?.typology !== payload.typology) {
         console.warn("[documents] typology mismatch after insert", {
           expectedTypology: payload.typology,
           persistedTypology: data?.[0]?.typology,
