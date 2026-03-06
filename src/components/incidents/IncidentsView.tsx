@@ -161,10 +161,12 @@ export function IncidentsView({
         return withInsight;
       })();
 
-      const [{ data: incidenciasData, error: incidenciasError }, { data: auditsData, error: auditsError }, { data: usersData, error: usersError }] = await Promise.all([
+      const [{ data: incidenciasData, error: incidenciasError }, { data: auditsData, error: auditsError }, { data: usersData, error: usersError }, { data: capaData }, { data: linksData }] = await Promise.all([
         incidentsPromise,
         (supabase as any).from("audits").select("id,title").order("created_at", { ascending: false }),
         supabase.from("profiles").select("user_id,full_name,email"),
+        (supabase as any).from("capa_plans").select("id,title,audit_id"),
+        (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
       ]);
 
       if (incidenciasError) {
@@ -185,9 +187,26 @@ export function IncidentsView({
         ? usersData.map((u) => ({ id: u.user_id, full_name: u.full_name, email: u.email })).filter((u): u is UserRef => typeof u.id === "string" && u.id.trim().length > 0)
         : [];
 
+      // Build CAPA plan refs with audit titles
+      const auditMap = new Map(safeAudits.map((a) => [a.id, a.title]));
+      const safeCapa: CapaPlanRef[] = Array.isArray(capaData)
+        ? (capaData as any[]).map((c) => ({ id: c.id, title: c.title, auditTitle: auditMap.get(c.audit_id) ?? null }))
+        : [];
+
+      // Build links map: incidencia_id -> capa_plan_id[]
+      const linksMap: Record<string, string[]> = {};
+      if (Array.isArray(linksData)) {
+        for (const link of linksData as any[]) {
+          if (!linksMap[link.incidencia_id]) linksMap[link.incidencia_id] = [];
+          linksMap[link.incidencia_id].push(link.capa_plan_id);
+        }
+      }
+
       setIncidents(safeIncidents);
       setAudits(safeAudits);
       setUsers(safeUsers);
+      setCapaPlans(safeCapa);
+      setIncidentCapaLinks(linksMap);
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudieron cargar las incidencias.";
       const denied = isPermissionError(message);
