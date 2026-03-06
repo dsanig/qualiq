@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Clock, Filter, Link as LinkIcon, Plus, Search, Pencil, X, CalendarIcon } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Filter, Link as LinkIcon, Plus, Search, Pencil, X, CalendarIcon, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import type { FiltersState } from "@/components/filters/FilterModal";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
-import { IncidentFormFields, type IncidentFormData } from "./IncidentFormFields";
+import { IncidentFormFields, type IncidentFormData, type CapaPlanRef } from "./IncidentFormFields";
 import { format } from "date-fns";
 
 type IncidentType = "incidencia" | "reclamacion" | "desviacion" | "otra";
