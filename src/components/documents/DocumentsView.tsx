@@ -2887,7 +2887,7 @@ export function DocumentsView({
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <History className="w-5 h-5" />
+              <ScrollText className="w-5 h-5" />
               Historial completo — {selectedDocument?.code}
             </DialogTitle>
           </DialogHeader>
