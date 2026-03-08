@@ -1998,6 +1998,7 @@ export function DocumentsView({
                               onView={() => handleOpenPreview(doc)}
                               onEdit={() => handleOpenEdit(doc)}
                               onViewHistory={() => handleOpenHistory(doc)}
+                              onViewFullHistory={() => handleOpenFullHistory(doc)}
                               onViewOwners={() => handleOpenOwners(doc)}
                               onDownload={() => handleDownload(doc)}
                                onSign={() => handleOpenSign(doc)}
