@@ -389,6 +389,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       }
     }
     toast({ title: "Acción creada" });
+    logAction({ action: "create", entity_type: "capa_action", entity_id: data?.id, entity_title: actionForm.description, details: { action_type: actionForm.action_type, responsible_id: actionForm.responsible_id } });
     setNewActionOpen(false);
     setActionForm({ non_conformity_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open", file: null });
     await loadData();
