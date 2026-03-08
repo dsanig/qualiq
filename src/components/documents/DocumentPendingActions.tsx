@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { ClipboardList, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { ClipboardList, CheckCircle2, Clock, AlertTriangle, ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+
+const statusLabels: Record<string, string> = {
+  draft: "Borrador",
+  review: "En Revisión",
+  pending_signature: "Pendiente de Firma",
+  pending_approval: "Pendiente de Aprobación",
+  approved: "Aprobado",
+};
+
+/** Given the current doc status, return the next allowed manual transition for the responsible */
+function getNextStatusForAction(docStatus: string | undefined, actionType: string): { nextStatus: string; label: string } | null {
+  if (!docStatus) return null;
+  // draft → review: any reviewer can trigger this
+  if (docStatus === "draft" && actionType === "revision") {
+    return { nextStatus: "review", label: "Pasar a En Revisión" };
+  }
+  // pending_approval → approved: approval responsible triggers this
+  if (docStatus === "pending_approval" && actionType === "aprobacion") {
+    return { nextStatus: "approved", label: "Aprobar documento" };
+  }
+  return null;
+}
 
 const actionTypeLabels: Record<string, string> = {
   firma: "Firma",
@@ -146,6 +168,55 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     }
   };
 
+  const [changingStatusDocId, setChangingStatusDocId] = useState<string | null>(null);
+
+  const handleChangeDocumentStatus = async (action: PendingAction, nextStatus: string) => {
+    if (!user || action.user_id !== user.id) {
+      toast({ title: "Error", description: "Solo el responsable asignado puede cambiar el estado.", variant: "destructive" });
+      return;
+    }
+
+    setChangingStatusDocId(action.document_id);
+    try {
+      const { error: updateError } = await supabase.from("documents").update({
+        status: nextStatus as any,
+      }).eq("id", action.document_id);
+      if (updateError) throw updateError;
+
+      // Record the status change
+      const { error: insertError } = await (supabase as any).from("document_status_changes").insert({
+        document_id: action.document_id,
+        old_status: action.documentStatus,
+        new_status: nextStatus,
+        changed_by: user.id,
+        comment: `Cambio de estado desde acciones pendientes`,
+      });
+      if (insertError) throw insertError;
+
+      const fromLabel = statusLabels[action.documentStatus || ""] || action.documentStatus;
+      const toLabel = statusLabels[nextStatus] || nextStatus;
+      toast({ title: "Estado actualizado", description: `${action.documentCode}: ${fromLabel} → ${toLabel}` });
+
+      // If approving, also complete the action
+      if (nextStatus === "approved" && action.action_type === "aprobacion") {
+        await (supabase as any)
+          .from("document_responsibilities")
+          .update({ status: "completed", completed_at: new Date().toISOString() })
+          .eq("id", action.id);
+        setActions(prev => prev.filter(a => a.id !== action.id));
+      } else {
+        // Refresh to pick up new document status
+        fetchActions();
+      }
+
+      onActionCompleted?.();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setChangingStatusDocId(null);
+    }
+  };
+
   const now = new Date();
 
   if (isLoading) {
@@ -174,6 +245,8 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
           (action.action_type === "firma" && action.documentStatus === "pending_signature") ||
           (action.action_type === "aprobacion" && action.documentStatus === "pending_approval");
         const canComplete = isActionableStatus;
+        const nextTransition = getNextStatusForAction(action.documentStatus, action.action_type);
+        const canChangeStatus = !isActionableStatus && nextTransition && user && action.user_id === user.id;
 
         return (
           <div
@@ -195,6 +268,9 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   <Badge variant="outline" className={cn("text-xs", actionTypeColors[action.action_type])}>
                     {actionTypeLabels[action.action_type] || action.action_type}
                   </Badge>
+                  <Badge variant="outline" className="text-xs bg-secondary/50">
+                    {statusLabels[action.documentStatus || ""] || action.documentStatus}
+                  </Badge>
                   <span className="text-xs text-muted-foreground">
                     → {action.responsibleName}
                   </span>
@@ -207,36 +283,54 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   </span>
                 </div>
               </div>
-              {canComplete && user && action.user_id === user.id ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    "text-success border-success/30 hover:bg-success/10 shrink-0",
-                    compact && "h-7 text-xs px-2"
-                  )}
-                  onClick={() => handleComplete(action)}
-                  disabled={completingId === action.id}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                  {completingId === action.id
-                    ? "..."
-                    : action.action_type === "firma"
-                    ? "Firmado"
-                    : action.action_type === "revision"
-                    ? "Revisado"
-                    : action.action_type === "aprobacion"
-                    ? "Aprobado"
-                    : "Completar"}
-                </Button>
-              ) : !isActionableStatus ? (
-                <span className={cn("text-xs text-muted-foreground italic shrink-0", compact && "text-[10px]")}>
-                  {action.action_type === "revision" ? "Esperando estado 'En Revisión'" 
-                   : action.action_type === "firma" ? "Esperando estado 'Pendiente de Firma'"
-                   : action.action_type === "aprobacion" ? "Esperando estado 'Pendiente de Aprobación'"
-                   : "No disponible"}
-                </span>
-              ) : null}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {canChangeStatus && nextTransition && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "text-primary border-primary/30 hover:bg-primary/10",
+                      compact && "h-7 text-xs px-2"
+                    )}
+                    onClick={() => handleChangeDocumentStatus(action, nextTransition.nextStatus)}
+                    disabled={changingStatusDocId === action.document_id}
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
+                    {changingStatusDocId === action.document_id ? "..." : nextTransition.label}
+                  </Button>
+                )}
+                {canComplete && user && action.user_id === user.id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "text-success border-success/30 hover:bg-success/10",
+                      compact && "h-7 text-xs px-2"
+                    )}
+                    onClick={() => handleComplete(action)}
+                    disabled={completingId === action.id}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                    {completingId === action.id
+                      ? "..."
+                      : action.action_type === "firma"
+                      ? "Firmado"
+                      : action.action_type === "revision"
+                      ? "Revisado"
+                      : action.action_type === "aprobacion"
+                      ? "Aprobado"
+                      : "Completar"}
+                  </Button>
+                )}
+                {!isActionableStatus && !canChangeStatus && (
+                  <span className={cn("text-xs text-muted-foreground italic", compact && "text-[10px]")}>
+                    {action.action_type === "revision" ? "Esperando estado 'En Revisión'" 
+                     : action.action_type === "firma" ? "Esperando estado 'Pendiente de Firma'"
+                     : action.action_type === "aprobacion" ? "Esperando estado 'Pendiente de Aprobación'"
+                     : "No disponible"}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         );
