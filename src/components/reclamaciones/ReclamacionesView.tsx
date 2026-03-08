@@ -509,7 +509,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                     <AlertTriangle className="w-4 h-4 mr-1" />Crear incidencia
                   </Button>
                 )}
-                {editingReclamacion && (user?.id === editingReclamacion.responsible_id || isSuperadmin) && (
+                {editingReclamacion && user?.id === editingReclamacion.responsible_id && (
                   <Button variant="outline" onClick={() => setIsStatusChangeOpen(true)}>
                     <History className="w-4 h-4 mr-1" />Cambiar Estado
                   </Button>
