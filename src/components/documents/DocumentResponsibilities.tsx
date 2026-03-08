@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Trash2, Clock, Users } from "lucide-react";
+import { Plus, Trash2, Clock, Users, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +32,11 @@ const actionTypeColors: Record<string, string> = {
   revision: "bg-warning/10 text-warning",
 };
 
+const statusLabels: Record<string, string> = {
+  pending: "Pendiente",
+  completed: "Completado",
+};
+
 interface Responsibility {
   id: string;
   user_id: string;
@@ -55,9 +60,10 @@ interface DocumentResponsibilitiesProps {
   documentCode: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onWorkflowChange?: () => void;
 }
 
-export function DocumentResponsibilities({ documentId, documentCode, open, onOpenChange }: DocumentResponsibilitiesProps) {
+export function DocumentResponsibilities({ documentId, documentCode, open, onOpenChange, onWorkflowChange }: DocumentResponsibilitiesProps) {
   const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,6 +71,7 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
   const [selectedActionType, setSelectedActionType] = useState("revision");
   const [selectedDueDate, setSelectedDueDate] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [isCompleting, setIsCompleting] = useState<string | null>(null);
   const { user, profile } = useAuth();
   const { canEditContent } = usePermissions();
   const { toast } = useToast();
@@ -145,7 +152,39 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
     }
   };
 
+  const handleMarkCompleted = async (resp: Responsibility) => {
+    if (!user) return;
+    // Only the assigned user can mark their own review as completed
+    if (resp.user_id !== user.id) {
+      toast({ title: "No permitido", description: "Solo el responsable asignado puede marcar esta acción como completada.", variant: "destructive" });
+      return;
+    }
+    setIsCompleting(resp.id);
+    try {
+      const { error } = await (supabase as any)
+        .from("document_responsibilities")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", resp.id);
+      if (error) throw error;
+
+      toast({ title: "Revisión completada", description: "Has marcado tu revisión como completada." });
+      await fetchResponsibilities();
+      onWorkflowChange?.();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsCompleting(null);
+    }
+  };
+
   const now = new Date();
+
+  // Compute workflow summary
+  const reviewResps = responsibilities.filter(r => r.action_type === "revision");
+  const firmaResps = responsibilities.filter(r => r.action_type === "firma");
+  const aprobacionResps = responsibilities.filter(r => r.action_type === "aprobacion");
+  const completedReviews = reviewResps.filter(r => r.status === "completed").length;
+  const completedFirmas = firmaResps.filter(r => r.status === "completed").length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -159,6 +198,37 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
             Asigna responsables con acciones y fechas límite para {documentCode}.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Workflow summary */}
+        {responsibilities.length > 0 && (
+          <div className="border border-border rounded-lg p-4 bg-secondary/5 space-y-2">
+            <p className="text-sm font-medium text-foreground">Estado del flujo de aprobación</p>
+            <div className="flex flex-wrap gap-3 text-xs">
+              {reviewResps.length > 0 && (
+                <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-md",
+                  completedReviews === reviewResps.length ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+                )}>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Revisión: {completedReviews}/{reviewResps.length}
+                </div>
+              )}
+              {firmaResps.length > 0 && (
+                <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-md",
+                  completedFirmas === firmaResps.length ? "bg-success/10 text-success" : "bg-primary/10 text-primary"
+                )}>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Firma: {completedFirmas}/{firmaResps.length}
+                </div>
+              )}
+              {aprobacionResps.length > 0 && (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-accent/10 text-accent">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Aprobación: {aprobacionResps.filter(r => r.status === "completed").length}/{aprobacionResps.length}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Add new responsibility */}
         {canEditContent && (
@@ -211,6 +281,9 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
             responsibilities.map(r => {
               const isOverdue = r.status === "pending" && new Date(r.due_date) < now;
               const isCompleted = r.status === "completed";
+              const isCurrentUser = user?.id === r.user_id;
+              const canComplete = isCurrentUser && r.status === "pending" && r.action_type === "revision";
+
               return (
                 <div
                   key={r.id}
@@ -229,7 +302,12 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
                       </Badge>
                       {isCompleted && (
                         <Badge variant="outline" className="text-xs bg-success/10 text-success">
-                          Completado
+                          {r.action_type === "revision" ? "Revisado" : "Completado"}
+                        </Badge>
+                      )}
+                      {!isCompleted && isCurrentUser && (
+                        <Badge variant="outline" className="text-xs bg-accent/10 text-accent">
+                          Tu tarea
                         </Badge>
                       )}
                     </div>
@@ -248,13 +326,25 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
                       )}
                     </div>
                   </div>
-                  {canEditContent && (
-                    <div className="flex gap-1">
+                  <div className="flex gap-1">
+                    {canComplete && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-success border-success/30 hover:bg-success/10"
+                        onClick={() => handleMarkCompleted(r)}
+                        disabled={isCompleting === r.id}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                        {isCompleting === r.id ? "..." : "Revisado"}
+                      </Button>
+                    )}
+                    {canEditContent && (
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(r.id)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               );
             })

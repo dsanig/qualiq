@@ -57,7 +57,7 @@ interface Document {
   categoryId: string;
   version: string;
   versionNum: number;
-  status: "approved" | "draft" | "review" | "obsolete" | "archived";
+  status: "approved" | "draft" | "review" | "pending_signature" | "obsolete" | "archived";
   lastUpdated: string;
   owner: string;
   ownerId: string;
@@ -179,10 +179,11 @@ const typologyLabelMap: Record<DocumentTypology, string> = Object.fromEntries(
   typologyOptions.map((option) => [option.value, option.label])
 ) as Record<DocumentTypology, string>;
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; class: string }> = {
   approved: { label: "Aprobado", icon: CheckCircle, class: "text-success" },
   draft: { label: "Borrador", icon: Clock, class: "text-muted-foreground" },
   review: { label: "En Revisión", icon: AlertCircle, class: "text-warning" },
+  pending_signature: { label: "Pendiente de Firma", icon: PenTool, class: "text-primary" },
   obsolete: { label: "Obsoleto", icon: AlertCircle, class: "text-destructive" },
   archived: { label: "Archivado", icon: AlertCircle, class: "text-muted-foreground" },
 };
@@ -190,6 +191,7 @@ const statusConfig = {
 const statusOptions = [
   { value: "draft", label: "Borrador" },
   { value: "review", label: "En Revisión" },
+  { value: "pending_signature", label: "Pendiente de Firma" },
   { value: "approved", label: "Aprobado" },
 ];
 
@@ -630,21 +632,51 @@ export function DocumentsView({
     }
     setIsChangingStatus(true);
     try {
-      const requiredAction =
-        changeStatusTarget === "review"
-          ? "revision"
-          : changeStatusTarget === "approved"
-            ? "aprobacion"
-            : null;
+      // Workflow validation
+      const currentStatus = selectedDocument.status;
 
-      if (requiredAction) {
-        const allowed = await canPerformAction(user.id, selectedDocument.id, requiredAction);
+      // Get responsibilities for validation
+      const { data: resps } = await (supabase as any)
+        .from("document_responsibilities")
+        .select("action_type, status")
+        .eq("document_id", selectedDocument.id);
+
+      const allResps = (resps as { action_type: string; status: string }[]) || [];
+      const reviews = allResps.filter(r => r.action_type === "revision");
+      const signatures = allResps.filter(r => r.action_type === "firma");
+      const completedReviews = reviews.filter(r => r.status === "completed");
+      const completedSignatures = signatures.filter(r => r.status === "completed");
+
+      // Validate transitions
+      if (changeStatusTarget === "review" && currentStatus !== "draft") {
+        toast({ title: "Transición no permitida", description: "Solo se puede pasar a 'En Revisión' desde 'Borrador'.", variant: "destructive" });
+        return;
+      }
+
+      if (changeStatusTarget === "pending_signature") {
+        if (currentStatus !== "review") {
+          toast({ title: "Transición no permitida", description: "Solo se puede pasar a 'Pendiente de Firma' desde 'En Revisión'.", variant: "destructive" });
+          return;
+        }
+        if (reviews.length > 0 && completedReviews.length < reviews.length) {
+          toast({ title: "Revisiones pendientes", description: `Faltan ${reviews.length - completedReviews.length} revisores por completar su revisión.`, variant: "destructive" });
+          return;
+        }
+      }
+
+      if (changeStatusTarget === "approved") {
+        if (currentStatus !== "pending_signature") {
+          toast({ title: "Transición no permitida", description: "Solo se puede aprobar un documento que esté en 'Pendiente de Firma'.", variant: "destructive" });
+          return;
+        }
+        if (signatures.length > 0 && completedSignatures.length < signatures.length) {
+          toast({ title: "Firmas pendientes", description: `Faltan ${signatures.length - completedSignatures.length} firmantes por completar su firma.`, variant: "destructive" });
+          return;
+        }
+        // Check if user has aprobacion responsibility
+        const allowed = await canPerformAction(user.id, selectedDocument.id, "aprobacion");
         if (!allowed) {
-          toast({
-            title: "Permisos insuficientes",
-            description: "No eres responsable de esta acción para el documento seleccionado.",
-            variant: "destructive",
-          });
+          toast({ title: "Permisos insuficientes", description: "Solo el responsable de aprobación puede aprobar este documento.", variant: "destructive" });
           return;
         }
       }
@@ -669,6 +701,7 @@ export function DocumentsView({
       toast({ title: "Estado actualizado", description: `El documento ahora está en "${statusLabel}".` });
       setIsChangeStatusOpen(false);
       fetchDocuments();
+      fetchFirmaStatus();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -2273,6 +2306,15 @@ export function DocumentsView({
                 {selectedDocument ? (statusConfig[selectedDocument.status]?.label ?? selectedDocument.status) : "—"}
               </p>
             </div>
+
+            {/* Workflow guidance */}
+            <div className="border border-border rounded-lg p-3 bg-secondary/10 text-xs text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground text-sm">Flujo de aprobación</p>
+              <p>1. <strong>Borrador</strong> → En Revisión (se asignan revisores)</p>
+              <p>2. <strong>En Revisión</strong> → Pendiente de Firma (cuando todos los revisores han revisado)</p>
+              <p>3. <strong>Pendiente de Firma</strong> → Aprobado (cuando todos han firmado, el responsable aprueba)</p>
+            </div>
+
             <div className="space-y-2">
               <Label>Nuevo estado</Label>
               <Select value={changeStatusTarget} onValueChange={setChangeStatusTarget}>
@@ -2362,6 +2404,7 @@ export function DocumentsView({
           documentCode={selectedDocument.code}
           open={isResponsibilitiesOpen}
           onOpenChange={setIsResponsibilitiesOpen}
+          onWorkflowChange={() => { fetchDocuments(); fetchFirmaStatus(); }}
         />
       )}
     </div>

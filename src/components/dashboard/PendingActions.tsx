@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, FileText, AlertCircle, PenTool, CheckCircle, Search as SearchIcon, GraduationCap } from "lucide-react";
+import { CheckCircle2, Clock, FileText, AlertCircle, PenTool, CheckCircle, Search as SearchIcon, GraduationCap, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,8 @@ interface PendingAction {
   source: "capa" | "document" | "training";
   documentCode?: string;
   documentId?: string;
+  documentStatus?: string;
+  workflowHint?: string;
 }
 
 const typeIcons: Record<string, typeof CheckCircle2> = {
@@ -26,6 +28,7 @@ const typeIcons: Record<string, typeof CheckCircle2> = {
   aprobacion: CheckCircle,
   revision: SearchIcon,
   training: GraduationCap,
+  waiting: Eye,
 };
 
 const typeLabels: Record<string, string> = {
@@ -36,6 +39,7 @@ const typeLabels: Record<string, string> = {
   aprobacion: "Aprobación",
   revision: "Revisión",
   training: "Formación",
+  waiting: "En espera",
 };
 
 interface PendingActionsProps {
@@ -74,14 +78,25 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
           .from("document_responsibilities")
           .select("id, action_type, due_date, status, document_id")
           .eq("user_id", user.id)
-          .eq("status", "pending")
           .order("due_date", { ascending: true })
-          .limit(10);
+          .limit(20);
 
         if (respData && (respData as any[]).length > 0) {
           const docIds = [...new Set((respData as any[]).map(r => r.document_id))];
-          const { data: docs } = await supabase.from("documents").select("id, code, title").in("id", docIds);
+          const { data: docs } = await supabase.from("documents").select("id, code, title, status").in("id", docIds);
           const docMap = new Map((docs || []).map(d => [d.id, d]));
+
+          // Get all responsibilities for these documents (to compute workflow state)
+          const { data: allResps } = await (supabase as any)
+            .from("document_responsibilities")
+            .select("document_id, action_type, status")
+            .in("document_id", docIds);
+
+          const respsByDoc = new Map<string, { action_type: string; status: string }[]>();
+          for (const r of (allResps as any[] || [])) {
+            if (!respsByDoc.has(r.document_id)) respsByDoc.set(r.document_id, []);
+            respsByDoc.get(r.document_id)!.push(r);
+          }
 
           // Check which firma responsibilities already have a signature recorded
           const firmaResps = (respData as any[]).filter(r => r.action_type === "firma");
@@ -102,6 +117,8 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
 
           docActions = (respData as any[])
             .filter((r) => {
+              // Exclude completed responsibilities
+              if (r.status === "completed") return false;
               // Exclude firma responsibilities that already have a signature
               if (r.action_type === "firma" && signedSet.has(`${r.document_id}:${user.id}`)) {
                 return false;
@@ -110,16 +127,59 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
             })
             .map((r) => {
               const doc = docMap.get(r.document_id);
+              const docStatus = doc?.status || "draft";
+              const docResps = respsByDoc.get(r.document_id) || [];
+              
+              // Compute workflow hint
+              let workflowHint = "";
+              let effectiveActionType = r.action_type;
+
+              if (r.action_type === "revision") {
+                if (docStatus === "review") {
+                  const totalReviews = docResps.filter(rr => rr.action_type === "revision").length;
+                  const completedReviews = docResps.filter(rr => rr.action_type === "revision" && rr.status === "completed").length;
+                  workflowHint = `Debes revisar este documento (${completedReviews}/${totalReviews} revisiones completadas)`;
+                } else if (docStatus === "draft") {
+                  workflowHint = "Documento aún en borrador — pendiente de pasar a revisión";
+                  effectiveActionType = "waiting";
+                }
+              } else if (r.action_type === "firma") {
+                if (docStatus === "pending_signature") {
+                  const totalSigs = docResps.filter(rr => rr.action_type === "firma").length;
+                  const completedSigs = docResps.filter(rr => rr.action_type === "firma" && rr.status === "completed").length;
+                  workflowHint = `Debes firmar este documento (${completedSigs}/${totalSigs} firmas)`;
+                } else if (docStatus === "review") {
+                  workflowHint = "Documento en revisión — tu firma será requerida después";
+                  effectiveActionType = "waiting";
+                }
+              } else if (r.action_type === "aprobacion") {
+                if (docStatus === "pending_signature") {
+                  const totalSigs = docResps.filter(rr => rr.action_type === "firma").length;
+                  const completedSigs = docResps.filter(rr => rr.action_type === "firma" && rr.status === "completed").length;
+                  if (totalSigs > 0 && completedSigs < totalSigs) {
+                    workflowHint = `Esperando firmas (${completedSigs}/${totalSigs}) antes de poder aprobar`;
+                    effectiveActionType = "waiting";
+                  } else {
+                    workflowHint = "Todas las firmas completadas — puedes aprobar el documento";
+                  }
+                } else {
+                  workflowHint = "Documento no está listo para aprobación";
+                  effectiveActionType = "waiting";
+                }
+              }
+
               return {
                 id: r.id,
                 description: `${typeLabels[r.action_type] || r.action_type}: ${doc?.title || doc?.code || "Documento"}`,
-                action_type: r.action_type,
+                action_type: effectiveActionType,
                 due_date: r.due_date,
                 status: r.status,
                 isOverdue: r.due_date ? new Date(r.due_date) < now : false,
                 source: "document" as const,
                 documentCode: doc?.code,
                 documentId: r.document_id,
+                documentStatus: docStatus,
+                workflowHint,
               };
             });
         }
@@ -153,12 +213,18 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
         }
       }
 
-      // Combine and sort by due_date
-      const combined = [...capaActions, ...docActions, ...trainingActions].sort((a, b) => {
-        if (!a.due_date) return 1;
-        if (!b.due_date) return -1;
-        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-      }).slice(0, 10);
+      // Combine: active tasks first, waiting tasks last
+      const activeActions = [...capaActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions];
+      const waitingActions = docActions.filter(a => a.action_type === "waiting");
+      
+      const combined = [
+        ...activeActions.sort((a, b) => {
+          if (!a.due_date) return 1;
+          if (!b.due_date) return -1;
+          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+        }),
+        ...waitingActions,
+      ].slice(0, 12);
 
       setActions(combined);
       setIsLoading(false);
@@ -167,6 +233,13 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
   }, [user]);
 
   const overdueCount = actions.filter((a) => a.isOverdue).length;
+
+  const docStatusLabels: Record<string, string> = {
+    draft: "Borrador",
+    review: "En Revisión",
+    pending_signature: "Pend. Firma",
+    approved: "Aprobado",
+  };
 
   return (
     <div className="bg-card rounded-lg border border-border p-6">
@@ -187,14 +260,17 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
         ) : (
           actions.map((action) => {
             const Icon = typeIcons[action.action_type] || FileText;
+            const isWaiting = action.action_type === "waiting";
             return (
               <div
                 key={action.id}
                 className={cn(
                   "p-3 rounded-lg border transition-colors cursor-pointer",
-                  action.isOverdue
-                    ? "border-destructive/30 bg-destructive/5 hover:bg-destructive/10"
-                    : "border-border hover:bg-secondary/50"
+                  isWaiting
+                    ? "border-border/50 bg-secondary/20 opacity-70"
+                    : action.isOverdue
+                      ? "border-destructive/30 bg-destructive/5 hover:bg-destructive/10"
+                      : "border-border hover:bg-secondary/50"
                 )}
                 onClick={() => {
                   if (action.source === "document" && action.documentCode && onNavigateToDocument) {
@@ -207,13 +283,23 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                 }}
               >
                 <div className="flex items-start gap-3">
-                  <Icon className={cn("w-4 h-4 mt-0.5", action.isOverdue ? "text-destructive" : "text-muted-foreground")} />
+                  <Icon className={cn("w-4 h-4 mt-0.5",
+                    isWaiting ? "text-muted-foreground/50" :
+                    action.isOverdue ? "text-destructive" : "text-muted-foreground"
+                  )} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{action.description}</p>
+                    {action.workflowHint && (
+                      <p className={cn("text-xs mt-0.5", isWaiting ? "text-muted-foreground/70 italic" : "text-accent")}>
+                        {action.workflowHint}
+                      </p>
+                    )}
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-xs text-muted-foreground">{typeLabels[action.action_type] || action.action_type}</span>
                       {action.source === "document" && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">Documento</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                          {action.documentStatus ? docStatusLabels[action.documentStatus] || action.documentStatus : "Documento"}
+                        </span>
                       )}
                       {action.source === "training" && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">Formación</span>
