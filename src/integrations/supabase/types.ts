@@ -799,6 +799,7 @@ export type Database = {
           typology: string
           updated_at: string
           version: number
+          version_minor: number
         }
         Insert: {
           category?: string
@@ -819,6 +820,7 @@ export type Database = {
           typology?: string
           updated_at?: string
           version?: number
+          version_minor?: number
         }
         Update: {
           category?: string
@@ -839,6 +841,7 @@ export type Database = {
           typology?: string
           updated_at?: string
           version?: number
+          version_minor?: number
         }
         Relationships: [
           {
