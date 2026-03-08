@@ -165,6 +165,7 @@ const Index = () => {
             onViewPendingActions={handleViewPendingActions}
             onViewIncidents={handleViewIncidents}
             onNavigateToDocument={handleNavigateToDocument}
+            onNavigateToModule={setActiveModule}
           />
         );
       case "documents":
