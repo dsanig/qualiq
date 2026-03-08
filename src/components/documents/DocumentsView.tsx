@@ -2901,7 +2901,7 @@ export function DocumentsView({
               <HistoryIcon className="w-4 h-4 mr-1" />
               Historial de Versiones
             </Button>
-            <Button variant="outline" size="sm" onClick={() => { if (selectedDocument) { setIsFullHistoryOpen(false); setIsStatusHistoryOpen(true); } }}>
+            <Button variant="outline" size="sm" onClick={() => { if (selectedDocument) { setIsFullHistoryOpen(false); handleOpenStatusHistory(selectedDocument); } }}>
               <ArrowRightLeft className="w-4 h-4 mr-1" />
               Historial de Estados
             </Button>
