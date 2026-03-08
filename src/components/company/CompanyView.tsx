@@ -51,7 +51,7 @@ export function CompanyView() {
   });
   const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "" });
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ fullName: "", jobTitle: "", role: "Espectador" });
+  const [editForm, setEditForm] = useState({ fullName: "", jobTitle: "", role: "Espectador", email: "" });
   const [editingUserId, setEditingUserId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [devDetectedRole, setDevDetectedRole] = useState<string>("Desconocido");
