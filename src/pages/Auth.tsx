@@ -112,7 +112,7 @@ export default function Auth() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">QualiQ<span className="text-sm font-normal italic text-muted-foreground">, by INMEDSA</span></h1>
-            <p className="text-sm text-muted-foreground">Compliance Platform</p>
+            <p className="text-sm text-muted-foreground italic">Advanced Document Management System</p>
           </div>
         </div>
 
