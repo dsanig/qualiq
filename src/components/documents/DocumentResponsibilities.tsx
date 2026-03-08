@@ -336,7 +336,7 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
                         disabled={isCompleting === r.id}
                       >
                         <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                        {isCompleting === r.id ? "..." : "Revisado"}
+                        {isCompleting === r.id ? "..." : r.action_type === "firma" ? "Firmado" : "Revisado"}
                       </Button>
                     )}
                     {canEditContent && (
