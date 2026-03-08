@@ -573,7 +573,7 @@ export function DocumentsView({
       }));
       setDbDocuments(mapped);
     }
-  }, [filters, onFiltersChange, profile?.company_id, toast]);
+  }, [filters, onFiltersChange, effectiveCompanyId, toast]);
 
   const fetchCompanyUsers = useCallback(async () => {
     if (!profile?.company_id) return;
