@@ -62,6 +62,8 @@ const Index = () => {
     signatureStatus: "all",
     incidentType: "all",
     incidentStatus: "all",
+    dateFrom: null,
+    dateTo: null,
   });
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isNewDocumentOpen, setIsNewDocumentOpen] = useState(false);

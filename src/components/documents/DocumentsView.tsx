@@ -1282,14 +1282,11 @@ export function DocumentsView({
       const matchesStatus = filters.documentStatus === "all" || doc.status === filters.documentStatus;
       const matchesTypology = filters.documentTypology === "all" || doc.typology === filters.documentTypology;
       
-      const isSigned = !!signedDocuments[doc.id];
-      const matchesSignature =
-        filters.signatureStatus === "all" ||
-        (filters.signatureStatus === "signed" && isSigned) ||
-        (filters.signatureStatus === "pending" && !isSigned && doc.status === "approved") ||
-        (filters.signatureStatus === "not_required" && doc.status !== "approved");
+      const docDate = new Date(doc.lastUpdated);
+      const matchesDateFrom = !filters.dateFrom || docDate >= filters.dateFrom;
+      const matchesDateTo = !filters.dateTo || docDate <= new Date(filters.dateTo.getTime() + 86400000 - 1);
 
-      return matchesQuery && matchesCategory && matchesStatus && matchesTypology && matchesSignature;
+      return matchesQuery && matchesCategory && matchesStatus && matchesTypology && matchesDateFrom && matchesDateTo;
     });
   }, [debouncedSearchQuery, filters, signedDocuments, allDocuments]);
 
