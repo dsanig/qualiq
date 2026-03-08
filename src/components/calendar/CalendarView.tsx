@@ -469,7 +469,10 @@ export function CalendarView({
                     return (
                       <div
                         key={ev.id}
-                        onClick={() => canNavigate && handleEventClick(ev)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (canNavigate) handleEventClick(ev);
+                        }}
                         className={cn(
                           "flex items-center gap-3 p-2 rounded-md border-l-4",
                           color.bg,
