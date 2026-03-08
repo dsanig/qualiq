@@ -265,6 +265,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     await supabase.storage.from("documents").remove([attachment.object_path]);
     await (supabase as any).from("audit_attachments").delete().eq("id", attachment.id);
     toast({ title: "Adjunto eliminado" });
+    logAction({ action: "delete_attachment", entity_type: "audit", entity_id: attachment.audit_id, details: { file_name: attachment.file_name } });
     await loadData();
   };
 
