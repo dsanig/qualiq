@@ -83,8 +83,7 @@ export function ShareDocumentDialog({
 
       if (error) throw error;
 
-      const baseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-document`;
-      const link = `${baseUrl}?token=${data.token}`;
+      const link = `https://qualiq.inmedsa.com/share?token=${data.token}`;
       setGeneratedLink(link);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
