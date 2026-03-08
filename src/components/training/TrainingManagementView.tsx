@@ -421,11 +421,15 @@ export function TrainingManagementView() {
     return (
       <Dialog open={!!detailRecord} onOpenChange={() => setDetailRecord(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
+          <DialogHeader className="flex flex-row items-start justify-between gap-2">
             <DialogTitle className="flex items-center gap-2">
               <GraduationCap className="w-5 h-5" />
               {detailRecord.title}
             </DialogTitle>
+            <Button variant="outline" size="sm" className="shrink-0" onClick={() => { setDetailRecord(null); openEditForm(detailRecord); }}>
+              <PenLine className="w-3.5 h-3.5 mr-1" />
+              Editar
+            </Button>
           </DialogHeader>
 
           <div className="space-y-5">
