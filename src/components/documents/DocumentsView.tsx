@@ -2895,6 +2895,16 @@ export function DocumentsView({
               Historial completo — {selectedDocument?.code}
             </DialogTitle>
           </DialogHeader>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => { if (selectedDocument) { setIsFullHistoryOpen(false); handleOpenHistory(selectedDocument); } }}>
+              <History className="w-4 h-4 mr-1" />
+              Historial de Versiones
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => { if (selectedDocument) { setIsFullHistoryOpen(false); setIsStatusHistoryOpen(true); } }}>
+              <ArrowRightLeft className="w-4 h-4 mr-1" />
+              Historial de Estados
+            </Button>
+          </div>
           <div className="space-y-1">
             {isLoadingFullHistory && <p className="text-center py-4 text-muted-foreground">Cargando historial...</p>}
             {!isLoadingFullHistory && fullHistory.length === 0 && <p className="text-center py-4 text-muted-foreground">No hay eventos registrados.</p>}
