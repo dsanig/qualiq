@@ -14,7 +14,7 @@ import { matchesNormalizedQuery } from "@/utils/search";
 import { IncidentFormFields, type IncidentFormData, type CapaPlanRef } from "./IncidentFormFields";
 import { format } from "date-fns";
 
-type IncidentType = "incidencia" | "reclamacion" | "desviacion" | "otra";
+type IncidentType = "incidencia" | "desviacion" | "no_conformidad" | "otra";
 
 interface Incident {
   id: string;
