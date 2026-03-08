@@ -379,7 +379,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
     });
   };
 
-  const unreadWindowInsights = windowInsights.filter((i) => !i.read_at);
+  const unreadWindowInsights = windowInsights.filter((i) => !i.is_acknowledged);
   const unacknowledgedCount = unreadWindowInsights.length;
   const highSeverityCount = unreadWindowInsights.filter((i) => i.severity === "high").length;
   const currentValidation = lastValidation ?? isDataSufficientForPrediction(incidentsForWindow, analysisWindow);
