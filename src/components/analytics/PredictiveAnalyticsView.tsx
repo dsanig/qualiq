@@ -73,8 +73,8 @@ const DEFAULT_ANALYSIS_WINDOW: AnalysisWindow = "1m";
 const STORAGE_WINDOW_KEY = "predictive-analysis-window";
 const MIN_RECORDS_BY_WINDOW: Record<AnalysisWindow, number> = {
   current: 3,
-  "1w": 10,
-  "2w": 10,
+  "1w": 3,
+  "2w": 5,
   "1m": 10,
   "3m": 10,
   "6m": 10,
