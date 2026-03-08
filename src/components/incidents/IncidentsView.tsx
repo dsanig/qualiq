@@ -60,6 +60,8 @@ interface IncidentsViewProps {
   reloadToken?: number;
   prefill?: IncidentPrefillPayload | null;
   onPrefillConsumed?: () => void;
+  openIncidentId?: string | null;
+  onOpenIncidentConsumed?: () => void;
 }
 
 const typeLabels: Record<IncidentType, string> = {
@@ -90,6 +92,7 @@ const defaultForm = (type?: IncidentType): IncidentFormData => ({
 export function IncidentsView({
   searchQuery, onSearchChange, filters, onFiltersChange, onOpenFilters,
   isNewIncidentOpen, onNewIncidentOpenChange, initialIncidentType, reloadToken, prefill, onPrefillConsumed,
+  openIncidentId, onOpenIncidentConsumed,
 }: IncidentsViewProps) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [audits, setAudits] = useState<AuditRef[]>([]);
@@ -243,6 +246,16 @@ export function IncidentsView({
   };
 
   useEffect(() => { void loadData(); }, [reloadToken]);
+
+  // Auto-open a specific incident by ID (e.g. from reclamaciones navigation)
+  useEffect(() => {
+    if (!openIncidentId || incidents.length === 0) return;
+    const incident = incidents.find((i) => i.id === openIncidentId);
+    if (incident) {
+      openEdit(incident);
+      onOpenIncidentConsumed?.();
+    }
+  }, [openIncidentId, incidents]);
 
   useEffect(() => {
     if (!prefill || !isNewIncidentOpen) return;

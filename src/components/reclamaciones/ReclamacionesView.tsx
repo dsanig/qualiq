@@ -72,9 +72,10 @@ interface ReclamacionesViewProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onOpenNewIncident?: (reclamacionId: string, reclamacionTitle: string) => void;
+  onNavigateToIncident?: (incidenciaId: string) => void;
 }
 
-export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncident }: ReclamacionesViewProps) {
+export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncident, onNavigateToIncident }: ReclamacionesViewProps) {
   const [reclamaciones, setReclamaciones] = useState<Reclamacion[]>([]);
   const [users, setUsers] = useState<UserRef[]>([]);
   const [incidencias, setIncidencias] = useState<IncidenciaRef[]>([]);
@@ -367,7 +368,13 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
                         <LinkIcon className="h-3 w-3 text-muted-foreground" />
                         {linkedIncidencias.map(inc => (
-                          <span key={inc!.id} className="text-xs bg-warning/10 text-warning rounded-full px-1.5 py-0.5">{inc!.title}</span>
+                          <button
+                            key={inc!.id}
+                            className="text-xs bg-warning/10 text-warning rounded-full px-1.5 py-0.5 hover:bg-warning/20 transition-colors"
+                            onClick={(e) => { e.stopPropagation(); onNavigateToIncident?.(inc!.id); }}
+                          >
+                            {inc!.title} →
+                          </button>
                         ))}
                       </div>
                     )}
@@ -379,8 +386,13 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <span className={`text-xs flex items-center gap-1 ${status.color}`}><StatusIcon className="h-3 w-3" />{status.label}</span>
+                    {canEditContent && onOpenNewIncident && (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleOpenNewIncident(rec); }}>
+                        <AlertTriangle className="h-3 w-3 mr-1" />Crear incidencia
+                      </Button>
+                    )}
                     {canEditContent && <Pencil className="h-3.5 w-3.5 text-muted-foreground" />}
                   </div>
                 </div>
@@ -455,9 +467,13 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                 {reclamacionLinks[editingReclamacion.id]?.map((incId) => {
                   const inc = incidencias.find((i) => i.id === incId);
                   return (
-                    <span key={incId} className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5">
-                      <LinkIcon className="h-3 w-3" />{inc?.title || "Incidencia"}
-                    </span>
+                    <button
+                      key={incId}
+                      className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5 hover:bg-warning/20 transition-colors"
+                      onClick={() => { setIsEditOpen(false); onNavigateToIncident?.(incId); }}
+                    >
+                      <LinkIcon className="h-3 w-3" />{inc?.title || "Incidencia"} →
+                    </button>
                   );
                 })}
               </div>

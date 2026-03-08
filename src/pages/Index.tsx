@@ -65,6 +65,7 @@ const Index = () => {
   const [incidentViewResetSeed, setIncidentViewResetSeed] = useState(0);
   const [incidentTypeSeed, setIncidentTypeSeed] = useState<IncidentType | undefined>(undefined);
   const [incidentPrefill, setIncidentPrefill] = useState<IncidentPrefillPayload | null>(null);
+  const [openIncidentId, setOpenIncidentId] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
   const { enabledFeatures } = useCompanyFeatures();
   const navigate = useNavigate();
@@ -209,6 +210,8 @@ const Index = () => {
               reloadToken={incidentViewResetSeed}
               prefill={incidentPrefill}
               onPrefillConsumed={() => setIncidentPrefill(null)}
+              openIncidentId={openIncidentId}
+              onOpenIncidentConsumed={() => setOpenIncidentId(null)}
             />
           </ErrorBoundary>
         );
@@ -222,6 +225,10 @@ const Index = () => {
               setIncidentPrefill({ title: `Incidencia desde reclamación: ${reclamacionTitle}`, description: `Incidencia generada a partir de la reclamación "${reclamacionTitle}".`, sourceReclamacionId: reclamacionId });
               setActiveModule("incidents");
               setIsNewIncidentOpen(true);
+            }}
+            onNavigateToIncident={(incidenciaId) => {
+              setOpenIncidentId(incidenciaId);
+              setActiveModule("incidents");
             }}
           />
         );
