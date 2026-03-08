@@ -98,7 +98,7 @@ serve(async (req) => {
 
     // Determine minimum records based on the selected analysis window
     const windowMinRecords: Record<string, number> = {
-      current: 3, "1w": 3, "2w": 5, "1m": 10, "3m": 10, "6m": 10, "1y": 10,
+      current: 1, "1w": 1, "2w": 1, "1m": 1, "3m": 1, "6m": 1, "1y": 1,
     };
     const minRecords = windowMinRecords[analysisWindow] ?? PREDICTION_MIN_RECORDS;
     
