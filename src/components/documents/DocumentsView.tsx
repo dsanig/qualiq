@@ -491,7 +491,7 @@ export function DocumentsView({
       const { data: fallbackData, error: fallbackError } = await supabase
         .from("documents")
         .select("*")
-        .eq("company_id", profile.company_id)
+        .eq("company_id", effectiveCompanyId)
         .order("created_at", { ascending: false });
 
       if (fallbackError || !fallbackData) return;
