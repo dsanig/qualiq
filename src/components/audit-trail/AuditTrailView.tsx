@@ -3,8 +3,9 @@ import {
   Shield, Search, Filter, RefreshCw, ChevronLeft, ChevronRight,
   User, FileText, AlertTriangle, ClipboardCheck, MessageSquare,
   Settings, Building2, GraduationCap, TrendingUp, FileWarning,
-  LogIn, LogOut, Key, Eye
+  LogIn, LogOut, Key, Eye, Download
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
