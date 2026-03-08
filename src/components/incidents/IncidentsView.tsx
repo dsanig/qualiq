@@ -169,12 +169,14 @@ export function IncidentsView({
         return withInsight;
       })();
 
-      const [{ data: incidenciasData, error: incidenciasError }, { data: auditsData, error: auditsError }, { data: usersData, error: usersError }, { data: capaData }, { data: linksData }] = await Promise.all([
+      const [{ data: incidenciasData, error: incidenciasError }, { data: auditsData, error: auditsError }, { data: usersData, error: usersError }, { data: capaData }, { data: linksData }, { data: recLinksData }, { data: recData }] = await Promise.all([
         incidentsPromise,
         (supabase as any).from("audits").select("id,title").order("created_at", { ascending: false }),
         supabase.from("profiles").select("user_id,full_name,email"),
         (supabase as any).from("capa_plans").select("id,title,audit_id"),
         (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
+        (supabase as any).from("reclamacion_incidencias").select("reclamacion_id,incidencia_id"),
+        (supabase as any).from("reclamaciones").select("id,title"),
       ]);
 
       if (incidenciasError) {
