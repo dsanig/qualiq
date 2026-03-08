@@ -1714,7 +1714,7 @@ export function DocumentsView({
                 </thead>
                 <tbody className="divide-y divide-border">
                   {paginatedDocuments.map((doc) => {
-                    const status = statusConfig[doc.status];
+                    const status = statusConfig[doc.status] || defaultStatus;
                     const StatusIcon = status.icon;
                     return (
                       <Fragment key={doc.id}>
