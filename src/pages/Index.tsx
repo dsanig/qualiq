@@ -100,6 +100,8 @@ const Index = () => {
         return "Buscar documentos...";
       case "incidents":
         return "Buscar incidencias...";
+      case "reclamaciones":
+        return "Buscar reclamaciones...";
       case "audits":
         return "Buscar auditorías...";
       default:
