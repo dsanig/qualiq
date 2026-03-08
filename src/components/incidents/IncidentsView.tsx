@@ -598,7 +598,7 @@ export function IncidentsView({
               )}
             </div>
             <Button variant="outline" onClick={onOpenFilters}><Filter className="w-4 h-4 mr-1" />Filtros</Button>
-            <Button onClick={() => onNewIncidentOpenChange(true)} data-testid="incidents-new-button"><Plus className="w-4 h-4 mr-1" />Nueva incidencia</Button>
+            <Button onClick={() => { setForm(defaultForm(initialIncidentType)); setNewAttachments([]); setSelectedCapaPlanIds([]); setSourceInsightId(null); setSourceReclamacionId(null); onNewIncidentOpenChange(true); }} data-testid="incidents-new-button"><Plus className="w-4 h-4 mr-1" />Nueva incidencia</Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
