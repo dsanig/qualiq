@@ -418,6 +418,18 @@ export function CompanyManagementView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!modulesCompany} onOpenChange={(open) => !open && setModulesCompany(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Módulos — {modulesCompany?.name}</DialogTitle>
+            <DialogDescription>
+              Activa o desactiva funcionalidades para esta empresa.
+            </DialogDescription>
+          </DialogHeader>
+          {modulesCompany && <FeatureToggles companyId={modulesCompany.id} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
