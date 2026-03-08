@@ -786,9 +786,17 @@ export function TrainingManagementView() {
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(rec.created_at).toLocaleDateString("es-ES")}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(rec.created_at).toLocaleDateString("es-ES")}
+                    </span>
+                    {rec.deadline && (
+                      <span className={cn("text-xs flex items-center gap-1", rec.status !== "completa" && new Date(rec.deadline) < new Date() ? "text-destructive font-medium" : "text-muted-foreground")}>
+                        <CalendarIcon className="w-3 h-3" />
+                        Límite: {new Date(rec.deadline).toLocaleDateString("es-ES")}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEditForm(rec); }}>
                       <PenLine className="w-3.5 h-3.5" />
