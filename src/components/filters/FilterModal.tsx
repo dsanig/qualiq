@@ -1,7 +1,14 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 export type FiltersState = {
   category: string;
@@ -10,6 +17,8 @@ export type FiltersState = {
   signatureStatus: string;
   incidentType: string;
   incidentStatus: string;
+  dateFrom?: Date | null;
+  dateTo?: Date | null;
 };
 
 interface FilterModalProps {
@@ -21,7 +30,7 @@ interface FilterModalProps {
 }
 
 export function FilterModal({ open, onOpenChange, filters, onFiltersChange, activeModule }: FilterModalProps) {
-  const updateFilter = (key: keyof FiltersState, value: string) => {
+  const updateFilter = (key: keyof FiltersState, value: any) => {
     onFiltersChange({
       ...filters,
       [key]: value,
@@ -36,6 +45,8 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange, acti
       signatureStatus: "all",
       incidentType: "all",
       incidentStatus: "all",
+      dateFrom: null,
+      dateTo: null,
     });
   };
 
@@ -53,6 +64,23 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange, acti
           {/* Document filters */}
           {(!activeModule || activeModule === "documents") && (
             <>
+              <div className="space-y-2">
+                <Label>Categoría</Label>
+                <Select value={filters.category} onValueChange={(value) => updateFilter("category", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="calidad">Calidad</SelectItem>
+                    <SelectItem value="produccion">Producción</SelectItem>
+                    <SelectItem value="logistica">Logística</SelectItem>
+                    <SelectItem value="rrhh">RRHH</SelectItem>
+                    <SelectItem value="regulatory">Regulatorio</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label>Tipología</Label>
                 <Select value={filters.documentTypology} onValueChange={(value) => updateFilter("documentTypology", value)}>
@@ -79,29 +107,79 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange, acti
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="approved">Aprobado</SelectItem>
-                    <SelectItem value="review">En revisión</SelectItem>
+                    <SelectItem value="review">En Revisión</SelectItem>
                     <SelectItem value="draft">Borrador</SelectItem>
                     <SelectItem value="pending_signature">Pendiente de Firma</SelectItem>
                     <SelectItem value="pending_approval">Pendiente de Aprobación</SelectItem>
-                    <SelectItem value="obsolete">Obsoleto</SelectItem>
-                    <SelectItem value="archived">Archivado</SelectItem>
+                    <SelectItem value="obsolete">Denegado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Estado de firma</Label>
-                <Select value={filters.signatureStatus} onValueChange={(value) => updateFilter("signatureStatus", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona estado de firma" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="pending">Pendiente de firma</SelectItem>
-                    <SelectItem value="signed">Firmado</SelectItem>
-                    <SelectItem value="not_required">No requiere firma</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Última actualización (desde)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !filters.dateFrom && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filters.dateFrom ? format(filters.dateFrom, "dd/MM/yyyy", { locale: es }) : "Seleccionar fecha"}
+                      {filters.dateFrom && (
+                        <X
+                          className="ml-auto h-4 w-4 opacity-50 hover:opacity-100"
+                          onClick={(e) => { e.stopPropagation(); updateFilter("dateFrom", null); }}
+                        />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={filters.dateFrom ?? undefined}
+                      onSelect={(date) => updateFilter("dateFrom", date ?? null)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Última actualización (hasta)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !filters.dateTo && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filters.dateTo ? format(filters.dateTo, "dd/MM/yyyy", { locale: es }) : "Seleccionar fecha"}
+                      {filters.dateTo && (
+                        <X
+                          className="ml-auto h-4 w-4 opacity-50 hover:opacity-100"
+                          onClick={(e) => { e.stopPropagation(); updateFilter("dateTo", null); }}
+                        />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={filters.dateTo ?? undefined}
+                      onSelect={(date) => updateFilter("dateTo", date ?? null)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </>
           )}
