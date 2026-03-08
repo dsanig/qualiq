@@ -30,6 +30,7 @@ const typeIcons: Record<string, typeof CheckCircle2> = {
   training: GraduationCap,
   waiting: Eye,
   reclamacion: FileWarning,
+  incidencia: AlertCircle,
 };
 
 const typeLabels: Record<string, string> = {
