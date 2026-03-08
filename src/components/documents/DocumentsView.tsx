@@ -680,7 +680,7 @@ export function DocumentsView({
       }
 
       toast({ title: "Documento actualizado" });
-      logAction({ action: "update", entity_type: "document", entity_id: editingDocId, entity_title: editDocTitle.trim(), details: { code: editDocCode.trim(), category: editDocCategory, typology: editDocTypology, status: editDocStatus } });
+      logAction({ action: "update", entity_type: "document", entity_id: editingDocId, entity_title: editDocTitle.trim(), details: { code: editDocCode.trim(), category: editDocCategory, typology: editDocTypology, status: editDocStatus, effective_date: editDocEffectiveImmediate ? "Efectivo Inmediatamente" : (editDocEffectiveDate || null), expiry_date: editDocNoExpiry ? "Sin Caducidad" : (editDocExpiryDate || null) } });
       setIsEditOpen(false);
       fetchDocuments();
     } catch (err: any) {
