@@ -1678,12 +1678,10 @@ export function DocumentsView({
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Título</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Tipología</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Versión</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Firma</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actualizado</th>
                     <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</th>
                   </tr>
@@ -1695,7 +1693,6 @@ export function DocumentsView({
                     return (
                       <Fragment key={doc.id}>
                         <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => handleToggleSummary(doc.id)}>
-                          <td className="px-4 py-3"><span className="font-mono text-sm text-foreground">{doc.code}</span></td>
                           <td className="px-4 py-3"><span className="font-mono text-sm text-foreground">{doc.code}</span></td>
                           <td className="px-4 py-3">
                             <div>
@@ -1714,19 +1711,6 @@ export function DocumentsView({
                               <StatusIcon className="w-3.5 h-3.5" />
                               {status.label}
                             </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            {(() => {
-                              const sigStatus = getSignatureStatusLabel(doc.id);
-                              if (!sigStatus) return <span className="text-xs text-muted-foreground">—</span>;
-                              const SigIcon = sigStatus.icon;
-                              return (
-                                <span className={cn("inline-flex items-center gap-1.5 text-sm", sigStatus.class)}>
-                                  <SigIcon className="w-3.5 h-3.5" />
-                                  {sigStatus.label}
-                                </span>
-                              );
-                            })()}
                           </td>
                           <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{doc.lastUpdated}</span></td>
                           <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
