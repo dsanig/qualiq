@@ -116,7 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {
+      // Even if server-side logout fails, clear local state
+    }
+    setUser(null);
+    setSession(null);
     setProfile(null);
     setIsAdmin(false);
     setIsRootAdmin(false);
