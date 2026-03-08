@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { ClipboardList, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { ClipboardList, CheckCircle2, Clock, AlertTriangle, ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+
+const statusLabels: Record<string, string> = {
+  draft: "Borrador",
+  review: "En Revisión",
+  pending_signature: "Pendiente de Firma",
+  pending_approval: "Pendiente de Aprobación",
+  approved: "Aprobado",
+};
+
+/** Given the current doc status, return the next allowed manual transition for the responsible */
+function getNextStatusForAction(docStatus: string | undefined, actionType: string): { nextStatus: string; label: string } | null {
+  if (!docStatus) return null;
+  // draft → review: any reviewer can trigger this
+  if (docStatus === "draft" && actionType === "revision") {
+    return { nextStatus: "review", label: "Pasar a En Revisión" };
+  }
+  // pending_approval → approved: approval responsible triggers this
+  if (docStatus === "pending_approval" && actionType === "aprobacion") {
+    return { nextStatus: "approved", label: "Aprobar documento" };
+  }
+  return null;
+}
 
 const actionTypeLabels: Record<string, string> = {
   firma: "Firma",
