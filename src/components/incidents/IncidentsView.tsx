@@ -707,6 +707,19 @@ export function IncidentsView({
             selectedCapaPlanIds={selectedCapaPlanIds}
             onCapaPlanToggle={canEditContent ? handleCapaPlanToggle : undefined}
           />
+          {/* Read-only linked reclamaciones */}
+          {editingIncident && (incidentReclamacionLinks[editingIncident.id]?.length > 0) && (
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Reclamación de origen</p>
+              <div className="flex flex-wrap gap-1">
+                {incidentReclamacionLinks[editingIncident.id].map((title, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5">
+                    <LinkIcon className="h-3 w-3" />{title}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <DialogFooter>
             <div className="w-full flex items-center justify-between gap-2">
               {canDeleteIncidencia && editingIncident ? (
