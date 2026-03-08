@@ -656,7 +656,7 @@ export function DocumentsView({
         toast({ title: "Transición automática", description: "El documento pasará a 'Pendiente de Firma' automáticamente cuando todos los revisores completen su revisión.", variant: "destructive" });
         return;
       } else if (changeStatusTarget === "pending_approval") {
-        toast({ title: "Transición automática", description: "El documento pasará a 'En Aprobación' automáticamente cuando todos los firmantes completen su firma.", variant: "destructive" });
+        toast({ title: "Transición automática", description: "El documento pasará a 'Pendiente de Aprobación' automáticamente cuando todos los firmantes completen su firma.", variant: "destructive" });
         return;
       } else if (changeStatusTarget === "approved") {
         if (currentStatus !== "pending_approval") {
