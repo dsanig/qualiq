@@ -40,6 +40,18 @@ export function CompanyView() {
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [users, setUsers] = useState<UserDirectoryEntry[]>([]);
   const [companyName, setCompanyName] = useState("");
+  const [companyForm, setCompanyForm] = useState({
+    legal_name: "",
+    cif: "",
+    address: "",
+    city: "",
+    postal_code: "",
+    province: "",
+    country: "España",
+    phone: "",
+    email: "",
+    website: "",
+  });
   const [isCompanySaving, setIsCompanySaving] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [createForm, setCreateForm] = useState({
@@ -142,7 +154,7 @@ export function CompanyView() {
 
       const { data, error } = await supabase
         .from("companies")
-        .select("name")
+        .select("name, legal_name, cif, address, city, postal_code, province, country, phone, email, website")
         .eq("id", profile.company_id)
         .maybeSingle();
 
@@ -155,7 +167,19 @@ export function CompanyView() {
         return;
       }
 
-      setCompanyName(data?.name ?? "");
+      setCompanyName((data as any)?.name ?? "");
+      setCompanyForm({
+        legal_name: (data as any)?.legal_name ?? "",
+        cif: (data as any)?.cif ?? "",
+        address: (data as any)?.address ?? "",
+        city: (data as any)?.city ?? "",
+        postal_code: (data as any)?.postal_code ?? "",
+        province: (data as any)?.province ?? "",
+        country: (data as any)?.country ?? "España",
+        phone: (data as any)?.phone ?? "",
+        email: (data as any)?.email ?? "",
+        website: (data as any)?.website ?? "",
+      });
     };
 
     void fetchCompany();
@@ -453,7 +477,19 @@ export function CompanyView() {
     setIsCompanySaving(true);
     const { error } = await supabase
       .from("companies")
-      .update({ name: companyName.trim() })
+      .update({
+        name: companyName.trim(),
+        legal_name: companyForm.legal_name.trim() || null,
+        cif: companyForm.cif.trim() || null,
+        address: companyForm.address.trim() || null,
+        city: companyForm.city.trim() || null,
+        postal_code: companyForm.postal_code.trim() || null,
+        province: companyForm.province.trim() || null,
+        country: companyForm.country.trim() || null,
+        phone: companyForm.phone.trim() || null,
+        email: companyForm.email.trim() || null,
+        website: companyForm.website.trim() || null,
+      } as any)
       .eq("id", profile.company_id);
 
     setIsCompanySaving(false);
@@ -469,7 +505,7 @@ export function CompanyView() {
 
     toast({
       title: "Perfil actualizado",
-      description: "Se guardaron los datos reales de la empresa.",
+      description: "Se guardaron los datos de la empresa.",
     });
   };
 
@@ -573,28 +609,76 @@ export function CompanyView() {
         </TabsList>
 
         <TabsContent value="perfil" className="mt-6">
-          <div className="bg-card rounded-lg border border-border p-6 space-y-4">
+          <div className="bg-card rounded-lg border border-border p-6 space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-foreground">Perfil de la empresa</h3>
-              <Button variant="outline">Editar perfil</Button>
             </div>
-            <div className="rounded-lg border border-border p-4 bg-secondary/20">
-              <p className="text-sm font-medium text-foreground">Flujo de administración</p>
-              <ol className="mt-2 text-xs text-muted-foreground list-decimal list-inside space-y-1">
-                <li>Completa la ficha de empresa y guarda los datos fiscales.</li>
-                <li>Configura usuarios y roles en la pestaña "Usuarios".</li>
-                <li>Revisa la facturación y genera facturas españolas si es necesario.</li>
-              </ol>
-            </div>
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <Label>Nombre de la empresa</Label>
-                <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+
+            {/* Datos generales */}
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-3">Datos generales</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nombre comercial *</Label>
+                  <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Nombre comercial" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Razón social</Label>
+                  <Input value={companyForm.legal_name} onChange={(e) => setCompanyForm((p) => ({ ...p, legal_name: e.target.value }))} placeholder="Razón social / denominación legal" />
+                </div>
+                <div className="space-y-2">
+                  <Label>CIF / NIF</Label>
+                  <Input value={companyForm.cif} onChange={(e) => setCompanyForm((p) => ({ ...p, cif: e.target.value }))} placeholder="B12345678" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Sitio web</Label>
+                  <Input value={companyForm.website} onChange={(e) => setCompanyForm((p) => ({ ...p, website: e.target.value }))} placeholder="https://www.ejemplo.com" />
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Esta vista solo muestra y permite editar datos reales disponibles en la base de datos.
-              </p>
             </div>
+
+            {/* Contacto */}
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-3">Contacto</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Email de contacto</Label>
+                  <Input type="email" value={companyForm.email} onChange={(e) => setCompanyForm((p) => ({ ...p, email: e.target.value }))} placeholder="info@empresa.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Teléfono</Label>
+                  <Input value={companyForm.phone} onChange={(e) => setCompanyForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+34 912 345 678" />
+                </div>
+              </div>
+            </div>
+
+            {/* Dirección */}
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-3">Dirección fiscal</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Dirección</Label>
+                  <Input value={companyForm.address} onChange={(e) => setCompanyForm((p) => ({ ...p, address: e.target.value }))} placeholder="Calle, número, piso..." />
+                </div>
+                <div className="space-y-2">
+                  <Label>Ciudad</Label>
+                  <Input value={companyForm.city} onChange={(e) => setCompanyForm((p) => ({ ...p, city: e.target.value }))} placeholder="Madrid" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Código postal</Label>
+                  <Input value={companyForm.postal_code} onChange={(e) => setCompanyForm((p) => ({ ...p, postal_code: e.target.value }))} placeholder="28001" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Provincia</Label>
+                  <Input value={companyForm.province} onChange={(e) => setCompanyForm((p) => ({ ...p, province: e.target.value }))} placeholder="Madrid" />
+                </div>
+                <div className="space-y-2">
+                  <Label>País</Label>
+                  <Input value={companyForm.country} onChange={(e) => setCompanyForm((p) => ({ ...p, country: e.target.value }))} placeholder="España" />
+                </div>
+              </div>
+            </div>
+
             <Button variant="accent" onClick={handleSaveCompany} disabled={isCompanySaving}>
               {isCompanySaving ? "Guardando..." : "Guardar cambios"}
             </Button>
