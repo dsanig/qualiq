@@ -121,7 +121,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       return;
     }
     if (action.action_type === "aprobacion" && docStatus !== "pending_approval") {
-      toast({ title: "No permitido", description: "Solo se puede aprobar un documento en estado 'En Aprobación'.", variant: "destructive" });
+      toast({ title: "No permitido", description: "Solo se puede aprobar un documento en estado 'Pendiente de Aprobación'.", variant: "destructive" });
       return;
     }
 
@@ -233,7 +233,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                 <span className={cn("text-xs text-muted-foreground italic shrink-0", compact && "text-[10px]")}>
                   {action.action_type === "revision" ? "Esperando estado 'En Revisión'" 
                    : action.action_type === "firma" ? "Esperando estado 'Pendiente de Firma'"
-                   : action.action_type === "aprobacion" ? "Esperando estado 'En Aprobación'"
+                   : action.action_type === "aprobacion" ? "Esperando estado 'Pendiente de Aprobación'"
                    : "No disponible"}
                 </span>
               ) : null}

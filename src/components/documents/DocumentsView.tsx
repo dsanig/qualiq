@@ -186,7 +186,7 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; cl
   draft: { label: "Borrador", icon: Clock, class: "text-muted-foreground" },
   review: { label: "En Revisión", icon: AlertCircle, class: "text-warning" },
   pending_signature: { label: "Pendiente de Firma", icon: PenTool, class: "text-primary" },
-  pending_approval: { label: "En Aprobación", icon: ClipboardList, class: "text-accent-foreground" },
+  pending_approval: { label: "Pendiente de Aprobación", icon: ClipboardList, class: "text-accent-foreground" },
   obsolete: { label: "Obsoleto", icon: AlertCircle, class: "text-destructive" },
   archived: { label: "Archivado", icon: AlertCircle, class: "text-muted-foreground" },
 };
@@ -656,11 +656,11 @@ export function DocumentsView({
         toast({ title: "Transición automática", description: "El documento pasará a 'Pendiente de Firma' automáticamente cuando todos los revisores completen su revisión.", variant: "destructive" });
         return;
       } else if (changeStatusTarget === "pending_approval") {
-        toast({ title: "Transición automática", description: "El documento pasará a 'En Aprobación' automáticamente cuando todos los firmantes completen su firma.", variant: "destructive" });
+        toast({ title: "Transición automática", description: "El documento pasará a 'Pendiente de Aprobación' automáticamente cuando todos los firmantes completen su firma.", variant: "destructive" });
         return;
       } else if (changeStatusTarget === "approved") {
         if (currentStatus !== "pending_approval") {
-          toast({ title: "Transición no permitida", description: "Solo se puede aprobar un documento que esté 'En Aprobación'.", variant: "destructive" });
+          toast({ title: "Transición no permitida", description: "Solo se puede aprobar un documento que esté 'Pendiente de Aprobación'.", variant: "destructive" });
           return;
         }
         // Check if user has aprobacion responsibility
@@ -1678,12 +1678,10 @@ export function DocumentsView({
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Título</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Tipología</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Versión</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Firma</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actualizado</th>
                     <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Acciones</th>
                   </tr>
@@ -1695,7 +1693,6 @@ export function DocumentsView({
                     return (
                       <Fragment key={doc.id}>
                         <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => handleToggleSummary(doc.id)}>
-                          <td className="px-4 py-3"><span className="font-mono text-sm text-foreground">{doc.code}</span></td>
                           <td className="px-4 py-3"><span className="font-mono text-sm text-foreground">{doc.code}</span></td>
                           <td className="px-4 py-3">
                             <div>
@@ -1714,19 +1711,6 @@ export function DocumentsView({
                               <StatusIcon className="w-3.5 h-3.5" />
                               {status.label}
                             </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            {(() => {
-                              const sigStatus = getSignatureStatusLabel(doc.id);
-                              if (!sigStatus) return <span className="text-xs text-muted-foreground">—</span>;
-                              const SigIcon = sigStatus.icon;
-                              return (
-                                <span className={cn("inline-flex items-center gap-1.5 text-sm", sigStatus.class)}>
-                                  <SigIcon className="w-3.5 h-3.5" />
-                                  {sigStatus.label}
-                                </span>
-                              );
-                            })()}
                           </td>
                           <td className="px-4 py-3"><span className="text-sm text-muted-foreground">{doc.lastUpdated}</span></td>
                           <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
@@ -1752,7 +1736,7 @@ export function DocumentsView({
                         </tr>
                         {expandedDocumentId === doc.id && (
                           <tr className="bg-secondary/20">
-                            <td colSpan={8} className="px-4 py-4">
+                            <td colSpan={7} className="px-4 py-4">
                               <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-muted-foreground">
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Formato</p><p className="text-sm font-medium text-foreground">{doc.format.toUpperCase()}</p></div>
@@ -1760,7 +1744,6 @@ export function DocumentsView({
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Versión actual</p><p className="text-sm font-medium text-foreground">v{doc.version}</p></div>
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Última modificación</p><p className="text-sm font-medium text-foreground">{doc.lastUpdated}</p></div>
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Modificado por</p><p className="text-sm font-medium text-foreground">{doc.lastModifiedBy}</p></div>
-                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Firma</p><p className="text-sm font-medium text-foreground">{getSignatureStatusLabel(doc.id)?.label ?? "Sin responsables"}</p></div>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
@@ -1821,7 +1804,6 @@ export function DocumentsView({
                   <p>Autor: {selectedDocument.originalAuthor}</p>
                   <p>Versión: v{selectedDocument.version}</p>
                   <p>Última modificación: {selectedDocument.lastUpdated}</p>
-                  <p>Firma: {signedDocuments[selectedDocument.id] ? "Firmado con DNIe" : "Pendiente"}</p>
                 </div>
               </div>
 
@@ -2380,8 +2362,9 @@ export function DocumentsView({
             <div className="border border-border rounded-lg p-3 bg-secondary/10 text-xs text-muted-foreground space-y-1">
               <p className="font-medium text-foreground text-sm">Flujo de aprobación</p>
               <p>1. <strong>Borrador</strong> → En Revisión (se asignan revisores)</p>
-              <p>2. <strong>En Revisión</strong> → Pendiente de Firma (cuando todos los revisores han revisado)</p>
-              <p>3. <strong>Pendiente de Firma</strong> → Aprobado (cuando todos han firmado, el responsable aprueba)</p>
+              <p>2. <strong>En Revisión</strong> → Pendiente de Firma (automático: cuando todos los revisores completan)</p>
+              <p>3. <strong>Pendiente de Firma</strong> → Pendiente de Aprobación (automático: cuando todos firman)</p>
+              <p>4. <strong>Pendiente de Aprobación</strong> → Aprobado (el responsable de aprobación aprueba)</p>
             </div>
 
             <div className="space-y-2">
