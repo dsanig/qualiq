@@ -2362,8 +2362,9 @@ export function DocumentsView({
             <div className="border border-border rounded-lg p-3 bg-secondary/10 text-xs text-muted-foreground space-y-1">
               <p className="font-medium text-foreground text-sm">Flujo de aprobación</p>
               <p>1. <strong>Borrador</strong> → En Revisión (se asignan revisores)</p>
-              <p>2. <strong>En Revisión</strong> → Pendiente de Firma (cuando todos los revisores han revisado)</p>
-              <p>3. <strong>Pendiente de Firma</strong> → Aprobado (cuando todos han firmado, el responsable aprueba)</p>
+              <p>2. <strong>En Revisión</strong> → Pendiente de Firma (automático: cuando todos los revisores completan)</p>
+              <p>3. <strong>Pendiente de Firma</strong> → Pendiente de Aprobación (automático: cuando todos firman)</p>
+              <p>4. <strong>Pendiente de Aprobación</strong> → Aprobado (el responsable de aprobación aprueba)</p>
             </div>
 
             <div className="space-y-2">
