@@ -120,6 +120,7 @@ export function SettingsView() {
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Tu nombre completo"
                 className="mt-1"
+                disabled={!canManageCompany}
               />
             </div>
             <div>
@@ -130,6 +131,7 @@ export function SettingsView() {
                 onChange={(e) => setJobTitle(e.target.value)}
                 placeholder="Ej: Responsable de Calidad"
                 className="mt-1"
+                disabled={!canManageCompany}
               />
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -138,10 +140,12 @@ export function SettingsView() {
             </div>
           </div>
 
-          <Button onClick={handleSaveProfile} disabled={savingProfile} size="sm">
-            {savingProfile ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />}
-            Guardar perfil
-          </Button>
+          {canManageCompany && (
+            <Button onClick={handleSaveProfile} disabled={savingProfile} size="sm">
+              {savingProfile ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />}
+              Guardar perfil
+            </Button>
+          )}
         </div>
 
         {/* Security card */}
