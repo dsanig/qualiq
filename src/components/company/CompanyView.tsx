@@ -44,6 +44,7 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
 export function CompanyView() {
   const { canManageCompany, canManagePasswords, isSuperadmin, refreshPermissions } = usePermissions();
   const { profile, user } = useAuth();
+  const { effectiveCompanyId } = useCompanyContext();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("perfil");
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
