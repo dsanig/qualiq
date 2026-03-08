@@ -92,6 +92,7 @@ const defaultForm = (type?: IncidentType): IncidentFormData => ({
 export function IncidentsView({
   searchQuery, onSearchChange, filters, onFiltersChange, onOpenFilters,
   isNewIncidentOpen, onNewIncidentOpenChange, initialIncidentType, reloadToken, prefill, onPrefillConsumed,
+  openIncidentId, onOpenIncidentConsumed,
 }: IncidentsViewProps) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [audits, setAudits] = useState<AuditRef[]>([]);
