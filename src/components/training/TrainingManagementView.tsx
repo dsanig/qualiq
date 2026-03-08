@@ -267,6 +267,7 @@ export function TrainingManagementView() {
       }
 
       toast({ title: editingId ? "Formación actualizada" : "Formación creada" });
+      logAction({ action: editingId ? "update" : "create", entity_type: "training", entity_id: recordId ?? undefined, entity_title: title, details: { status: formStatus } });
       setFormOpen(false);
       fetchRecords();
     } catch (err) {
