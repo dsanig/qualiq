@@ -2624,9 +2624,29 @@ export function DocumentsView({
                 Acciones pendientes para {selectedDocument.code}
               </DialogDescription>
             </DialogHeader>
+            {/* Rejected document banner in pending actions */}
+            {selectedDocument.status === "draft" && rejectedDocIds.has(selectedDocument.id) && (
+              <div className="border border-destructive/30 rounded-lg p-3 bg-destructive/5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
+                  <p className="text-sm text-destructive font-medium">
+                    Documento <strong>denegado</strong>. Actualiza el archivo para reiniciar el flujo.
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => { setIsPendingActionsOpen(false); handleOpenUpdateVersion(selectedDocument); }}
+                  disabled={!canEditContent}
+                >
+                  <UploadCloud className="w-4 h-4 mr-1" />
+                  Actualizar documento
+                </Button>
+              </div>
+            )}
             <DocumentPendingActions
               documentId={selectedDocument.id}
-              onActionCompleted={() => { fetchDocuments(); fetchFirmaStatus(); }}
+              onActionCompleted={() => { fetchDocuments(); fetchFirmaStatus(); fetchRejectedDocs(); }}
             />
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsPendingActionsOpen(false)}>Cerrar</Button>
