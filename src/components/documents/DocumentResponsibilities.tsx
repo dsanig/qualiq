@@ -102,6 +102,8 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
       .eq("document_id", documentId)
       .order("created_at", { ascending: true });
 
+    const actionTypeOrder: Record<string, number> = { revision: 0, firma: 1, aprobacion: 2 };
+
     if (!error && data) {
       const userIds = [...new Set((data as Responsibility[]).map(r => r.user_id))];
       const { data: profiles } = userIds.length
