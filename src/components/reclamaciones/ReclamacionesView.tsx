@@ -75,7 +75,7 @@ interface ReclamacionesViewProps {
   onNavigateToIncident?: (incidenciaId: string) => void;
 }
 
-export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncident }: ReclamacionesViewProps) {
+export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncident, onNavigateToIncident }: ReclamacionesViewProps) {
   const [reclamaciones, setReclamaciones] = useState<Reclamacion[]>([]);
   const [users, setUsers] = useState<UserRef[]>([]);
   const [incidencias, setIncidencias] = useState<IncidenciaRef[]>([]);
