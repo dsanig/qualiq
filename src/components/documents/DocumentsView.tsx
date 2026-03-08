@@ -317,6 +317,7 @@ export function DocumentsView({
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const { canEditContent, canManageCompany, isSuperadmin, refreshPermissions } = usePermissions();
+  const { effectiveCompanyId } = useCompanyContext();
   const { logAction } = useAuditLog();
 
   // Edit document state
