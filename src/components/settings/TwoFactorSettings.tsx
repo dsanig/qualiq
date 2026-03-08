@@ -106,6 +106,7 @@ export function TwoFactorSettings() {
       const { error } = await supabase.auth.mfa.unenroll({ factorId });
       if (error) throw error;
       toast.success("Autenticación de dos factores desactivada.");
+      try { const { logAuditAction } = await import("@/hooks/useAuditLog"); const u = (await supabase.auth.getUser()).data.user; if (u) { const p = await supabase.from("profiles").select("full_name, company_id").eq("user_id", u.id).single(); logAuditAction({ userId: u.id, userEmail: u.email, userName: p.data?.full_name ?? u.email, companyId: p.data?.company_id ?? undefined, action: "mfa_disable", entity_type: "auth", entity_title: "Desactivar 2FA" }); } } catch {}
       setIsEnabled(false);
       setFactorId(null);
     } catch (e: any) {

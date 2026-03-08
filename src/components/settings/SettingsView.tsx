@@ -69,6 +69,7 @@ export function SettingsView() {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       toast.success("Contraseña actualizada correctamente.");
+      logAction({ action: "password_change", entity_type: "auth", entity_title: "Cambio de contraseña" });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
