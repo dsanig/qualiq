@@ -186,6 +186,7 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; cl
   draft: { label: "Borrador", icon: Clock, class: "text-muted-foreground" },
   review: { label: "En Revisión", icon: AlertCircle, class: "text-warning" },
   pending_signature: { label: "Pendiente de Firma", icon: PenTool, class: "text-primary" },
+  pending_approval: { label: "En Aprobación", icon: ClipboardList, class: "text-accent-foreground" },
   obsolete: { label: "Obsoleto", icon: AlertCircle, class: "text-destructive" },
   archived: { label: "Archivado", icon: AlertCircle, class: "text-muted-foreground" },
 };
@@ -193,7 +194,6 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; cl
 const statusOptions = [
   { value: "draft", label: "Borrador" },
   { value: "review", label: "En Revisión" },
-  { value: "pending_signature", label: "Pendiente de Firma" },
   { value: "approved", label: "Aprobado" },
 ];
 
