@@ -1586,15 +1586,12 @@ export function DocumentsView({
                   </SelectContent>
                 </Select>
               </div>
-              <span className="text-xs text-muted-foreground">{selectedIds.length} seleccionados</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      <Checkbox checked={paginatedDocuments.length > 0 && selectedIds.length === paginatedDocuments.length} onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))} aria-label="Seleccionar todos" />
-                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Título</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Tipología</th>
@@ -1612,9 +1609,7 @@ export function DocumentsView({
                     return (
                       <Fragment key={doc.id}>
                         <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => handleToggleSummary(doc.id)}>
-                          <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                            <Checkbox checked={selectedIds.includes(doc.id)} onCheckedChange={(checked) => toggleSelect(doc.id, Boolean(checked))} aria-label={`Seleccionar ${doc.code}`} />
-                          </td>
+                          <td className="px-4 py-3"><span className="font-mono text-sm text-foreground">{doc.code}</span></td>
                           <td className="px-4 py-3"><span className="font-mono text-sm text-foreground">{doc.code}</span></td>
                           <td className="px-4 py-3">
                             <div>
