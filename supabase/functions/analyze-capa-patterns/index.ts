@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 
-const PREDICTION_MIN_RECORDS = 3;
+const PREDICTION_MIN_RECORDS = 1;
 
 function validateIncidentsForPrediction(incidentsData: Array<{ created_at?: string | null }>, minRecords: number) {
   if (incidentsData.length < minRecords) {
