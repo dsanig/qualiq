@@ -174,7 +174,7 @@ export default function Auth() {
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          © 2024 QualiQ. Todos los derechos reservados.
+          © 2026 QualiQ. Todos los derechos reservados.
         </p>
       </div>
     </div>
