@@ -268,6 +268,9 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   <Badge variant="outline" className={cn("text-xs", actionTypeColors[action.action_type])}>
                     {actionTypeLabels[action.action_type] || action.action_type}
                   </Badge>
+                  <Badge variant="outline" className="text-xs bg-secondary/50">
+                    {statusLabels[action.documentStatus || ""] || action.documentStatus}
+                  </Badge>
                   <span className="text-xs text-muted-foreground">
                     → {action.responsibleName}
                   </span>
@@ -280,7 +283,23 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   </span>
                 </div>
               </div>
-              {canComplete && user && action.user_id === user.id ? (
+              <div className="flex items-center gap-1.5 shrink-0">
+                {canChangeStatus && nextTransition && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "text-primary border-primary/30 hover:bg-primary/10",
+                      compact && "h-7 text-xs px-2"
+                    )}
+                    onClick={() => handleChangeDocumentStatus(action, nextTransition.nextStatus)}
+                    disabled={changingStatusDocId === action.document_id}
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
+                    {changingStatusDocId === action.document_id ? "..." : nextTransition.label}
+                  </Button>
+                )}
+                {canComplete && user && action.user_id === user.id && (
                 <Button
                   variant="outline"
                   size="sm"
