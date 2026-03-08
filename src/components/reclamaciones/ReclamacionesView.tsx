@@ -100,6 +100,17 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
   const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
   const { user } = useAuth();
 
+  useEffect(() => {
+    if (isNewOpenExternal) {
+      setForm(defaultForm());
+      setNewAttachments([]);
+      setSelectedIncidenciaIds([]);
+      setParticipantIds([]);
+      setIsNewOpen(true);
+      onNewOpenExternalConsumed?.();
+    }
+  }, [isNewOpenExternal]);
+
   const getUserName = (userId: string | null | undefined) => {
     if (!userId) return null;
     const u = users.find((usr) => usr.id === userId);
