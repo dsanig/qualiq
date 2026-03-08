@@ -310,6 +310,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     });
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Plan CAPA creado" });
+    logAction({ action: "create", entity_type: "capa_plan", entity_id: selectedAuditId, entity_title: capaForm.title });
     setNewCapaOpen(false);
     setCapaForm({ title: "", description: "", responsible_id: "" });
     await loadData();
