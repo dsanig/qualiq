@@ -1447,16 +1447,17 @@ export function DocumentsView({
       link.click();
       URL.revokeObjectURL(url);
     } else if (doc.fileUrl && !doc.fileUrl.startsWith("/docs/")) {
-      const { data, error } = await supabase.storage.from("documents").createSignedUrl(doc.fileUrl, 60);
-      if (error || !data?.signedUrl) {
-        toast({ title: "Error", description: "No se pudo generar el enlace de descarga.", variant: "destructive" });
+      const { data, error } = await supabase.storage.from("documents").download(doc.fileUrl);
+      if (error || !data) {
+        toast({ title: "Error", description: "No se pudo descargar el archivo.", variant: "destructive" });
         return;
       }
+      const url = URL.createObjectURL(data);
       const link = document.createElement("a");
-      link.href = data.signedUrl;
+      link.href = url;
       link.download = `${doc.code}.${doc.format}`;
-      link.target = "_blank";
       link.click();
+      URL.revokeObjectURL(url);
     } else {
       toast({ title: "Sin archivo", description: "Este documento no tiene un archivo asociado.", variant: "destructive" });
       return;
