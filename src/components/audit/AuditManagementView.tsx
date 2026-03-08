@@ -205,6 +205,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     if (auditFiles) await uploadAuditAttachments(data.id, auditFiles);
     await syncParticipants(data.id, auditForm.participant_ids);
     toast({ title: "Auditoría creada" });
+    logAction({ action: "create", entity_type: "audit", entity_id: data?.id, entity_title: auditForm.title, details: { status: auditForm.status } });
     setNewAuditOpen(false);
     resetAuditForm();
     await loadData();
