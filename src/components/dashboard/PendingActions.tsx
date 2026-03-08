@@ -125,12 +125,40 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
         }
       }
 
+      // Fetch training tasks where current user is a participant and training is not complete
+      let trainingActions: PendingAction[] = [];
+      if (user) {
+        const { data: myParticipations } = await (supabase as any)
+          .from("training_participants")
+          .select("training_record_id, role")
+          .eq("user_id", user.id);
+
+        if (myParticipations && myParticipations.length > 0) {
+          const trainingIds = [...new Set(myParticipations.map((p: any) => p.training_record_id))];
+          const { data: trainings } = await (supabase as any)
+            .from("training_records")
+            .select("id, title, status, deadline")
+            .in("id", trainingIds)
+            .in("status", ["pendiente", "en_proceso"]);
+
+          trainingActions = ((trainings as any[]) ?? []).map((t) => ({
+            id: t.id,
+            description: `Formación: ${t.title}`,
+            action_type: "training",
+            due_date: t.deadline,
+            status: t.status,
+            isOverdue: t.deadline ? new Date(t.deadline) < now : false,
+            source: "training" as const,
+          }));
+        }
+      }
+
       // Combine and sort by due_date
-      const combined = [...capaActions, ...docActions].sort((a, b) => {
+      const combined = [...capaActions, ...docActions, ...trainingActions].sort((a, b) => {
         if (!a.due_date) return 1;
         if (!b.due_date) return -1;
         return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-      }).slice(0, 8);
+      }).slice(0, 10);
 
       setActions(combined);
       setIsLoading(false);
