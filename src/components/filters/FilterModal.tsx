@@ -111,7 +111,7 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange, acti
                     <SelectItem value="draft">Borrador</SelectItem>
                     <SelectItem value="pending_signature">Pendiente de Firma</SelectItem>
                     <SelectItem value="pending_approval">Pendiente de Aprobación</SelectItem>
-                    <SelectItem value="obsolete">Denegado</SelectItem>
+                    <SelectItem value="obsolete">Obsoleto</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
