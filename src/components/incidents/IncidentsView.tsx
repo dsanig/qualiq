@@ -62,6 +62,7 @@ interface IncidentsViewProps {
   onPrefillConsumed?: () => void;
   openIncidentId?: string | null;
   onOpenIncidentConsumed?: () => void;
+  onNavigateToReclamacion?: (reclamacionId: string) => void;
 }
 
 const typeLabels: Record<IncidentType, string> = {
@@ -92,14 +93,14 @@ const defaultForm = (type?: IncidentType): IncidentFormData => ({
 export function IncidentsView({
   searchQuery, onSearchChange, filters, onFiltersChange, onOpenFilters,
   isNewIncidentOpen, onNewIncidentOpenChange, initialIncidentType, reloadToken, prefill, onPrefillConsumed,
-  openIncidentId, onOpenIncidentConsumed,
+  openIncidentId, onOpenIncidentConsumed, onNavigateToReclamacion,
 }: IncidentsViewProps) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [audits, setAudits] = useState<AuditRef[]>([]);
   const [users, setUsers] = useState<UserRef[]>([]);
   const [capaPlans, setCapaPlans] = useState<CapaPlanRef[]>([]);
   const [incidentCapaLinks, setIncidentCapaLinks] = useState<Record<string, string[]>>({});
-  const [incidentReclamacionLinks, setIncidentReclamacionLinks] = useState<Record<string, string[]>>({});
+  const [incidentReclamacionLinks, setIncidentReclamacionLinks] = useState<Record<string, { id: string; title: string }[]>>({});
   const [selectedCapaPlanIds, setSelectedCapaPlanIds] = useState<string[]>([]);
   const [form, setForm] = useState<IncidentFormData>(defaultForm(initialIncidentType));
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
@@ -216,14 +217,14 @@ export function IncidentsView({
         }
       }
 
-      // Build reclamacion links map: incidencia_id -> reclamacion titles
+      // Build reclamacion links map: incidencia_id -> { id, title }[]
       const recTitleMap = new Map((Array.isArray(recData) ? recData : []).map((r: any) => [r.id, r.title]));
-      const recLinksMap: Record<string, string[]> = {};
+      const recLinksMap: Record<string, { id: string; title: string }[]> = {};
       if (Array.isArray(recLinksData)) {
         for (const link of recLinksData as any[]) {
           if (!recLinksMap[link.incidencia_id]) recLinksMap[link.incidencia_id] = [];
           const title = recTitleMap.get(link.reclamacion_id);
-          if (title) recLinksMap[link.incidencia_id].push(title);
+          if (title) recLinksMap[link.incidencia_id].push({ id: link.reclamacion_id, title });
         }
       }
 
@@ -725,10 +726,19 @@ export function IncidentsView({
             <div className="space-y-1">
               <p className="text-sm font-medium">Reclamación de origen</p>
               <div className="flex flex-wrap gap-1">
-                {incidentReclamacionLinks[editingIncident.id].map((title, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5">
-                    <LinkIcon className="h-3 w-3" />{title}
-                  </span>
+                {incidentReclamacionLinks[editingIncident.id].map((rec) => (
+                  <button
+                    key={rec.id}
+                    type="button"
+                    className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5 hover:bg-warning/20 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setIsEditOpen(false);
+                      setEditingIncident(null);
+                      onNavigateToReclamacion?.(rec.id);
+                    }}
+                  >
+                    <LinkIcon className="h-3 w-3" />{rec.title} →
+                  </button>
                 ))}
               </div>
             </div>

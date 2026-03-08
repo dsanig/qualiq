@@ -66,6 +66,7 @@ const Index = () => {
   const [incidentTypeSeed, setIncidentTypeSeed] = useState<IncidentType | undefined>(undefined);
   const [incidentPrefill, setIncidentPrefill] = useState<IncidentPrefillPayload | null>(null);
   const [openIncidentId, setOpenIncidentId] = useState<string | null>(null);
+  const [openReclamacionId, setOpenReclamacionId] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
   const { enabledFeatures } = useCompanyFeatures();
   const navigate = useNavigate();
@@ -212,6 +213,10 @@ const Index = () => {
               onPrefillConsumed={() => setIncidentPrefill(null)}
               openIncidentId={openIncidentId}
               onOpenIncidentConsumed={() => setOpenIncidentId(null)}
+              onNavigateToReclamacion={(recId) => {
+                setOpenReclamacionId(recId);
+                setActiveModule("reclamaciones");
+              }}
             />
           </ErrorBoundary>
         );
@@ -230,6 +235,8 @@ const Index = () => {
               setOpenIncidentId(incidenciaId);
               setActiveModule("incidents");
             }}
+            openReclamacionId={openReclamacionId}
+            onOpenReclamacionConsumed={() => setOpenReclamacionId(null)}
           />
         );
       case "audits":

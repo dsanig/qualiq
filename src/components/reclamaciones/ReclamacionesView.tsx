@@ -73,9 +73,11 @@ interface ReclamacionesViewProps {
   onSearchChange: (value: string) => void;
   onOpenNewIncident?: (reclamacionId: string, reclamacionTitle: string) => void;
   onNavigateToIncident?: (incidenciaId: string) => void;
+  openReclamacionId?: string | null;
+  onOpenReclamacionConsumed?: () => void;
 }
 
-export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncident, onNavigateToIncident }: ReclamacionesViewProps) {
+export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncident, onNavigateToIncident, openReclamacionId, onOpenReclamacionConsumed }: ReclamacionesViewProps) {
   const [reclamaciones, setReclamaciones] = useState<Reclamacion[]>([]);
   const [users, setUsers] = useState<UserRef[]>([]);
   const [incidencias, setIncidencias] = useState<IncidenciaRef[]>([]);
@@ -247,6 +249,16 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     void loadParticipants(rec.id);
     setIsEditOpen(true);
   };
+
+  // Auto-open a specific reclamacion when navigating from another module
+  useEffect(() => {
+    if (!openReclamacionId || reclamaciones.length === 0) return;
+    const rec = reclamaciones.find((r) => r.id === openReclamacionId);
+    if (rec) {
+      openEdit(rec);
+      onOpenReclamacionConsumed?.();
+    }
+  }, [openReclamacionId, reclamaciones]);
 
   const updateReclamacion = async () => {
     if (!editingReclamacion) return;
