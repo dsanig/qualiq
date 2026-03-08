@@ -1771,6 +1771,10 @@ export function DocumentsView({
                                 <div className="flex flex-wrap gap-2">
                                   <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
                                   <Button variant="outline" onClick={() => handleOpenUpdateVersion(doc)} disabled={!canEditContent}>Actualizar versión</Button>
+                                  <Button variant="outline" onClick={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}>
+                                    <ClipboardList className="w-4 h-4 mr-1" />
+                                    Acciones Pendientes
+                                  </Button>
                                   <Button variant="accent" onClick={() => handleDownload(doc)}>Descargar</Button>
                                 </div>
                               </div>
