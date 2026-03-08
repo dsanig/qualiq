@@ -187,6 +187,7 @@ export function AuditSimulatorView() {
         title: "Simulación completada",
         description: "Los resultados de la inspección simulada están listos",
       });
+      logAction({ action: "run_simulation", entity_type: "audit_simulation", entity_id: simulation.id, details: { simulation_type: simulationType } });
 
       fetchSimulations();
     } catch (e) {
