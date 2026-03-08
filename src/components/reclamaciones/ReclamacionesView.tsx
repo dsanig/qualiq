@@ -100,6 +100,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
   const { canEditContent, isSuperadmin } = usePermissions();
   const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
   const { user } = useAuth();
+  const { logAction } = useAuditLog();
 
   useEffect(() => {
     if (isNewOpenExternal) {

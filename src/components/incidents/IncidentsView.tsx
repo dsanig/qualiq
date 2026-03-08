@@ -122,6 +122,7 @@ export function IncidentsView({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
   const { user } = useAuth();
+  const { logAction } = useAuditLog();
 
   const canDeleteIncidencia = isSuperadmin;
 

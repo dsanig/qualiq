@@ -95,6 +95,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
   const { user, profile } = useAuth();
   const { canEditContent } = usePermissions();
   const { toast } = useToast();
+  const { logAction } = useAuditLog();
 
   const fetchResponsibilities = useCallback(async () => {
     setIsLoading(true);

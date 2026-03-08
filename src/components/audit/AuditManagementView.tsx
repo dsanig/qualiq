@@ -53,6 +53,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [linkIncidenciaOpen, setLinkIncidenciaOpen] = useState(false);
   const [linkingCapaPlanId, setLinkingCapaPlanId] = useState<string | null>(null);
   const { canEditContent, canManageCompany } = usePermissions();
+  const { logAction } = useAuditLog();
 
   // Dialog states
   const [newAuditOpen, setNewAuditOpen] = useState(false);

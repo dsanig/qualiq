@@ -167,6 +167,7 @@ export function ChatbotView() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { logAction } = useAuditLog();
 
   const activeChat = useMemo(
     () => chats.find((chat) => chat.id === activeChatId) ?? chats[0],

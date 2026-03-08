@@ -44,6 +44,7 @@ const PLAN_LABELS: Record<string, string> = {
 export function CompanyManagementView() {
   const { isSuperadmin } = usePermissions();
   const { toast } = useToast();
+  const { logAction } = useAuditLog();
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);

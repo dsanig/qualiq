@@ -28,6 +28,7 @@ interface Question {
 
 export function TrainingExamView() {
   const { user } = useAuth();
+  const { logAction } = useAuditLog();
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [activeSession, setActiveSession] = useState<TrainingSession | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);

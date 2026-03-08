@@ -90,6 +90,7 @@ const formatCategory = (cat: string) =>
 
 export function AuditSimulatorView() {
   const { user, profile } = useAuth();
+  const { logAction } = useAuditLog();
   const [simulations, setSimulations] = useState<AuditSimulation[]>([]);
   const [selectedSimulation, setSelectedSimulation] = useState<AuditSimulation | null>(null);
   const [findings, setFindings] = useState<AuditFinding[]>([]);

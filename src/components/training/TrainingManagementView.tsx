@@ -94,6 +94,7 @@ interface Attachment {
 
 export function TrainingManagementView() {
   const { user, profile } = useAuth();
+  const { logAction } = useAuditLog();
 
   /* List state */
   const [records, setRecords] = useState<TrainingRecord[]>([]);

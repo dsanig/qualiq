@@ -34,6 +34,7 @@ const typeConfig: Record<string, { icon: typeof Bell; class: string }> = {
 
 export function NotificationsDropdown() {
   const { user } = useAuth();
+  const { logAction } = useAuditLog();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 

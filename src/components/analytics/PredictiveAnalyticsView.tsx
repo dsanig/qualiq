@@ -103,6 +103,7 @@ interface PredictiveAnalyticsViewProps {
 
 export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: PredictiveAnalyticsViewProps) {
   const { profile } = useAuth();
+  const { logAction } = useAuditLog();
   const [insights, setInsights] = useState<PredictiveInsight[]>([]);
   const [windowInsights, setWindowInsights] = useState<PredictiveInsight[]>([]);
   const [analysisWindow, setAnalysisWindow] = useState<AnalysisWindow>(DEFAULT_ANALYSIS_WINDOW);
