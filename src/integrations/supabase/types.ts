@@ -1468,7 +1468,13 @@ export type Database = {
         | "Administrador"
         | "Editor"
         | "Espectador"
-      document_status: "draft" | "review" | "approved" | "obsolete" | "archived"
+      document_status:
+        | "draft"
+        | "review"
+        | "approved"
+        | "obsolete"
+        | "archived"
+        | "pending_signature"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1606,7 +1612,14 @@ export const Constants = {
         "Editor",
         "Espectador",
       ],
-      document_status: ["draft", "review", "approved", "obsolete", "archived"],
+      document_status: [
+        "draft",
+        "review",
+        "approved",
+        "obsolete",
+        "archived",
+        "pending_signature",
+      ],
     },
   },
 } as const
