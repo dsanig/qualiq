@@ -185,6 +185,8 @@ export function TrainingManagementView() {
     setTitle(rec.title);
     setDescription(rec.description ?? "");
     setContents(rec.contents ?? "");
+    setFormStatus(rec.status || "pendiente");
+    setFormDeadline(rec.deadline ? new Date(rec.deadline) : null);
 
     // Load linked docs
     const { data: linkedDocs } = await (supabase as any)
