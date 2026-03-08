@@ -1212,6 +1212,7 @@ export function DocumentsView({
         if (updateError) throw updateError;
 
         toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0` });
+        logAction({ action: "update_version", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { new_version: newVersion, changes: updateVersionChanges.trim() } });
       }
 
       setIsUpdateVersionOpen(false);
