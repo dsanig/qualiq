@@ -1,0 +1,1 @@
+ALTER TABLE public.documents ADD COLUMN version_minor integer NOT NULL DEFAULT 0;

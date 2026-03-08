@@ -64,7 +64,8 @@ interface Document {
   category: string;
   categoryId: string;
   version: string;
-  versionNum: number;
+  versionMajor: number;
+  versionMinor: number;
   status: "approved" | "draft" | "review" | "pending_signature" | "pending_approval" | "obsolete" | "archived";
   lastUpdated: string;
   owner: string;
@@ -345,6 +346,7 @@ export function DocumentsView({
   const [updateRespAction, setUpdateRespAction] = useState("revision");
   const [updateRespDueDate, setUpdateRespDueDate] = useState("");
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
+  const [updateMinorOnly, setUpdateMinorOnly] = useState(false);
 
   // Version history
   const [versionHistory, setVersionHistory] = useState<VersionRecord[]>([]);
@@ -529,8 +531,9 @@ export function DocumentsView({
         typology: normalizeTypology(d.typology),
         category: d.category,
         categoryId: d.category.toLowerCase().replace(/ó/g, "o").replace(/í/g, "i"),
-        version: String(d.version) + ".0",
-        versionNum: d.version,
+        version: `${d.version}.${(d as any).version_minor ?? 0}`,
+        versionMajor: d.version,
+        versionMinor: (d as any).version_minor ?? 0,
         status: d.status as Document["status"],
         lastUpdated: new Date(d.updated_at).toISOString().split("T")[0],
         owner: ownerUserMap.get(d.owner_id) || d.owner_id,
@@ -571,8 +574,9 @@ export function DocumentsView({
         typology: normalizeTypology(d.typology),
         category: d.category,
         categoryId: d.category.toLowerCase().replace(/ó/g, "o").replace(/í/g, "i"),
-        version: String(d.version) + ".0",
-        versionNum: d.version,
+        version: `${d.version}.${(d as any).version_minor ?? 0}`,
+        versionMajor: d.version,
+        versionMinor: (d as any).version_minor ?? 0,
         status: d.status as Document["status"],
         lastUpdated: new Date(d.updated_at).toISOString().split("T")[0],
         owner: ownerUserMap.get(d.owner_id) || d.owner_id,
@@ -1030,6 +1034,7 @@ export function DocumentsView({
     setUpdateRespUserId("");
     setUpdateRespAction("revision");
     setUpdateRespDueDate("");
+    setUpdateMinorOnly(false);
     setIsUpdateVersionOpen(true);
 
     try {
@@ -1049,7 +1054,18 @@ export function DocumentsView({
     setIsUpdatingVersion(true);
     try {
       const isRejectedDraft = selectedDocument.status === "draft" && rejectedDocIds.has(selectedDocument.id);
-      const newVersion = isRejectedDraft ? selectedDocument.versionNum : selectedDocument.versionNum + 1;
+      // Rejected draft → minor bump; Normal update → major bump (unless user chose minor)
+      let newMajor = selectedDocument.versionMajor;
+      let newMinor = selectedDocument.versionMinor;
+      if (isRejectedDraft) {
+        newMinor = selectedDocument.versionMinor + 1;
+      } else if (updateMinorOnly) {
+        newMinor = selectedDocument.versionMinor + 1;
+      } else {
+        newMajor = selectedDocument.versionMajor + 1;
+        newMinor = 0;
+      }
+      const newVersionLabel = `${newMajor}.${newMinor}`;
       const fileType = fileTypeForDb(updateVersionFile);
       const fileExt = getFileExtension(updateVersionFile.name) || "bin";
       debugFileTypeMapping(updateVersionFile);
@@ -1082,18 +1098,19 @@ export function DocumentsView({
       }
 
       if (isRejectedDraft) {
-        // Rejected draft: just replace file and reset responsibilities, no version bump
+        // Rejected draft: bump minor version, replace file and reset responsibilities
         const { data: authData, error: authError } = await supabase.auth.getUser();
         if (authError || !authData.user) throw authError ?? new Error("No se pudo obtener el usuario autenticado.");
         const actorId = authData.user.id;
 
-        // Update document file without changing version
+        // Update document file with minor version bump
         const { error: docUpdateError } = await (supabase as any)
           .from("documents")
           .update({
             file_url: filePath,
             file_type: fileType,
             status: "draft",
+            version_minor: newMinor,
           })
           .eq("id", selectedDocument.id);
         if (docUpdateError) throw docUpdateError;
@@ -1127,8 +1144,8 @@ export function DocumentsView({
           comment: "Documento actualizado tras denegación. Flujo de aprobación reiniciado.",
         });
 
-        toast({ title: "Documento actualizado", description: `${selectedDocument.code} ha sido actualizado. El flujo de aprobación se ha reiniciado.` });
-        logAction({ action: "update_version_rejected", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { version: selectedDocument.versionNum } });
+        toast({ title: "Documento actualizado", description: `${selectedDocument.code} v${newVersionLabel} — flujo de aprobación reiniciado.` });
+        logAction({ action: "update_version_rejected", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { version: newVersionLabel } });
       } else {
         // Normal version update flow
         const createVersionArgs = {
@@ -1143,11 +1160,10 @@ export function DocumentsView({
           if (authError || !authData.user) throw authError ?? new Error("No se pudo obtener el usuario autenticado.");
 
           const actorId = authData.user.id;
-          const nextVersion = selectedDocument.versionNum + 1;
 
           const { error: versionInsertError } = await (supabase as any).from("document_versions").insert({
             document_id: selectedDocument.id,
-            version: selectedDocument.versionNum,
+            version: selectedDocument.versionMajor,
             file_url: selectedDocument.fileUrl,
             changes_description: updateVersionChanges.trim() || null,
             created_by: actorId,
@@ -1157,7 +1173,8 @@ export function DocumentsView({
           const { error: docUpdateError } = await (supabase as any)
             .from("documents")
             .update({
-              version: nextVersion,
+              version: newMajor,
+              version_minor: newMinor,
               file_url: filePath,
               file_type: fileType,
               status: "draft",
@@ -1230,11 +1247,11 @@ export function DocumentsView({
           await fallbackToClientVersionUpdate();
         }
 
-        const { error: updateError } = await supabase.from("documents").update({ file_type: fileType }).eq("id", selectedDocument.id);
+        const { error: updateError } = await (supabase as any).from("documents").update({ file_type: fileType, version: newMajor, version_minor: newMinor }).eq("id", selectedDocument.id);
         if (updateError) throw updateError;
 
-        toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0` });
-        logAction({ action: "update_version", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { new_version: newVersion, changes: updateVersionChanges.trim() } });
+        toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersionLabel}` });
+        logAction({ action: "update_version", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { new_version: newVersionLabel, version_type: updateMinorOnly ? "menor" : "mayor", changes: updateVersionChanges.trim() } });
       }
 
       setIsUpdateVersionOpen(false);
@@ -2630,6 +2647,25 @@ export function DocumentsView({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Version type selector - only for non-rejected docs */}
+            {selectedDocument && !(selectedDocument.status === "draft" && rejectedDocIds.has(selectedDocument.id)) && (
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/10">
+                <Checkbox checked={updateMinorOnly} onCheckedChange={(v) => setUpdateMinorOnly(!!v)} />
+                <div>
+                  <span className="text-sm font-medium">Actualización menor</span>
+                  <p className="text-xs text-muted-foreground">
+                    {updateMinorOnly
+                      ? `Se creará la versión ${selectedDocument.versionMajor}.${selectedDocument.versionMinor + 1}`
+                      : `Se creará la versión ${selectedDocument.versionMajor + 1}.0 (versión mayor)`}
+                  </p>
+                </div>
+              </div>
+            )}
+            {selectedDocument && selectedDocument.status === "draft" && rejectedDocIds.has(selectedDocument.id) && (
+              <div className="p-3 rounded-lg border border-border bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-300">
+                Documento denegado — se incrementará la versión menor: v{selectedDocument.versionMajor}.{selectedDocument.versionMinor + 1}
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Nuevo archivo</Label>
               <Input type="file" accept=".pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg,.webp" onChange={(e) => setUpdateVersionFile(e.target.files?.[0] || null)} />
