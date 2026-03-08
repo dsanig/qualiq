@@ -289,6 +289,7 @@ export function DocumentsView({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   const [expandedDocumentId, setExpandedDocumentId] = useState<string | null>(null);
+  const [expandedResponsibilities, setExpandedResponsibilities] = useState<Record<string, Array<{ action_type: string; user_id: string; due_date: string; status: string; userName?: string }>>>({});
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isOwnersOpen, setIsOwnersOpen] = useState(false);
   const [isSignOpen, setIsSignOpen] = useState(false);
