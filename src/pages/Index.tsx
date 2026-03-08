@@ -186,7 +186,25 @@ const Index = () => {
           />
         );
       case "calendar":
-        return <CalendarView />;
+        return (
+          <CalendarView
+            onNavigateToIncident={(incidentId) => {
+              setOpenIncidentId(incidentId);
+              setActiveModule("incidents");
+            }}
+            onNavigateToReclamacion={(recId) => {
+              setOpenReclamacionId(recId);
+              setActiveModule("reclamaciones");
+            }}
+            onNavigateToAudit={(mod) => setActiveModule(mod)}
+            onNavigateToTraining={(mod) => setActiveModule(mod)}
+            onNavigateToDocument={(documentCode) => {
+              setModuleSearchQueries((prev) => ({ ...prev, documents: documentCode }));
+              setActiveModule("documents");
+            }}
+            onNavigateToPendingActions={() => setActiveModule("pending-actions")}
+          />
+        );
       case "documents":
         return (
           <DocumentsView
