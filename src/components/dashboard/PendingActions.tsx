@@ -55,7 +55,7 @@ interface PendingActionsProps {
 export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToModule }: PendingActionsProps) {
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     async function fetchAll() {
