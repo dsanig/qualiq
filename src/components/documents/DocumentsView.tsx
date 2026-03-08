@@ -361,6 +361,7 @@ export function DocumentsView({
   const [isFullHistoryOpen, setIsFullHistoryOpen] = useState(false);
   const [fullHistory, setFullHistory] = useState<FullHistoryEvent[]>([]);
   const [isLoadingFullHistory, setIsLoadingFullHistory] = useState(false);
+  const [isStatusHistoryOpen, setIsStatusHistoryOpen] = useState(false);
   
   // Responsibilities state
   const [isResponsibilitiesOpen, setIsResponsibilitiesOpen] = useState(false);
