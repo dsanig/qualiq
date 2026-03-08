@@ -43,6 +43,7 @@ const typeLabels: Record<string, string> = {
   training: "Formación",
   waiting: "En espera",
   reclamacion: "Reclamación",
+  incidencia: "Incidencia",
 };
 
 interface PendingActionsProps {
