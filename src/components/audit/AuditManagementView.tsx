@@ -67,8 +67,9 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   // Forms
   const [auditForm, setAuditForm] = useState({
-    title: "", description: "", audit_date: "", auditor_id: "",
+    title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "",
     observations: "", findings: "", conclusions: "", status: "open",
+    participant_ids: [] as string[],
   });
   const [auditFiles, setAuditFiles] = useState<FileList | null>(null);
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "" });
