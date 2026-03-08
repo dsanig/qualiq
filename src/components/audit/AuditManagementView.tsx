@@ -17,6 +17,7 @@ type Audit = {
   id: string; title: string; description: string | null; audit_date: string | null;
   auditor_id: string | null; responsible_id: string | null; observations: string | null;
   findings: string | null; conclusions: string | null; status: string;
+  audit_type: string; external_entity_id: string | null;
 };
 type AuditAttachment = { id: string; audit_id: string; file_name: string | null; object_path: string; file_type: string | null };
 type AuditParticipant = { id: string; audit_id: string; user_id: string };
@@ -73,6 +74,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "",
     observations: "", findings: "", conclusions: "", status: "open",
     participant_ids: [] as string[],
+    audit_type: "interna" as "interna" | "externa", external_entity_id: "",
   });
   const [auditFiles, setAuditFiles] = useState<FileList | null>(null);
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "" });
@@ -111,7 +113,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     setIsLoading(true);
     try {
       const [{ data: auditsData }, { data: attachData }, { data: participantsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: incData }, { data: linksData }] = await Promise.all([
-        (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id,responsible_id,observations,findings,conclusions,status").order("created_at", { ascending: false }),
+        (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id,responsible_id,observations,findings,conclusions,status,audit_type,external_entity_id").order("created_at", { ascending: false }),
         (supabase as any).from("audit_attachments").select("id,audit_id,file_name,object_path,file_type"),
         (supabase as any).from("audit_participants").select("id,audit_id,user_id"),
         (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
@@ -199,6 +201,8 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       responsible_id: auditForm.responsible_id || null,
       observations: auditForm.observations || null, findings: auditForm.findings || null,
       conclusions: auditForm.conclusions || null, status: auditForm.status,
+      audit_type: auditForm.audit_type,
+      external_entity_id: auditForm.audit_type === "externa" ? (auditForm.external_entity_id || null) : null,
       company_id: profileData?.company_id, created_by: user?.id,
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
@@ -219,6 +223,8 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       responsible_id: auditForm.responsible_id || null,
       observations: auditForm.observations || null, findings: auditForm.findings || null,
       conclusions: auditForm.conclusions || null, status: auditForm.status,
+      audit_type: auditForm.audit_type,
+      external_entity_id: auditForm.audit_type === "externa" ? (auditForm.external_entity_id || null) : null,
     }).eq("id", editingAudit.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (auditFiles) await uploadAuditAttachments(editingAudit.id, auditFiles);
@@ -284,7 +290,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     }
   };
   const resetAuditForm = () => {
-    setAuditForm({ title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "", observations: "", findings: "", conclusions: "", status: "open", participant_ids: [] });
+    setAuditForm({ title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "", observations: "", findings: "", conclusions: "", status: "open", participant_ids: [], audit_type: "interna", external_entity_id: "" });
     setAuditFiles(null);
   };
 
@@ -297,6 +303,8 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       observations: audit.observations ?? "", findings: audit.findings ?? "",
       conclusions: audit.conclusions ?? "", status: audit.status ?? "open",
       participant_ids: participantUserIds,
+      audit_type: (audit.audit_type as "interna" | "externa") ?? "interna",
+      external_entity_id: audit.external_entity_id ?? "",
     });
     setAuditFiles(null);
     setEditAuditOpen(true);
@@ -467,6 +475,26 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       <div><Label>Título *</Label><Input value={auditForm.title} onChange={(e) => setAuditForm((p) => ({ ...p, title: e.target.value }))} /></div>
       <div><Label>Fecha</Label><Input type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} /></div>
       <div>
+        <Label>Tipo de auditoría</Label>
+        <Select value={auditForm.audit_type} onValueChange={(v: "interna" | "externa") => setAuditForm((p) => ({ ...p, audit_type: v, external_entity_id: v === "interna" ? "" : p.external_entity_id }))}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="interna">Interna</SelectItem>
+            <SelectItem value="externa">Externa</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {auditForm.audit_type === "externa" && (
+        <div>
+          <Label>Identificación del cliente / proveedor *</Label>
+          <Input 
+            value={auditForm.external_entity_id} 
+            onChange={(e) => setAuditForm((p) => ({ ...p, external_entity_id: e.target.value }))} 
+            placeholder="Nombre o código del cliente/proveedor externo"
+          />
+        </div>
+      )}
+      <div>
         <Label>Auditor</Label>
         <Select value={auditForm.auditor_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, auditor_id: v }))}>
           <SelectTrigger><SelectValue placeholder="Selecciona auditor" /></SelectTrigger>
@@ -626,8 +654,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
           {!isLoading && paginatedAudits.map((audit) => (
             <button key={audit.id} onClick={() => setSelectedAuditId(audit.id)} className={`w-full rounded border p-3 text-left ${selectedAuditId === audit.id ? "border-primary bg-primary/5" : "border-border"}`}>
-              <p className="font-medium">{audit.title}</p>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <p className="font-medium flex-1">{audit.title}</p>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${audit.audit_type === "externa" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"}`}>
+                  {audit.audit_type === "externa" ? "Externa" : "Interna"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-1">
                 <p className="text-xs text-muted-foreground">{audit.audit_date ?? "Sin fecha"}</p>
                 <span className="text-xs text-muted-foreground">{statusLabel(audit.status)}</span>
               </div>
@@ -698,6 +731,10 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div><span className="font-medium text-muted-foreground">Título:</span> <span>{selectedAudit.title}</span></div>
                   <div><span className="font-medium text-muted-foreground">Fecha:</span> <span>{selectedAudit.audit_date ?? "Sin fecha"}</span></div>
+                  <div><span className="font-medium text-muted-foreground">Tipo:</span> <span className="capitalize">{selectedAudit.audit_type === "externa" ? "Externa" : "Interna"}</span></div>
+                  {selectedAudit.audit_type === "externa" && selectedAudit.external_entity_id && (
+                    <div><span className="font-medium text-muted-foreground">Cliente/Proveedor:</span> <span>{selectedAudit.external_entity_id}</span></div>
+                  )}
                   <div><span className="font-medium text-muted-foreground">Auditor:</span> <span>{getUserName(selectedAudit.auditor_id) ?? "Sin asignar"}</span></div>
                   <div><span className="font-medium text-muted-foreground">Responsable:</span> <span>{getUserName(selectedAudit.responsible_id) ?? "Sin asignar"}</span></div>
                   <div><span className="font-medium text-muted-foreground">Estado:</span> <span>{statusLabel(selectedAudit.status)}</span></div>
