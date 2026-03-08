@@ -1592,9 +1592,7 @@ export function DocumentsView({
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      <Checkbox checked={paginatedDocuments.length > 0 && selectedIds.length === paginatedDocuments.length} onCheckedChange={(checked) => toggleSelectAll(Boolean(checked))} aria-label="Seleccionar todos" />
-                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Título</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Tipología</th>
