@@ -442,17 +442,32 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                 handleRemoveNewAttachment(idx - existingAttachments.length);
               }
             } : undefined}
-            incidencias={incidencias}
-            selectedIncidenciaIds={selectedIncidenciaIds}
-            onIncidenciaToggle={canEditContent ? (id) => setSelectedIncidenciaIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]) : undefined}
             participantIds={participantIds}
             onParticipantToggle={canEditContent ? (uid) => setParticipantIds(prev => prev.includes(uid) ? prev.filter(x => x !== uid) : [...prev, uid]) : undefined}
           />
+
+          {/* Read-only linked incidencias */}
+          {editingReclamacion && (reclamacionLinks[editingReclamacion.id]?.length > 0) && (
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Incidencias vinculadas</Label>
+              <div className="flex flex-wrap gap-1">
+                {reclamacionLinks[editingReclamacion.id]?.map((incId) => {
+                  const inc = incidencias.find((i) => i.id === incId);
+                  return (
+                    <span key={incId} className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5">
+                      <LinkIcon className="h-3 w-3" />{inc?.title || "Incidencia"}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <div className="w-full flex items-center justify-between gap-2">
               {canEditContent && editingReclamacion && onOpenNewIncident && (
                 <Button variant="outline" onClick={() => handleOpenNewIncident(editingReclamacion)}>
-                  <AlertTriangle className="w-4 h-4 mr-1" />Abrir incidencia
+                  <AlertTriangle className="w-4 h-4 mr-1" />Crear incidencia
                 </Button>
               )}
               {!onOpenNewIncident && <span />}
