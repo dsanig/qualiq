@@ -777,8 +777,9 @@ export function TrainingManagementView() {
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <CardTitle className="text-base line-clamp-2">{rec.title}</CardTitle>
-                  <Badge variant={rec.status === "completed" ? "default" : "secondary"} className="ml-2 flex-shrink-0">
-                    {rec.status === "completed" ? "Completada" : "Borrador"}
+                  <Badge variant={statusVariant(rec.status, rec.deadline)} className="ml-2 flex-shrink-0">
+                    {statusLabel(rec.status)}
+                    {rec.status !== "completa" && rec.deadline && new Date(rec.deadline) < new Date() ? " ⚠" : ""}
                   </Badge>
                 </div>
                 <CardDescription className="line-clamp-2">{rec.description || "Sin descripción"}</CardDescription>
