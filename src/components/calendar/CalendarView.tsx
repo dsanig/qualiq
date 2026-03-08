@@ -299,7 +299,7 @@ export function CalendarView({
   }, [user]);
 
   const handleEventClick = useCallback((ev: CalendarEvent) => {
-    if (ev.userId !== user?.id) return;
+    if (!ev.companyWide && ev.userId !== user?.id) return;
 
     switch (ev.type) {
       case "incident":
@@ -317,6 +317,8 @@ export function CalendarView({
         onNavigateToTraining?.("training");
         break;
       case "doc_responsibility":
+      case "doc_effective":
+      case "doc_expiry":
         if (ev.documentCode) {
           onNavigateToDocument?.(ev.documentCode);
         } else {
