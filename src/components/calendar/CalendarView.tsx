@@ -22,7 +22,7 @@ const USER_COLORS = [
   { bg: "bg-teal-100 dark:bg-teal-900/40", text: "text-teal-700 dark:text-teal-300", border: "border-teal-400", dot: "bg-teal-500" },
 ];
 
-type EventType = "doc_responsibility" | "incident" | "reclamacion" | "audit" | "training" | "non_conformity" | "capa_action";
+type EventType = "doc_responsibility" | "incident" | "reclamacion" | "audit" | "training" | "non_conformity" | "capa_action" | "doc_effective" | "doc_expiry";
 
 interface CalendarEvent {
   id: string;
@@ -34,6 +34,7 @@ interface CalendarEvent {
   userName: string;
   typeLabel: string;
   documentCode?: string;
+  companyWide?: boolean;
 }
 
 interface UserInfo {
