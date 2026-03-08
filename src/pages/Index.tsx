@@ -37,7 +37,7 @@ const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   "pending-actions": { title: "Acciones Pendientes", subtitle: "Seguimiento completo de tareas y aprobaciones" },
 };
 
-type IncidentType = "incidencia" | "reclamacion" | "desviacion" | "otra";
+type IncidentType = "incidencia" | "desviacion" | "no_conformidad" | "otra";
 
 interface IncidentPrefillPayload {
   title: string;
