@@ -11,7 +11,8 @@ import {
   Trash2,
   PenTool,
   ArrowRightLeft,
-  UserCheck
+  UserCheck,
+  ClipboardList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +39,7 @@ interface DocumentActionsMenuProps {
   onChangeStatus?: () => void;
   onManageResponsibilities?: () => void;
   onViewSignatureStatus?: () => void;
+  onViewPendingActions?: () => void;
 }
 
 export function DocumentActionsMenu({
