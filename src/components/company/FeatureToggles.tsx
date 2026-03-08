@@ -60,6 +60,8 @@ export function FeatureToggles({ companyId }: FeatureTogglesProps) {
       toast({ title: "Error al actualizar", description: error.message, variant: "destructive" });
     } else {
       toast({ title: enabled ? "Módulo activado" : "Módulo desactivado" });
+      const feature = features.find(f => f.id === featureId);
+      logAction({ action: enabled ? "enable_feature" : "disable_feature", entity_type: "company_feature", entity_id: featureId, entity_title: feature?.feature_key, details: { company_id: companyId } });
     }
   };
 

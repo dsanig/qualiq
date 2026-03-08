@@ -258,6 +258,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
         description: `El documento ${documentCode} ha sido devuelto a Borrador.`,
         variant: "destructive",
       });
+      logAction({ action: "reject_responsibility", entity_type: "document", entity_id: documentId, entity_title: documentCode, details: { action_type: rejectingResp.action_type, comment: rejectComment } });
 
       setRejectingResp(null);
       setRejectComment("");
