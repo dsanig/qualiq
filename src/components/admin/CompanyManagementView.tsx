@@ -115,6 +115,18 @@ export function CompanyManagementView() {
       return;
     }
 
+    // Validate admin fields for new company
+    if (!editingCompany) {
+      if (!form.admin_email.trim() || !form.admin_password.trim()) {
+        toast({ title: "Email y contraseña del administrador son obligatorios", variant: "destructive" });
+        return;
+      }
+      if (form.admin_password.trim().length < 8) {
+        toast({ title: "La contraseña debe tener al menos 8 caracteres", variant: "destructive" });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     if (editingCompany) {
@@ -131,17 +143,43 @@ export function CompanyManagementView() {
       toast({ title: "Empresa actualizada" });
       logAction({ action: "update", entity_type: "company", entity_id: editingCompany.id, entity_title: form.name.trim(), details: { status: form.status, plan_type: form.plan_type } });
     } else {
-      const { error } = await (supabase as any)
+      // Create company
+      const { data: newCompany, error } = await (supabase as any)
         .from("companies")
-        .insert({ name: form.name.trim(), slug: form.slug.trim(), status: form.status, plan_type: form.plan_type });
+        .insert({ name: form.name.trim(), slug: form.slug.trim(), status: form.status, plan_type: form.plan_type })
+        .select("id")
+        .single();
 
-      if (error) {
-        toast({ title: "Error creando empresa", description: error.message, variant: "destructive" });
+      if (error || !newCompany) {
+        toast({ title: "Error creando empresa", description: error?.message, variant: "destructive" });
         setIsSubmitting(false);
         return;
       }
-      toast({ title: "Empresa creada" });
-      logAction({ action: "create", entity_type: "company", entity_title: form.name.trim(), details: { slug: form.slug.trim(), plan_type: form.plan_type } });
+
+      // Create admin user for the new company
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      if (accessToken) {
+        const { data: fnData, error: fnError } = await supabase.functions.invoke("admin-create-user", {
+          body: {
+            email: form.admin_email.trim(),
+            password: form.admin_password.trim(),
+            full_name: "Administrador",
+            roles: ["Administrador"],
+            company_id: newCompany.id,
+          },
+        });
+
+        if (fnError || (fnData && !fnData.ok)) {
+          const errorMsg = fnData?.error?.message || fnError?.message || "Error desconocido";
+          toast({ title: "Empresa creada, pero error al crear administrador", description: errorMsg, variant: "destructive" });
+        } else {
+          toast({ title: "Empresa y administrador creados correctamente" });
+        }
+      }
+
+      logAction({ action: "create", entity_type: "company", entity_title: form.name.trim(), details: { slug: form.slug.trim(), plan_type: form.plan_type, admin_email: form.admin_email.trim() } });
     }
 
     setIsSubmitting(false);
