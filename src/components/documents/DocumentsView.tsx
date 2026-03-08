@@ -335,6 +335,7 @@ export function DocumentsView({
   // Responsibilities state
   const [isResponsibilitiesOpen, setIsResponsibilitiesOpen] = useState(false);
   const [isSignatureStatusOpen, setIsSignatureStatusOpen] = useState(false);
+  const [isPendingActionsOpen, setIsPendingActionsOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
