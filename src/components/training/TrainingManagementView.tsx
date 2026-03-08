@@ -100,6 +100,7 @@ export function TrainingManagementView() {
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [selectedTrainers, setSelectedTrainers] = useState<string[]>([]);
   const [selectedTrainees, setSelectedTrainees] = useState<string[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   /* Detail dialog */
