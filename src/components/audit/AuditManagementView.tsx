@@ -861,7 +861,20 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar auditoría?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción eliminará la auditoría y todos sus datos asociados (planes CAPA, no conformidades, acciones y adjuntos). No se puede deshacer.</AlertDialogDescription>
+            <AlertDialogDescription>
+              Esta acción eliminará la auditoría y todos sus datos asociados. No se puede deshacer.
+            </AlertDialogDescription>
+            {auditLinkedInfo.length > 0 && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 mt-2 space-y-1.5">
+                <p className="text-sm font-medium text-destructive">⚠️ Esta auditoría está vinculada a:</p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-0.5">
+                  {auditLinkedInfo.map((info, i) => (
+                    <li key={i}>{info}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground mt-1">Todos estos registros serán eliminados junto con la auditoría.</p>
+              </div>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
