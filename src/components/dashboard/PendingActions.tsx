@@ -39,9 +39,10 @@ const typeLabels: Record<string, string> = {
 interface PendingActionsProps {
   onViewAll: () => void;
   onNavigateToDocument?: (documentCode: string) => void;
+  onNavigateToModule?: (module: string) => void;
 }
 
-export function PendingActions({ onViewAll, onNavigateToDocument }: PendingActionsProps) {
+export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToModule }: PendingActionsProps) {
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
@@ -168,6 +169,8 @@ export function PendingActions({ onViewAll, onNavigateToDocument }: PendingActio
                 onClick={() => {
                   if (action.source === "document" && action.documentCode && onNavigateToDocument) {
                     onNavigateToDocument(action.documentCode);
+                  } else if (action.source === "capa" && onNavigateToModule) {
+                    onNavigateToModule("audits");
                   }
                 }}
               >
