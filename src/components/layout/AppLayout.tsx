@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 
-interface AppLayoutProps {
+export interface AppLayoutProps {
   children: React.ReactNode;
   activeModule: string;
   onModuleChange: (module: string) => void;
@@ -14,6 +14,7 @@ interface AppLayoutProps {
   onSearchClear?: () => void;
   searchPlaceholder?: string;
   enabledFeatures?: Set<string>;
+  isSuperadmin?: boolean;
 }
 
 export function AppLayout({
