@@ -141,7 +141,7 @@ serve(async (req) => {
       );
     }
 
-    const validation = validateIncidentsForPrediction(incidentsData);
+    const validation = validateIncidentsForPrediction(incidentsData, minRecords);
     if (!validation.ok) {
       return new Response(
         JSON.stringify({ error: validation.reason }),
