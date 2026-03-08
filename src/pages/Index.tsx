@@ -22,6 +22,7 @@ import { PredictiveAnalyticsView } from "@/components/analytics/PredictiveAnalyt
 import { AuditManagementView } from "@/components/audit/AuditManagementView";
 import { CompanyManagementView } from "@/components/admin/CompanyManagementView";
 import { CalendarView } from "@/components/calendar/CalendarView";
+import { AuditTrailView } from "@/components/audit-trail/AuditTrailView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
