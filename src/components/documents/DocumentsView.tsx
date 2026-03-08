@@ -658,6 +658,7 @@ export function DocumentsView({
       }
 
       toast({ title: "Documento actualizado" });
+      logAction({ action: "update", entity_type: "document", entity_id: editingDocId, entity_title: editDocTitle.trim(), details: { code: editDocCode.trim(), category: editDocCategory, typology: editDocTypology, status: editDocStatus } });
       setIsEditOpen(false);
       fetchDocuments();
     } catch (err: any) {
