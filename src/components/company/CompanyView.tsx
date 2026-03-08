@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { FeatureToggles } from "./FeatureToggles";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompanyContext } from "@/hooks/useCompanyContext";
 
 type UserDirectoryEntry = {
   id: string;
@@ -43,6 +44,7 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
 export function CompanyView() {
   const { canManageCompany, canManagePasswords, isSuperadmin, refreshPermissions } = usePermissions();
   const { profile, user } = useAuth();
+  const { effectiveCompanyId } = useCompanyContext();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("perfil");
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
@@ -134,9 +136,11 @@ export function CompanyView() {
   };
 
   const fetchUsers = useCallback(async () => {
+    if (!effectiveCompanyId) return;
     const { data, error } = await (supabase as any)
       .from("user_directory")
-      .select("id, email, full_name, role, is_superadmin, created_at")
+      .select("id, email, full_name, company_id, role, is_superadmin, created_at")
+      .eq("company_id", effectiveCompanyId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -149,7 +153,7 @@ export function CompanyView() {
     }
 
     setUsers((data ?? []) as UserDirectoryEntry[]);
-  }, [toast]);
+  }, [toast, effectiveCompanyId]);
 
   useEffect(() => {
     void fetchUsers();
@@ -157,12 +161,12 @@ export function CompanyView() {
 
   useEffect(() => {
     const fetchCompany = async () => {
-      if (!profile?.company_id) return;
+      if (!effectiveCompanyId) return;
 
       const { data, error } = await supabase
         .from("companies")
         .select("name, legal_name, cif, address, city, postal_code, province, country, phone, email, website")
-        .eq("id", profile.company_id)
+        .eq("id", effectiveCompanyId)
         .maybeSingle();
 
       if (error) {
@@ -190,7 +194,7 @@ export function CompanyView() {
     };
 
     void fetchCompany();
-  }, [profile?.company_id, toast]);
+  }, [effectiveCompanyId, toast]);
 
   useEffect(() => {
     void refreshPermissions();
@@ -472,7 +476,7 @@ export function CompanyView() {
   };
 
   const handleSaveCompany = async () => {
-    if (!profile?.company_id || !companyName.trim()) {
+    if (!effectiveCompanyId || !companyName.trim()) {
       toast({
         title: "Datos incompletos",
         description: "El nombre de la empresa es obligatorio.",
@@ -497,7 +501,7 @@ export function CompanyView() {
         email: companyForm.email.trim() || null,
         website: companyForm.website.trim() || null,
       } as any)
-      .eq("id", profile.company_id);
+      .eq("id", effectiveCompanyId);
 
     setIsCompanySaving(false);
 
@@ -786,7 +790,7 @@ export function CompanyView() {
 
         {isSuperadmin && (
           <TabsContent value="modulos" className="mt-6">
-            <FeatureToggles companyId={profile?.company_id || ""} />
+            <FeatureToggles companyId={effectiveCompanyId || ""} />
           </TabsContent>
         )}
       </Tabs>
