@@ -62,6 +62,8 @@ const EVENT_TYPE_CONFIG: Record<EventType, { label: string; color: string }> = {
   training: { label: "Formaciones", color: "bg-emerald-500" },
   non_conformity: { label: "No Conformidades", color: "bg-orange-500" },
   capa_action: { label: "Acciones CAPA", color: "bg-purple-500" },
+  doc_effective: { label: "Vigencia documento", color: "bg-green-600" },
+  doc_expiry: { label: "Caducidad documento", color: "bg-red-500" },
 };
 
 const ALL_EVENT_TYPES = Object.keys(EVENT_TYPE_CONFIG) as EventType[];
