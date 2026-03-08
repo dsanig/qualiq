@@ -1054,7 +1054,18 @@ export function DocumentsView({
     setIsUpdatingVersion(true);
     try {
       const isRejectedDraft = selectedDocument.status === "draft" && rejectedDocIds.has(selectedDocument.id);
-      const newVersion = isRejectedDraft ? selectedDocument.versionNum : selectedDocument.versionNum + 1;
+      // Rejected draft → minor bump; Normal update → major bump (unless user chose minor)
+      let newMajor = selectedDocument.versionMajor;
+      let newMinor = selectedDocument.versionMinor;
+      if (isRejectedDraft) {
+        newMinor = selectedDocument.versionMinor + 1;
+      } else if (updateMinorOnly) {
+        newMinor = selectedDocument.versionMinor + 1;
+      } else {
+        newMajor = selectedDocument.versionMajor + 1;
+        newMinor = 0;
+      }
+      const newVersionLabel = `${newMajor}.${newMinor}`;
       const fileType = fileTypeForDb(updateVersionFile);
       const fileExt = getFileExtension(updateVersionFile.name) || "bin";
       debugFileTypeMapping(updateVersionFile);
