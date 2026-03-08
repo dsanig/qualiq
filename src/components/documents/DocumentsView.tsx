@@ -2589,6 +2589,29 @@ export function DocumentsView({
                 </Select>
               </div>
             </div>
+            {/* Fecha efectiva y caducidad */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Fecha efectiva</Label>
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={editDocEffectiveImmediate} onCheckedChange={(v) => { setEditDocEffectiveImmediate(!!v); if (v) setEditDocEffectiveDate(""); }} />
+                  <span className="text-sm text-muted-foreground">Efectivo Inmediatamente</span>
+                </div>
+                {!editDocEffectiveImmediate && (
+                  <Input type="date" value={editDocEffectiveDate} onChange={(e) => setEditDocEffectiveDate(e.target.value)} />
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Fecha de caducidad</Label>
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={editDocNoExpiry} onCheckedChange={(v) => { setEditDocNoExpiry(!!v); if (v) setEditDocExpiryDate(""); }} />
+                  <span className="text-sm text-muted-foreground">Sin Caducidad</span>
+                </div>
+                {!editDocNoExpiry && (
+                  <Input type="date" value={editDocExpiryDate} onChange={(e) => setEditDocExpiryDate(e.target.value)} />
+                )}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
