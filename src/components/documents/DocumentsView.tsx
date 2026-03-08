@@ -405,7 +405,7 @@ export function DocumentsView({
   const [rejectedDocIds, setRejectedDocIds] = useState<Set<string>>(new Set());
 
   const fetchRejectedDocs = useCallback(async () => {
-    if (!profile?.company_id) return;
+    if (!effectiveCompanyId) return;
     const { data } = await (supabase as any)
       .from("document_responsibilities")
       .select("document_id")
