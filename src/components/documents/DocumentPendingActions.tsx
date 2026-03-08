@@ -168,6 +168,55 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     }
   };
 
+  const [changingStatusDocId, setChangingStatusDocId] = useState<string | null>(null);
+
+  const handleChangeDocumentStatus = async (action: PendingAction, nextStatus: string) => {
+    if (!user || action.user_id !== user.id) {
+      toast({ title: "Error", description: "Solo el responsable asignado puede cambiar el estado.", variant: "destructive" });
+      return;
+    }
+
+    setChangingStatusDocId(action.document_id);
+    try {
+      const { error: updateError } = await supabase.from("documents").update({
+        status: nextStatus as any,
+      }).eq("id", action.document_id);
+      if (updateError) throw updateError;
+
+      // Record the status change
+      const { error: insertError } = await (supabase as any).from("document_status_changes").insert({
+        document_id: action.document_id,
+        old_status: action.documentStatus,
+        new_status: nextStatus,
+        changed_by: user.id,
+        comment: `Cambio de estado desde acciones pendientes`,
+      });
+      if (insertError) throw insertError;
+
+      const fromLabel = statusLabels[action.documentStatus || ""] || action.documentStatus;
+      const toLabel = statusLabels[nextStatus] || nextStatus;
+      toast({ title: "Estado actualizado", description: `${action.documentCode}: ${fromLabel} → ${toLabel}` });
+
+      // If approving, also complete the action
+      if (nextStatus === "approved" && action.action_type === "aprobacion") {
+        await (supabase as any)
+          .from("document_responsibilities")
+          .update({ status: "completed", completed_at: new Date().toISOString() })
+          .eq("id", action.id);
+        setActions(prev => prev.filter(a => a.id !== action.id));
+      } else {
+        // Refresh to pick up new document status
+        fetchActions();
+      }
+
+      onActionCompleted?.();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setChangingStatusDocId(null);
+    }
+  };
+
   const now = new Date();
 
   if (isLoading) {
