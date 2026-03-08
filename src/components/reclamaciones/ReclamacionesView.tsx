@@ -95,6 +95,8 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
   const [existingAttachments, setExistingAttachments] = useState<AttachmentInfo[]>([]);
   const { toast } = useToast();
   const { canEditContent, isSuperadmin } = usePermissions();
+  const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
+  const { user } = useAuth();
 
   const getUserName = (userId: string | null | undefined) => {
     if (!userId) return null;
