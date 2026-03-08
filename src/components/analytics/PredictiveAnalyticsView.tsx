@@ -33,9 +33,7 @@ interface PredictiveInsight {
   affected_areas: string[] | null;
   suggested_actions: string[] | null;
   confidence_score: number | null;
-  is_acknowledged: boolean;
-  read_at?: string | null;
-  read_by?: string | null;
+  is_acknowledged: boolean | null;
   source?: Record<string, unknown> | null;
   created_at: string;
 }
