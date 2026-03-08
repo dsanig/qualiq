@@ -24,6 +24,7 @@ interface SidebarProps {
   onToggle?: () => void;
   enabledFeatures?: Set<string>;
   isSuperadmin?: boolean;
+  isAdmin?: boolean;
 }
 
 const navigationItems = [
