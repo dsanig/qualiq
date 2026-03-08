@@ -29,6 +29,7 @@ export function AppLayout({
   onSearchSubmit,
   onSearchClear,
   enabledFeatures,
+  isSuperadmin,
 }: AppLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
