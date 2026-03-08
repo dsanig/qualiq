@@ -282,7 +282,7 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
               const isOverdue = r.status === "pending" && new Date(r.due_date) < now;
               const isCompleted = r.status === "completed";
               const isCurrentUser = user?.id === r.user_id;
-              const canComplete = isCurrentUser && r.status === "pending" && r.action_type === "revision";
+              const canComplete = isCurrentUser && r.status === "pending" && (r.action_type === "revision" || r.action_type === "firma");
 
               return (
                 <div
@@ -336,7 +336,7 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
                         disabled={isCompleting === r.id}
                       >
                         <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                        {isCompleting === r.id ? "..." : "Revisado"}
+                        {isCompleting === r.id ? "..." : r.action_type === "firma" ? "Firmado" : "Revisado"}
                       </Button>
                     )}
                     {canEditContent && (
