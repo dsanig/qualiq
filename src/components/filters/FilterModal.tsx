@@ -8,9 +8,8 @@ export type FiltersState = {
   documentTypology: "all" | "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro";
   documentStatus: string;
   signatureStatus: string;
-  incidentArea: string;
+  incidentType: string;
   incidentStatus: string;
-  incidentPriority: string;
 };
 
 interface FilterModalProps {
