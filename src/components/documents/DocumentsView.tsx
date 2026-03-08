@@ -347,6 +347,18 @@ export function DocumentsView({
   const [statusHistory, setStatusHistory] = useState<StatusChangeRecord[]>([]);
   const [isStatusHistoryOpen, setIsStatusHistoryOpen] = useState(false);
   const [isLoadingStatusHistory, setIsLoadingStatusHistory] = useState(false);
+
+  // Full history state
+  interface FullHistoryEvent {
+    timestamp: string;
+    type: "status_change" | "version" | "signature" | "responsibility" | "creation";
+    description: string;
+    userName: string;
+    detail?: string;
+  }
+  const [isFullHistoryOpen, setIsFullHistoryOpen] = useState(false);
+  const [fullHistory, setFullHistory] = useState<FullHistoryEvent[]>([]);
+  const [isLoadingFullHistory, setIsLoadingFullHistory] = useState(false);
   
   // Responsibilities state
   const [isResponsibilitiesOpen, setIsResponsibilitiesOpen] = useState(false);
