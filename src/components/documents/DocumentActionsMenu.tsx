@@ -118,21 +118,6 @@ export function DocumentActionsMenu({
           <Share2 className="w-4 h-4 mr-2" />
           Compartir
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onToggleLock} className="cursor-pointer">
-          {isLocked ? (
-            <>
-              <Unlock className="w-4 h-4 mr-2" />
-              Desbloquear
-            </>
-          ) : (
-            <>
-              <Lock className="w-4 h-4 mr-2" />
-              Bloquear
-            </>
-          )}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onDelete} className="cursor-pointer text-destructive focus:text-destructive">
           <Trash2 className="w-4 h-4 mr-2" />
           Eliminar
