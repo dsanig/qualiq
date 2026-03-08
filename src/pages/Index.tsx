@@ -213,6 +213,10 @@ const Index = () => {
               onPrefillConsumed={() => setIncidentPrefill(null)}
               openIncidentId={openIncidentId}
               onOpenIncidentConsumed={() => setOpenIncidentId(null)}
+              onNavigateToReclamacion={(recId) => {
+                setOpenReclamacionId(recId);
+                setActiveModule("reclamaciones");
+              }}
             />
           </ErrorBoundary>
         );
