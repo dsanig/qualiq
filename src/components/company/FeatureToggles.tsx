@@ -20,6 +20,7 @@ interface FeatureTogglesProps {
 
 export function FeatureToggles({ companyId }: FeatureTogglesProps) {
   const { toast } = useToast();
+  const { logAction } = useAuditLog();
   const [features, setFeatures] = useState<FeatureRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
