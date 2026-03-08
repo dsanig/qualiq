@@ -454,11 +454,6 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
             </>
           )}
           </Button>
-          {windowInsights.length > 0 && (
-            <Button variant="destructive" size="icon" onClick={handleDeleteAllInsights} title="Eliminar todos los insights">
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          )}
         </div>
       </div>
 
