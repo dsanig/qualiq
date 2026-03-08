@@ -576,10 +576,10 @@ export function DocumentsView({
   }, [filters, onFiltersChange, effectiveCompanyId, toast]);
 
   const fetchCompanyUsers = useCallback(async () => {
-    if (!profile?.company_id) return;
-    const { data } = await supabase.from("profiles").select("user_id, full_name, email").eq("company_id", profile.company_id);
+    if (!effectiveCompanyId) return;
+    const { data } = await supabase.from("profiles").select("user_id, full_name, email").eq("company_id", effectiveCompanyId);
     setCompanyUsers(data || []);
-  }, [profile?.company_id]);
+  }, [effectiveCompanyId]);
 
   useEffect(() => {
     fetchDocuments();
