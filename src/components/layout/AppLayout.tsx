@@ -41,6 +41,7 @@ export function AppLayout({
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         enabledFeatures={enabledFeatures}
+        isSuperadmin={isSuperadmin}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header
