@@ -536,7 +536,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
                           Denegar
                         </Button>
                       )}
-                      {canEditContent && (
+                      {canEditContent && documentStatus !== "approved" && (
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(r.id)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
