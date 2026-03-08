@@ -2411,6 +2411,29 @@ export function DocumentsView({
                   </Select>
                 </div>
               </div>
+              {/* Fecha efectiva y caducidad */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Fecha efectiva</Label>
+                  <div className="flex items-center gap-2">
+                    <Checkbox checked={newDocEffectiveImmediate} onCheckedChange={(v) => { setNewDocEffectiveImmediate(!!v); if (v) setNewDocEffectiveDate(""); }} />
+                    <span className="text-sm text-muted-foreground">Efectivo Inmediatamente</span>
+                  </div>
+                  {!newDocEffectiveImmediate && (
+                    <Input type="date" value={newDocEffectiveDate} onChange={(e) => setNewDocEffectiveDate(e.target.value)} />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Fecha de caducidad</Label>
+                  <div className="flex items-center gap-2">
+                    <Checkbox checked={newDocNoExpiry} onCheckedChange={(v) => { setNewDocNoExpiry(!!v); if (v) setNewDocExpiryDate(""); }} />
+                    <span className="text-sm text-muted-foreground">Sin Caducidad</span>
+                  </div>
+                  {!newDocNoExpiry && (
+                    <Input type="date" value={newDocExpiryDate} onChange={(e) => setNewDocExpiryDate(e.target.value)} />
+                  )}
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label>Descripción / alcance</Label>
                 <Textarea placeholder="Describe el alcance del documento..." rows={3} value={newDocDescription} onChange={(e) => setNewDocDescription(e.target.value)} />
