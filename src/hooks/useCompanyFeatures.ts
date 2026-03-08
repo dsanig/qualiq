@@ -32,11 +32,17 @@ export function useCompanyFeatures(): CompanyFeaturesState {
       .from("company_features")
       .select("feature_key, enabled");
 
-    if (!error && data) {
+    if (!error && data && data.length > 0) {
+      const featureRows = data as { feature_key: string; enabled: boolean }[];
+      const knownKeys = new Set(featureRows.map((r) => r.feature_key));
       const enabled = new Set<FeatureKey>(
-        (data as { feature_key: string; enabled: boolean }[])
-          .filter((r) => r.enabled)
-          .map((r) => r.feature_key as FeatureKey)
+        ALL_FEATURES
+          .filter((f) => {
+            // If the feature has a row, use its enabled flag; otherwise default to enabled
+            const row = featureRows.find((r) => r.feature_key === f.key);
+            return row ? row.enabled : !knownKeys.has(f.key);
+          })
+          .map((f) => f.key)
       );
       setEnabledFeatures(enabled);
     }
