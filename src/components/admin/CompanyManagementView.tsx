@@ -99,13 +99,13 @@ export function CompanyManagementView() {
 
   const handleOpenCreate = () => {
     setEditingCompany(null);
-    setForm({ name: "", slug: "", status: "active", plan_type: "standard" });
+    setForm({ name: "", slug: "", status: "active", plan_type: "standard", admin_email: "", admin_password: "" });
     setIsDialogOpen(true);
   };
 
   const handleOpenEdit = (company: CompanyRow) => {
     setEditingCompany(company);
-    setForm({ name: company.name, slug: company.slug, status: company.status, plan_type: company.plan_type });
+    setForm({ name: company.name, slug: company.slug, status: company.status, plan_type: company.plan_type, admin_email: "", admin_password: "" });
     setIsDialogOpen(true);
   };
 
