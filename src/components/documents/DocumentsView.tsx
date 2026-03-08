@@ -194,6 +194,8 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; cl
 const statusOptions = [
   { value: "draft", label: "Borrador" },
   { value: "review", label: "En Revisión" },
+  { value: "pending_signature", label: "Pendiente de Firma" },
+  { value: "pending_approval", label: "Pendiente de Aprobación" },
   { value: "approved", label: "Aprobado" },
 ];
 
@@ -2379,7 +2381,8 @@ export function DocumentsView({
                       // Only show valid transitions for the current status
                       if (cs === "draft") return opt.value === "draft" || opt.value === "review";
                       if (cs === "review") return opt.value === "review"; // pending_signature is automatic
-                      if (cs === "pending_signature") return opt.value === "pending_signature" || opt.value === "approved";
+                      if (cs === "pending_signature") return opt.value === "pending_signature"; // pending_approval is automatic
+                      if (cs === "pending_approval") return opt.value === "pending_approval" || opt.value === "approved";
                       return opt.value === cs;
                     })
                     .map(opt => (
