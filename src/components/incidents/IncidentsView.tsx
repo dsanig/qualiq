@@ -712,7 +712,20 @@ export function IncidentsView({
               <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
                 <p className="font-medium text-destructive flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Incidencia: {incidentPendingDelete.title}</p>
                 <p className="text-muted-foreground mt-1">Solo el Superadmin puede realizar esta acción irreversible.</p>
-                <p className="text-muted-foreground mt-1">Esta incidencia puede estar relacionada con no conformidades, acciones correctivas o auditorías.</p>
+                {incidentLinkedInfo.length > 0 && (
+                  <div className="mt-2">
+                    <p className="font-medium text-destructive">⚠️ Esta incidencia está vinculada a:</p>
+                    <ul className="list-disc list-inside text-muted-foreground mt-1 space-y-0.5">
+                      {incidentLinkedInfo.map((info, i) => (
+                        <li key={i}>{info}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-muted-foreground mt-1">Todos estos registros serán eliminados junto con la incidencia.</p>
+                  </div>
+                )}
+                {incidentLinkedInfo.length === 0 && (
+                  <p className="text-muted-foreground mt-1">Esta incidencia no tiene registros vinculados.</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <p className="text-sm text-muted-foreground">Escriba ELIMINAR para confirmar la eliminación de esta incidencia.</p>
