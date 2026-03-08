@@ -326,6 +326,7 @@ export function TrainingManagementView() {
       });
       if (error) throw error;
       toast({ title: "Firmado correctamente" });
+      logAction({ action: "sign", entity_type: "training", entity_id: detailRecord.id, entity_title: detailRecord.title, details: { role, signer_name: signName.trim() } });
       setSignName("");
       openDetail(detailRecord);
     } catch (err: any) {
