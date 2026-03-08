@@ -300,36 +300,37 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   </Button>
                 )}
                 {canComplete && user && action.user_id === user.id && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    "text-success border-success/30 hover:bg-success/10 shrink-0",
-                    compact && "h-7 text-xs px-2"
-                  )}
-                  onClick={() => handleComplete(action)}
-                  disabled={completingId === action.id}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                  {completingId === action.id
-                    ? "..."
-                    : action.action_type === "firma"
-                    ? "Firmado"
-                    : action.action_type === "revision"
-                    ? "Revisado"
-                    : action.action_type === "aprobacion"
-                    ? "Aprobado"
-                    : "Completar"}
-                </Button>
-              ) : !isActionableStatus ? (
-                <span className={cn("text-xs text-muted-foreground italic shrink-0", compact && "text-[10px]")}>
-                  {action.action_type === "revision" ? "Esperando estado 'En Revisión'" 
-                   : action.action_type === "firma" ? "Esperando estado 'Pendiente de Firma'"
-                   : action.action_type === "aprobacion" ? "Esperando estado 'Pendiente de Aprobación'"
-                   : "No disponible"}
-                </span>
-              ) : null}
-            </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "text-success border-success/30 hover:bg-success/10",
+                      compact && "h-7 text-xs px-2"
+                    )}
+                    onClick={() => handleComplete(action)}
+                    disabled={completingId === action.id}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                    {completingId === action.id
+                      ? "..."
+                      : action.action_type === "firma"
+                      ? "Firmado"
+                      : action.action_type === "revision"
+                      ? "Revisado"
+                      : action.action_type === "aprobacion"
+                      ? "Aprobado"
+                      : "Completar"}
+                  </Button>
+                )}
+                {!isActionableStatus && !canChangeStatus && (
+                  <span className={cn("text-xs text-muted-foreground italic", compact && "text-[10px]")}>
+                    {action.action_type === "revision" ? "Esperando estado 'En Revisión'" 
+                     : action.action_type === "firma" ? "Esperando estado 'Pendiente de Firma'"
+                     : action.action_type === "aprobacion" ? "Esperando estado 'Pendiente de Aprobación'"
+                     : "No disponible"}
+                  </span>
+                )}
+              </div>
           </div>
         );
       })}
