@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const ALL_FEATURES = [
   { key: "documents", label: "Documentos" },
   { key: "incidents", label: "Incidencias" },
+  { key: "reclamaciones", label: "Reclamaciones" },
   { key: "audits", label: "Auditorías" },
   { key: "training", label: "Formación" },
   { key: "audit-simulator", label: "Simulador Auditoría" },
