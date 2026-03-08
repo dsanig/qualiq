@@ -59,7 +59,7 @@ interface Document {
   categoryId: string;
   version: string;
   versionNum: number;
-  status: "approved" | "draft" | "review" | "pending_signature" | "obsolete" | "archived";
+  status: "approved" | "draft" | "review" | "pending_signature" | "pending_approval" | "obsolete" | "archived";
   lastUpdated: string;
   owner: string;
   ownerId: string;
@@ -186,6 +186,7 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; cl
   draft: { label: "Borrador", icon: Clock, class: "text-muted-foreground" },
   review: { label: "En Revisión", icon: AlertCircle, class: "text-warning" },
   pending_signature: { label: "Pendiente de Firma", icon: PenTool, class: "text-primary" },
+  pending_approval: { label: "En Aprobación", icon: ClipboardList, class: "text-accent-foreground" },
   obsolete: { label: "Obsoleto", icon: AlertCircle, class: "text-destructive" },
   archived: { label: "Archivado", icon: AlertCircle, class: "text-muted-foreground" },
 };
@@ -193,7 +194,6 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; cl
 const statusOptions = [
   { value: "draft", label: "Borrador" },
   { value: "review", label: "En Revisión" },
-  { value: "pending_signature", label: "Pendiente de Firma" },
   { value: "approved", label: "Aprobado" },
 ];
 
@@ -635,57 +635,43 @@ export function DocumentsView({
     }
     setIsChangingStatus(true);
     try {
-      // Workflow validation
       const currentStatus = selectedDocument.status;
 
-      // Get responsibilities for validation
-      const { data: resps } = await (supabase as any)
-        .from("document_responsibilities")
-        .select("action_type, status, user_id")
-        .eq("document_id", selectedDocument.id);
+      // STRICT LINEAR WORKFLOW: draft → review → pending_signature → pending_approval → approved
+      // Only allowed manual transitions: draft→review and pending_approval→approved
+      // pending_signature and pending_approval are automatic transitions
 
-      const allResps = (resps as { action_type: string; status: string; user_id: string }[]) || [];
-      const reviews = allResps.filter(r => r.action_type === "revision");
-      const signatures = allResps.filter(r => r.action_type === "firma");
-      const completedReviews = reviews.filter(r => r.status === "completed");
-      const completedSignatures = signatures.filter(r => r.status === "completed");
-
-      // Validate transitions — only assigned responsible users can perform each action
-      if (changeStatusTarget === "review" && currentStatus !== "draft") {
-        toast({ title: "Transición no permitida", description: "Solo se puede pasar a 'En Revisión' desde 'Borrador'.", variant: "destructive" });
-        return;
-      }
-
-      // draft → review: only document owner or users with edit permissions
-      if (changeStatusTarget === "review" && currentStatus === "draft") {
+      if (changeStatusTarget === "review") {
+        if (currentStatus !== "draft") {
+          toast({ title: "Transición no permitida", description: "Solo se puede pasar a 'En Revisión' desde 'Borrador'.", variant: "destructive" });
+          return;
+        }
+        // Only document owner or editors can send to review
         const isOwner = selectedDocument.ownerId === user.id;
         if (!isOwner && !canEditContent) {
           toast({ title: "Permisos insuficientes", description: "Solo el propietario del documento o un editor puede enviarlo a revisión.", variant: "destructive" });
           return;
         }
-      }
-
-      if (changeStatusTarget === "pending_signature") {
-        // This transition is automatic via trigger, manual not allowed
+      } else if (changeStatusTarget === "pending_signature") {
         toast({ title: "Transición automática", description: "El documento pasará a 'Pendiente de Firma' automáticamente cuando todos los revisores completen su revisión.", variant: "destructive" });
         return;
-      }
-
-      if (changeStatusTarget === "approved") {
-        if (currentStatus !== "pending_signature") {
-          toast({ title: "Transición no permitida", description: "Solo se puede aprobar un documento que esté en 'Pendiente de Firma'.", variant: "destructive" });
+      } else if (changeStatusTarget === "pending_approval") {
+        toast({ title: "Transición automática", description: "El documento pasará a 'En Aprobación' automáticamente cuando todos los firmantes completen su firma.", variant: "destructive" });
+        return;
+      } else if (changeStatusTarget === "approved") {
+        if (currentStatus !== "pending_approval") {
+          toast({ title: "Transición no permitida", description: "Solo se puede aprobar un documento que esté 'En Aprobación'.", variant: "destructive" });
           return;
         }
-        if (signatures.length > 0 && completedSignatures.length < signatures.length) {
-          toast({ title: "Firmas pendientes", description: `Faltan ${signatures.length - completedSignatures.length} firmantes por completar su firma.`, variant: "destructive" });
-          return;
-        }
-        // Check if user has aprobacion responsibility — no exceptions
+        // Check if user has aprobacion responsibility
         const allowed = await canPerformAction(user.id, selectedDocument.id, "aprobacion");
         if (!allowed) {
           toast({ title: "Permisos insuficientes", description: "Solo el responsable de aprobación asignado puede aprobar este documento.", variant: "destructive" });
           return;
         }
+      } else {
+        toast({ title: "Transición no permitida", description: "Esta transición de estado no está permitida.", variant: "destructive" });
+        return;
       }
 
       // Update document status
@@ -704,7 +690,7 @@ export function DocumentsView({
       });
       if (insertError) throw insertError;
 
-      const statusLabel = statusOptions.find(s => s.value === changeStatusTarget)?.label || changeStatusTarget;
+      const statusLabel = statusOptions.find(s => s.value === changeStatusTarget)?.label || statusConfig[changeStatusTarget]?.label || changeStatusTarget;
       toast({ title: "Estado actualizado", description: `El documento ahora está en "${statusLabel}".` });
       setIsChangeStatusOpen(false);
       fetchDocuments();
@@ -1389,6 +1375,10 @@ export function DocumentsView({
   };
 
   const handleOpenSign = (doc: Document) => {
+    if (doc.status !== "pending_signature") {
+      toast({ title: "No se puede firmar", description: "Solo se pueden firmar documentos en estado 'Pendiente de Firma'.", variant: "destructive" });
+      return;
+    }
     setSelectedDocument(doc);
     const existingSignature = signedDocuments[doc.id];
     setSignStatus(existingSignature ? "completed" : "idle");
@@ -1505,6 +1495,10 @@ export function DocumentsView({
   };
 
   const handleOpenManualSign = (doc: Document) => {
+    if (doc.status !== "pending_signature") {
+      toast({ title: "No se puede firmar", description: "Solo se pueden firmar documentos en estado 'Pendiente de Firma'.", variant: "destructive" });
+      return;
+    }
     setSelectedDocument(doc);
     setManualSignName(profile?.full_name || "");
     setManualSignReason("");

@@ -30,6 +30,7 @@ interface PendingAction {
   completed_at: string | null;
   documentCode?: string;
   documentTitle?: string;
+  documentStatus?: string;
   responsibleName?: string;
 }
 
@@ -79,17 +80,18 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       const userIds = [...new Set(pendingActions.map((a: PendingAction) => a.user_id))];
 
       const [docsRes, usersRes] = await Promise.all([
-        supabase.from("documents").select("id, code, title").in("id", docIds),
+        supabase.from("documents").select("id, code, title, status").in("id", docIds),
         supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds),
       ]);
 
-      const docMap = new Map((docsRes.data || []).map(d => [d.id, { code: d.code, title: d.title }]));
+      const docMap = new Map((docsRes.data || []).map(d => [d.id, { code: d.code, title: d.title, status: (d as any).status }]));
       const userMap = new Map((usersRes.data || []).map(u => [u.user_id, u.full_name || u.email || u.user_id]));
 
       for (const action of pendingActions) {
         const doc = docMap.get(action.document_id);
         action.documentCode = doc?.code || "";
         action.documentTitle = doc?.title || "";
+        action.documentStatus = doc?.status || "";
         action.responsibleName = userMap.get(action.user_id) || action.user_id;
       }
     }
@@ -108,6 +110,21 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       return;
     }
 
+    // Validate document status matches the action type
+    const docStatus = action.documentStatus;
+    if (action.action_type === "revision" && docStatus !== "review") {
+      toast({ title: "No permitido", description: "Solo se puede revisar un documento en estado 'En Revisión'.", variant: "destructive" });
+      return;
+    }
+    if (action.action_type === "firma" && docStatus !== "pending_signature") {
+      toast({ title: "No permitido", description: "Solo se puede firmar un documento en estado 'Pendiente de Firma'.", variant: "destructive" });
+      return;
+    }
+    if (action.action_type === "aprobacion" && docStatus !== "pending_approval") {
+      toast({ title: "No permitido", description: "Solo se puede aprobar un documento en estado 'En Aprobación'.", variant: "destructive" });
+      return;
+    }
+
     setCompletingId(action.id);
     try {
       const { error } = await (supabase as any)
@@ -117,7 +134,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
 
       if (error) throw error;
 
-      const label = action.action_type === "revision" ? "Revisión completada" : action.action_type === "firma" ? "Firma registrada" : "Acción completada";
+      const label = action.action_type === "revision" ? "Revisión completada" : action.action_type === "firma" ? "Firma registrada" : action.action_type === "aprobacion" ? "Aprobación registrada" : "Acción completada";
       toast({ title: label, description: `Acción completada para ${action.documentCode}` });
 
       setActions(prev => prev.filter(a => a.id !== action.id));
@@ -152,7 +169,11 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     <div className={cn("space-y-2", compact && "space-y-1.5")}>
       {actions.map(action => {
         const isOverdue = new Date(action.due_date) < now;
-        const canComplete = action.action_type === "revision" || action.action_type === "firma";
+        const isActionableStatus =
+          (action.action_type === "revision" && action.documentStatus === "review") ||
+          (action.action_type === "firma" && action.documentStatus === "pending_signature") ||
+          (action.action_type === "aprobacion" && action.documentStatus === "pending_approval");
+        const canComplete = isActionableStatus;
 
         return (
           <div
@@ -186,7 +207,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   </span>
                 </div>
               </div>
-              {canComplete && user && action.user_id === user.id && (
+              {canComplete && user && action.user_id === user.id ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -204,9 +225,18 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                     ? "Firmado"
                     : action.action_type === "revision"
                     ? "Revisado"
+                    : action.action_type === "aprobacion"
+                    ? "Aprobado"
                     : "Completar"}
                 </Button>
-              )}
+              ) : !isActionableStatus ? (
+                <span className={cn("text-xs text-muted-foreground italic shrink-0", compact && "text-[10px]")}>
+                  {action.action_type === "revision" ? "Esperando estado 'En Revisión'" 
+                   : action.action_type === "firma" ? "Esperando estado 'Pendiente de Firma'"
+                   : action.action_type === "aprobacion" ? "Esperando estado 'En Aprobación'"
+                   : "No disponible"}
+                </span>
+              ) : null}
             </div>
           </div>
         );
