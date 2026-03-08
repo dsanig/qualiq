@@ -778,7 +778,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>No conformidades</CardTitle>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "" }); setNewNcOpen(true); }}>Añadir NC</Button>
+                <Button size="sm" variant="outline" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" }); setNewNcOpen(true); }}>Añadir NC</Button>
                 <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open", file: null }); setNewActionOpen(true); }}>Añadir acción</Button>
               </div>
             </CardHeader>
