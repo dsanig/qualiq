@@ -189,7 +189,7 @@ export function TrainingManagementView() {
       .eq("training_record_id", rec.id);
     setSelectedTrainers((parts ?? []).filter((p: any) => p.role === "trainer").map((p: any) => p.user_id));
     setSelectedTrainees((parts ?? []).filter((p: any) => p.role === "trainee").map((p: any) => p.user_id));
-
+    setPendingFiles([]);
     setFormOpen(true);
   };
 
