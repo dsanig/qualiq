@@ -626,6 +626,16 @@ export function CompanyView() {
                     <span className="text-xs bg-secondary px-2 py-1 rounded-full">
                       {userItem.is_superadmin ? "Superadministrador" : userItem.role}
                     </span>
+                    {isSuperadmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEditUser(userItem)}
+                      >
+                        <Pencil className="w-3 h-3 mr-1" />
+                        Editar
+                      </Button>
+                    )}
                     {canManagePasswords && (
                       <Button
                         variant="outline"
