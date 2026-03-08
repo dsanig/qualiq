@@ -84,6 +84,10 @@ export function DocumentActionsMenu({
           <UserCheck className="w-4 h-4 mr-2" />
           Responsables
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={onViewPendingActions} className="cursor-pointer">
+          <ClipboardList className="w-4 h-4 mr-2" />
+          Acciones Pendientes
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onViewHistory} className="cursor-pointer">
           <History className="w-4 h-4 mr-2" />
