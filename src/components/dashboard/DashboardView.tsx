@@ -116,7 +116,7 @@ export function DashboardView({ onQuickAction, onViewPendingActions, onViewIncid
 
       {/* Bottom Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PendingActions onViewAll={onViewPendingActions} onNavigateToDocument={onNavigateToDocument} />
+        <PendingActions onViewAll={onViewPendingActions} onNavigateToDocument={onNavigateToDocument} onNavigateToModule={onNavigateToModule} />
         
         {/* Quick Actions */}
         <div className="bg-card rounded-lg border border-border p-6">
