@@ -362,6 +362,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     }).eq("id", editingNc.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "No conformidad actualizada" });
+    logAction({ action: "update", entity_type: "non_conformity", entity_id: editingNc.id, entity_title: ncForm.title, details: { severity: ncForm.severity, status: ncForm.status } });
     setEditNcOpen(false); setEditingNc(null);
     await loadData();
   };
