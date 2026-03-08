@@ -990,6 +990,17 @@ export function DocumentsView({
       toast({ title: "Tipología requerida", description: "Selecciona una tipología para guardar el documento.", variant: "destructive" });
       return;
     }
+    // Validate at least one responsible per action type
+    const requiredActions = ["revision", "firma", "aprobacion"];
+    const missingActions = requiredActions.filter(
+      action => !newDocResponsibilities.some(r => r.actionType === action && r.userId)
+    );
+    if (missingActions.length > 0) {
+      const labels: Record<string, string> = { revision: "Revisión", firma: "Firma", aprobacion: "Aprobación" };
+      const missing = missingActions.map(a => labels[a]).join(", ");
+      toast({ title: "Responsables obligatorios", description: `Debes asignar al menos un responsable de: ${missing}.`, variant: "destructive" });
+      return;
+    }
     if (!user || !profile?.company_id) {
       toast({ title: "Error", description: "Debes iniciar sesión.", variant: "destructive" });
       return;
