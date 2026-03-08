@@ -21,6 +21,7 @@ interface SidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
   enabledFeatures?: Set<string>;
+  isSuperadmin?: boolean;
 }
 
 const navigationItems = [
