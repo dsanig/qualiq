@@ -1021,7 +1021,7 @@ export function DocumentsView({
   };
 
   const handleUpdateVersion = async () => {
-    if (!selectedDocument || !user || !profile?.company_id) return;
+    if (!selectedDocument || !user || !effectiveCompanyId) return;
     if (!updateVersionFile) {
       toast({ title: "Archivo requerido", description: "Selecciona un archivo para actualizar la versión.", variant: "destructive" });
       return;
