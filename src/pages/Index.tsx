@@ -212,6 +212,8 @@ const Index = () => {
       case "chatbot":
         return <ChatbotView />;
       case "training":
+        return <TrainingManagementView />;
+      case "training-exam":
         return <TrainingExamView />;
       case "audit-simulator":
         return <AuditSimulatorView />;
