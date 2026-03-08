@@ -1495,6 +1495,10 @@ export function DocumentsView({
   };
 
   const handleOpenManualSign = (doc: Document) => {
+    if (doc.status !== "pending_signature") {
+      toast({ title: "No se puede firmar", description: "Solo se pueden firmar documentos en estado 'Pendiente de Firma'.", variant: "destructive" });
+      return;
+    }
     setSelectedDocument(doc);
     setManualSignName(profile?.full_name || "");
     setManualSignReason("");
