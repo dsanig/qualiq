@@ -413,8 +413,28 @@ export function IncidentsView({
 
   const allAttachments = [...existingAttachments, ...newAttachments];
 
-  const promptDeleteIncident = (incident: Incident) => {
+  const [incidentLinkedInfo, setIncidentLinkedInfo] = useState<string[]>([]);
+
+  const promptDeleteIncident = async (incident: Incident) => {
     if (!canDeleteIncidencia) return;
+
+    // Check linked records
+    const links: string[] = [];
+    const [
+      { count: capaCount },
+      { count: attachCount },
+      { count: reclamacionCount },
+    ] = await Promise.all([
+      supabase.from("incidencia_capa_plans").select("id", { count: "exact", head: true }).eq("incidencia_id", incident.id),
+      supabase.from("incidencia_attachments").select("id", { count: "exact", head: true }).eq("incidencia_id", incident.id),
+      supabase.from("reclamacion_incidencias").select("id", { count: "exact", head: true }).eq("incidencia_id", incident.id),
+    ]);
+
+    if (capaCount && capaCount > 0) links.push(`${capaCount} plan(es) CAPA vinculado(s)`);
+    if (attachCount && attachCount > 0) links.push(`${attachCount} adjunto(s)`);
+    if (reclamacionCount && reclamacionCount > 0) links.push(`${reclamacionCount} reclamación(es) vinculada(s)`);
+
+    setIncidentLinkedInfo(links);
     setIncidentPendingDelete(incident);
     setDeleteConfirmationText("");
   };
