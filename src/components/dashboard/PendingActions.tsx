@@ -55,25 +55,65 @@ interface PendingActionsProps {
 export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToModule }: PendingActionsProps) {
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     async function fetchAll() {
       const now = new Date();
 
-      // Fetch CAPA actions
-      const { data: capaData } = await (supabase as any)
-        .from("actions")
-        .select("id, description, action_type, due_date, status")
-        .in("status", ["open", "in_progress"])
-        .order("due_date", { ascending: true, nullsFirst: false })
-        .limit(5);
+      // Fetch CAPA actions - only from audits in the user's company, assigned to user
+      let capaActions: PendingAction[] = [];
+      if (user && profile?.company_id) {
+        // Get audit IDs for user's company
+        const { data: companyAudits } = await (supabase as any)
+          .from("audits")
+          .select("id")
+          .eq("company_id", profile.company_id);
 
-      const capaActions: PendingAction[] = ((capaData as any[]) ?? []).map((a) => ({
-        ...a,
-        isOverdue: a.due_date ? new Date(a.due_date) < now : false,
-        source: "capa" as const,
-      }));
+        const auditIds = ((companyAudits as any[]) ?? []).map((a: any) => a.id);
+
+        if (auditIds.length > 0) {
+          // Get capa_plan IDs for those audits
+          const { data: capaPlans } = await (supabase as any)
+            .from("capa_plans")
+            .select("id")
+            .in("audit_id", auditIds);
+
+          const capaPlanIds = ((capaPlans as any[]) ?? []).map((c: any) => c.id);
+
+          if (capaPlanIds.length > 0) {
+            // Get NC IDs for those capa plans
+            const { data: ncs } = await (supabase as any)
+              .from("non_conformities")
+              .select("id")
+              .in("capa_plan_id", capaPlanIds);
+
+            const ncIds = ((ncs as any[]) ?? []).map((n: any) => n.id);
+
+            if (ncIds.length > 0) {
+              const { data: capaData } = await (supabase as any)
+                .from("actions")
+                .select("id, description, action_type, due_date, status, responsible_id")
+                .in("non_conformity_id", ncIds)
+                .in("status", ["open", "in_progress"])
+                .order("due_date", { ascending: true, nullsFirst: false })
+                .limit(10);
+
+              capaActions = ((capaData as any[]) ?? [])
+                .filter((a: any) => !a.responsible_id || a.responsible_id === user.id)
+                .map((a: any) => ({
+                  id: a.id,
+                  description: a.description || "Acción CAPA",
+                  action_type: a.action_type,
+                  due_date: a.due_date,
+                  status: a.status,
+                  isOverdue: a.due_date ? new Date(a.due_date) < now : false,
+                  source: "capa" as const,
+                }));
+            }
+          }
+        }
+      }
 
       // Fetch document responsibilities for current user
       let docActions: PendingAction[] = [];
