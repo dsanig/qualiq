@@ -221,7 +221,7 @@ export function TrainingManagementView() {
       } else {
         const { data, error } = await (supabase as any)
           .from("training_records")
-          .insert({ title, description, contents, company_id: profile.company_id, created_by: user.id })
+          .insert({ title, description, contents, status: formStatus, deadline: formDeadline ? formDeadline.toISOString().split("T")[0] : null, company_id: profile.company_id, created_by: user.id })
           .select("id")
           .single();
         if (error) throw error;
