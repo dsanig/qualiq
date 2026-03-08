@@ -258,6 +258,34 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
     }
   };
 
+  const handleTransitionToReview = async () => {
+    if (!user) return;
+    setIsTransitioning(true);
+    try {
+      const { error: updateError } = await supabase.from("documents").update({
+        status: "review" as any,
+      }).eq("id", documentId);
+      if (updateError) throw updateError;
+
+      await (supabase as any).from("document_status_changes").insert({
+        document_id: documentId,
+        old_status: "draft",
+        new_status: "review",
+        changed_by: user.id,
+        comment: `Cambio a En Revisión por ${profile?.full_name || user.email}`,
+      });
+
+      toast({ title: "Estado actualizado", description: `${documentCode}: Borrador → En Revisión` });
+      await fetchDocumentStatus();
+      await fetchResponsibilities();
+      onWorkflowChange?.();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
   const now = new Date();
 
   const reviewResps = responsibilities.filter(r => r.action_type === "revision");
