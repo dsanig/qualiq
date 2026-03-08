@@ -40,7 +40,18 @@ export function CompanyView() {
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [users, setUsers] = useState<UserDirectoryEntry[]>([]);
   const [companyName, setCompanyName] = useState("");
-  const [isCompanySaving, setIsCompanySaving] = useState(false);
+  const [companyForm, setCompanyForm] = useState({
+    legal_name: "",
+    cif: "",
+    address: "",
+    city: "",
+    postal_code: "",
+    province: "",
+    country: "España",
+    phone: "",
+    email: "",
+    website: "",
+  });
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [createForm, setCreateForm] = useState({
     fullName: "",
