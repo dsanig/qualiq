@@ -108,6 +108,9 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
   const { profile } = useAuth();
   const { logAction } = useAuditLog();
   const [insights, setInsights] = useState<PredictiveInsight[]>([]);
+  const [archivedInsights, setArchivedInsights] = useState<PredictiveInsight[]>([]);
+  const [expandedArchived, setExpandedArchived] = useState<Set<string>>(new Set());
+  const [showArchived, setShowArchived] = useState(false);
   const [windowInsights, setWindowInsights] = useState<PredictiveInsight[]>([]);
   const [analysisWindow, setAnalysisWindow] = useState<AnalysisWindow>(DEFAULT_ANALYSIS_WINDOW);
   const [incidentsForWindow, setIncidentsForWindow] = useState<IncidentForAnalysis[]>([]);
