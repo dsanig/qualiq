@@ -188,7 +188,7 @@ export function PendingActionsView({ onNavigateToIncident }: PendingActionsViewP
                         <span className="text-xs text-muted-foreground">Responsable: {action.owner}</span>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => onNavigateToIncident?.(action.id)}>
                       Revisar
                     </Button>
                   </div>
