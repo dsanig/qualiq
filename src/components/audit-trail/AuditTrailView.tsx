@@ -3,9 +3,11 @@ import {
   Shield, Search, Filter, RefreshCw, ChevronLeft, ChevronRight,
   User, FileText, AlertTriangle, ClipboardCheck, MessageSquare,
   Settings, Building2, GraduationCap, TrendingUp, FileWarning,
-  LogIn, LogOut, Key, Eye, Download
+  LogIn, LogOut, Key, Eye, Download, Trash2
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -250,6 +252,22 @@ export function AuditTrailView() {
     XLSX.writeFile(wb, `pista_auditoria_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`);
   };
 
+  const deleteAllEntries = async () => {
+    const { error } = await (supabase as any)
+      .from("audit_trail")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000"); // delete all rows
+
+    if (error) {
+      toast.error("Error al eliminar la pista de auditoría");
+      return;
+    }
+    toast.success("Pista de auditoría eliminada correctamente");
+    setPage(0);
+    loadEntries();
+    loadFilterOptions();
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Card>
@@ -261,6 +279,28 @@ export function AuditTrailView() {
               <Badge variant="secondary" className="ml-2">{totalCount} registros</Badge>
             </CardTitle>
             <div className="flex gap-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" disabled={totalCount === 0}>
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Eliminar todo
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Eliminar toda la pista de auditoría?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta acción eliminará permanentemente los <strong>{totalCount} registros</strong> de la pista de auditoría. Esta acción no se puede deshacer.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={deleteAllEntries} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Eliminar todo
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <Button variant="outline" size="sm" onClick={exportToExcel}>
                 <Download className="w-4 h-4 mr-1" />
                 Exportar Excel
