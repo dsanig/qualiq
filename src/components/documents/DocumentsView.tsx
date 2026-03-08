@@ -1837,7 +1837,7 @@ export function DocumentsView({
                                onChangeStatus={() => handleOpenChangeStatus(doc)}
                               onManageResponsibilities={() => { setSelectedDocument(doc); setIsResponsibilitiesOpen(true); }}
                               onViewPendingActions={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}
-                              onShare={() => handleAction("Compartir", doc.code)}
+                              onShare={() => { setSelectedDocument(doc); setIsShareOpen(true); }}
                               onToggleLock={() => handleAction("Bloquear/Desbloquear", doc.code)}
                               onDelete={() => handleRequestDelete(doc)}
                             />
