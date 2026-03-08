@@ -190,6 +190,9 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
   };
 
   const createReclamacion = async () => {
+    if (!form.responsible_id || form.responsible_id === "none") {
+      toast({ title: "Error", description: "Debe asignar un responsable.", variant: "destructive" }); return;
+    }
     const userId = (await supabase.auth.getUser()).data.user?.id;
     const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", userId ?? "").maybeSingle();
     const { data: inserted, error } = await (supabase as any).from("reclamaciones").insert({
