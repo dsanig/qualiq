@@ -184,26 +184,56 @@ Responde en formato JSON con esta estructura:
 
 Genera entre 2 y 5 insights relevantes basados en los patrones detectados.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
+    const MAX_RETRIES = 3;
+    let response: Response | null = null;
 
-    if (!response.ok) {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (response.ok) break;
+
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      console.error(`AI gateway error (attempt ${attempt}/${MAX_RETRIES}):`, response.status, errorText);
+
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Demasiadas solicitudes. Inténtalo de nuevo en unos minutos." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Créditos de IA agotados. Contacta con el administrador." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (attempt < MAX_RETRIES && (response.status === 503 || response.status === 502 || response.status >= 500)) {
+        const delay = attempt * 2000;
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      throw new Error(`El servicio de IA no está disponible temporalmente (${response.status}). Inténtalo de nuevo en unos minutos.`);
+    }
+
+    if (!response || !response.ok) {
+      throw new Error("El servicio de IA no está disponible temporalmente. Inténtalo de nuevo en unos minutos.");
     }
 
     const aiResponse = await response.json();
