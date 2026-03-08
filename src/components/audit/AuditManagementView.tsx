@@ -643,8 +643,21 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                   <div><span className="font-medium text-muted-foreground">Título:</span> <span>{selectedAudit.title}</span></div>
                   <div><span className="font-medium text-muted-foreground">Fecha:</span> <span>{selectedAudit.audit_date ?? "Sin fecha"}</span></div>
                   <div><span className="font-medium text-muted-foreground">Auditor:</span> <span>{getUserName(selectedAudit.auditor_id) ?? "Sin asignar"}</span></div>
+                  <div><span className="font-medium text-muted-foreground">Responsable:</span> <span>{getUserName(selectedAudit.responsible_id) ?? "Sin asignar"}</span></div>
                   <div><span className="font-medium text-muted-foreground">Estado:</span> <span>{statusLabel(selectedAudit.status)}</span></div>
                 </div>
+                {selectedAuditParticipants.length > 0 && (
+                  <div>
+                    <p className="font-medium text-muted-foreground mb-1">Empleados asignados:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedAuditParticipants.map((p) => (
+                        <span key={p.id} className="text-xs bg-secondary text-secondary-foreground rounded-full px-2 py-1">
+                          {getUserName(p.user_id) ?? p.user_id}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {selectedAudit.description && (
                   <div><p className="font-medium text-muted-foreground mb-1">Descripción:</p><p className="whitespace-pre-wrap">{selectedAudit.description}</p></div>
                 )}
