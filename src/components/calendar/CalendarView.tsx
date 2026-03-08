@@ -257,6 +257,41 @@ export function CalendarView({
         }
       });
 
+      // 8. Document effective dates
+      const { data: docsWithDates } = await supabase
+        .from("documents")
+        .select("id, title, code, effective_date, expiry_date, owner_id" as any);
+      (docsWithDates as any[])?.forEach((doc: any) => {
+        if (doc.effective_date) {
+          allEvents.push({
+            id: `doceff-${doc.id}`,
+            sourceId: doc.id,
+            title: `"${doc.title}" entra en efecto`,
+            date: doc.effective_date,
+            type: "doc_effective",
+            userId: doc.owner_id,
+            userName: "Todos",
+            typeLabel: EVENT_TYPE_CONFIG.doc_effective.label,
+            documentCode: doc.code,
+            companyWide: true,
+          });
+        }
+        if (doc.expiry_date) {
+          allEvents.push({
+            id: `docexp-${doc.id}`,
+            sourceId: doc.id,
+            title: `"${doc.title}" caduca`,
+            date: doc.expiry_date,
+            type: "doc_expiry",
+            userId: doc.owner_id,
+            userName: "Todos",
+            typeLabel: EVENT_TYPE_CONFIG.doc_expiry.label,
+            documentCode: doc.code,
+            companyWide: true,
+          });
+        }
+      });
+
       setEvents(allEvents);
       setLoading(false);
     };
