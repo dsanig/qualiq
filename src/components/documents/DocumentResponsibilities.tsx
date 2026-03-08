@@ -70,13 +70,14 @@ interface CompanyUser {
 interface DocumentResponsibilitiesProps {
   documentId: string;
   documentCode: string;
+  ownerName?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onWorkflowChange?: () => void;
   onUpdateDocument?: () => void;
 }
 
-export function DocumentResponsibilities({ documentId, documentCode, open, onOpenChange, onWorkflowChange, onUpdateDocument }: DocumentResponsibilitiesProps) {
+export function DocumentResponsibilities({ documentId, documentCode, ownerName, open, onOpenChange, onWorkflowChange, onUpdateDocument }: DocumentResponsibilitiesProps) {
   const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
