@@ -8,7 +8,8 @@ import {
   Building2,
   GraduationCap,
   ClipboardCheck,
-  TrendingUp
+  TrendingUp,
+  FileWarning
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
