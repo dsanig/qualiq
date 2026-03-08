@@ -23,7 +23,7 @@ interface DashboardStats {
   approvedDocsPct: string;
 }
 
-export function DashboardView({ onQuickAction, onViewPendingActions, onViewIncidents, onNavigateToDocument }: DashboardViewProps) {
+export function DashboardView({ onQuickAction, onViewPendingActions, onViewIncidents, onNavigateToDocument, onNavigateToModule }: DashboardViewProps) {
   const [stats, setStats] = useState<DashboardStats>({
     totalDocs: 0,
     docsInReview: 0,
