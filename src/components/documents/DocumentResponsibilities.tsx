@@ -87,6 +87,8 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
   const [rejectingResp, setRejectingResp] = useState<Responsibility | null>(null);
   const [rejectComment, setRejectComment] = useState("");
   const [isRejecting, setIsRejecting] = useState(false);
+  const [documentStatus, setDocumentStatus] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const { user, profile } = useAuth();
   const { canEditContent } = usePermissions();
   const { toast } = useToast();
