@@ -46,7 +46,7 @@ const superadminItems = [
   { id: "company-management", label: "Gestión Empresas", icon: Globe },
 ];
 
-export function Sidebar({ activeModule, onModuleChange, collapsed = false, onToggle, enabledFeatures }: SidebarProps) {
+export function Sidebar({ activeModule, onModuleChange, collapsed = false, onToggle, enabledFeatures, isSuperadmin = false }: SidebarProps) {
   const visibleNavItems = enabledFeatures
     ? navigationItems.filter((item) => item.id === "dashboard" || enabledFeatures.has(item.id))
     : navigationItems;
