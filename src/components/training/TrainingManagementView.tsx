@@ -100,6 +100,7 @@ export function TrainingManagementView() {
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [selectedTrainers, setSelectedTrainers] = useState<string[]>([]);
   const [selectedTrainees, setSelectedTrainees] = useState<string[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   /* Detail dialog */
@@ -164,6 +165,7 @@ export function TrainingManagementView() {
     setSelectedDocIds([]);
     setSelectedTrainers([]);
     setSelectedTrainees([]);
+    setPendingFiles([]);
     setFormOpen(true);
   };
 
@@ -187,7 +189,7 @@ export function TrainingManagementView() {
       .eq("training_record_id", rec.id);
     setSelectedTrainers((parts ?? []).filter((p: any) => p.role === "trainer").map((p: any) => p.user_id));
     setSelectedTrainees((parts ?? []).filter((p: any) => p.role === "trainee").map((p: any) => p.user_id));
-
+    setPendingFiles([]);
     setFormOpen(true);
   };
 
@@ -229,6 +231,24 @@ export function TrainingManagementView() {
       ];
       if (participantRows.length > 0) {
         await (supabase as any).from("training_participants").insert(participantRows);
+      }
+      // Upload pending files
+      if (pendingFiles.length > 0 && recordId) {
+        for (const file of pendingFiles) {
+          const path = `training/${recordId}/${Date.now()}_${file.name}`;
+          const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
+          if (uploadError) {
+            console.error(uploadError);
+            continue;
+          }
+          await (supabase as any).from("training_record_attachments").insert({
+            training_record_id: recordId,
+            object_path: path,
+            file_name: file.name,
+            file_type: file.type,
+            created_by: user.id,
+          });
+        }
       }
 
       toast({ title: editingId ? "Formación actualizada" : "Formación creada" });
@@ -616,6 +636,31 @@ export function TrainingManagementView() {
                   <span className="truncate">{u.full_name || u.email}</span>
                 </label>
               ))}
+            </div>
+          </div>
+
+          {/* File attachments */}
+          <div>
+            <Label className="mb-2 block">Archivos adjuntos</Label>
+            <div className="space-y-2">
+              {pendingFiles.map((file, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm border rounded px-2 py-1">
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="truncate flex-1">{file.name}</span>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== idx))}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.multiple = true;
+                input.onchange = () => { if (input.files?.length) setPendingFiles((prev) => [...prev, ...Array.from(input.files!)]); };
+                input.click();
+              }}>
+                <Paperclip className="h-4 w-4 mr-1" /> Adjuntar archivo
+              </Button>
             </div>
           </div>
         </div>
