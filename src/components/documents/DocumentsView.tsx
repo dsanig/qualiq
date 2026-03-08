@@ -1736,7 +1736,7 @@ export function DocumentsView({
                         </tr>
                         {expandedDocumentId === doc.id && (
                           <tr className="bg-secondary/20">
-                            <td colSpan={8} className="px-4 py-4">
+                            <td colSpan={7} className="px-4 py-4">
                               <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-muted-foreground">
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Formato</p><p className="text-sm font-medium text-foreground">{doc.format.toUpperCase()}</p></div>
@@ -1744,7 +1744,6 @@ export function DocumentsView({
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Versión actual</p><p className="text-sm font-medium text-foreground">v{doc.version}</p></div>
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Última modificación</p><p className="text-sm font-medium text-foreground">{doc.lastUpdated}</p></div>
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Modificado por</p><p className="text-sm font-medium text-foreground">{doc.lastModifiedBy}</p></div>
-                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Firma</p><p className="text-sm font-medium text-foreground">{getSignatureStatusLabel(doc.id)?.label ?? "Sin responsables"}</p></div>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
