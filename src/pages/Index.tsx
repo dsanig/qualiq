@@ -14,6 +14,7 @@ import { PendingActionsView } from "@/components/dashboard/PendingActionsView";
 import { CompanyView } from "@/components/company/CompanyView";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { TrainingExamView } from "@/components/training/TrainingExamView";
+import { TrainingManagementView } from "@/components/training/TrainingManagementView";
 import { AuditSimulatorView } from "@/components/audit/AuditSimulatorView";
 import { PredictiveAnalyticsView } from "@/components/analytics/PredictiveAnalyticsView";
 import { AuditManagementView } from "@/components/audit/AuditManagementView";
