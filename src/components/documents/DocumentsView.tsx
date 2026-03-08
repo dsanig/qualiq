@@ -773,7 +773,159 @@ export function DocumentsView({
     fetchStatusHistory(doc.id);
   };
 
-  // --- Version history ---
+  // --- Full document history ---
+  const fetchFullHistory = async (docId: string) => {
+    setIsLoadingFullHistory(true);
+    const events: FullHistoryEvent[] = [];
+
+    // Collect all user IDs for name resolution
+    const allUserIds = new Set<string>();
+
+    // 1. Status changes
+    const { data: statusData } = await (supabase as any)
+      .from("document_status_changes")
+      .select("old_status, new_status, changed_by, changed_at, comment")
+      .eq("document_id", docId)
+      .order("changed_at", { ascending: false });
+
+    if (statusData) {
+      for (const s of statusData) {
+        allUserIds.add(s.changed_by);
+      }
+    }
+
+    // 2. Version changes
+    const { data: versionData } = await (supabase as any)
+      .from("document_versions")
+      .select("version, created_by, created_at, changes_description")
+      .eq("document_id", docId)
+      .order("created_at", { ascending: false });
+
+    if (versionData) {
+      for (const v of versionData) {
+        allUserIds.add(v.created_by);
+      }
+    }
+
+    // 3. Signatures
+    const { data: sigData } = await (supabase as any)
+      .from("document_signatures")
+      .select("signed_by, signed_at, signer_name, signature_method")
+      .eq("document_id", docId)
+      .order("signed_at", { ascending: false });
+
+    if (sigData) {
+      for (const s of sigData) {
+        allUserIds.add(s.signed_by);
+      }
+    }
+
+    // 4. Responsibility completions
+    const { data: respData } = await (supabase as any)
+      .from("document_responsibilities")
+      .select("user_id, action_type, status, completed_at, created_at, created_by")
+      .eq("document_id", docId);
+
+    if (respData) {
+      for (const r of respData) {
+        allUserIds.add(r.user_id);
+        if (r.created_by) allUserIds.add(r.created_by);
+      }
+    }
+
+    // Resolve names
+    const userIds = [...allUserIds].filter(Boolean);
+    const { data: profiles } = userIds.length
+      ? await supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds)
+      : { data: [] };
+    const nameMap = new Map((profiles || []).map(p => [p.user_id, p.full_name || p.email || p.user_id]));
+    const getName = (id: string) => nameMap.get(id) || id;
+
+    const statusLabel = (s: string) => statusConfig[s]?.label || s;
+
+    // Build events
+    if (statusData) {
+      for (const s of statusData) {
+        const oldLabel = s.old_status ? statusLabel(s.old_status) : "—";
+        const newLabel = statusLabel(s.new_status);
+        events.push({
+          timestamp: s.changed_at,
+          type: "status_change",
+          description: `Estado cambiado: ${oldLabel} → ${newLabel}`,
+          userName: getName(s.changed_by),
+          detail: s.comment || undefined,
+        });
+      }
+    }
+
+    if (versionData) {
+      for (const v of versionData) {
+        events.push({
+          timestamp: v.created_at,
+          type: "version",
+          description: `Nueva versión archivada: v${v.version}.0`,
+          userName: getName(v.created_by),
+          detail: v.changes_description || undefined,
+        });
+      }
+    }
+
+    if (sigData) {
+      for (const s of sigData) {
+        const method = s.signature_method === "manual_name" ? "firma manual" : "DNIe/AutoFirma";
+        events.push({
+          timestamp: s.signed_at,
+          type: "signature",
+          description: `Documento firmado (${method})`,
+          userName: s.signer_name || getName(s.signed_by),
+        });
+      }
+    }
+
+    if (respData) {
+      for (const r of respData) {
+        const actionLabels: Record<string, string> = { revision: "Revisión", firma: "Firma", aprobacion: "Aprobación" };
+        const actionLabel = actionLabels[r.action_type] || r.action_type;
+
+        // Responsibility assigned
+        events.push({
+          timestamp: r.created_at,
+          type: "responsibility",
+          description: `Responsabilidad asignada: ${actionLabel}`,
+          userName: getName(r.user_id),
+          detail: r.created_by ? `Asignada por ${getName(r.created_by)}` : undefined,
+        });
+
+        // Responsibility completed or rejected
+        if (r.status === "completed" && r.completed_at) {
+          events.push({
+            timestamp: r.completed_at,
+            type: "responsibility",
+            description: `${actionLabel} completada`,
+            userName: getName(r.user_id),
+          });
+        } else if (r.status === "rejected" && r.completed_at) {
+          events.push({
+            timestamp: r.completed_at,
+            type: "responsibility",
+            description: `${actionLabel} denegada`,
+            userName: getName(r.user_id),
+          });
+        }
+      }
+    }
+
+    // Sort by timestamp descending
+    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    setFullHistory(events);
+    setIsLoadingFullHistory(false);
+  };
+
+  const handleOpenFullHistory = (doc: Document) => {
+    setSelectedDocument(doc);
+    setIsFullHistoryOpen(true);
+    fetchFullHistory(doc.id);
+  };
   const fetchVersionHistory = async (docId: string) => {
     setIsLoadingHistory(true);
     const { data, error } = await (supabase as any)
