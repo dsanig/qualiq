@@ -413,7 +413,7 @@ export function DocumentsView({
     if (data) {
       setRejectedDocIds(new Set((data as any[]).map((r: any) => r.document_id)));
     }
-  }, [profile?.company_id]);
+  }, [effectiveCompanyId]);
 
   // Fetch signatures from DB
   const fetchSignatures = useCallback(async () => {
