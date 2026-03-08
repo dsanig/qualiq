@@ -1271,7 +1271,7 @@ export function DocumentsView({
       toast({ title: "Responsables obligatorios", description: `Debes asignar al menos un responsable de: ${missing}.`, variant: "destructive" });
       return;
     }
-    if (!user || !profile?.company_id) {
+    if (!user || !effectiveCompanyId) {
       toast({ title: "Error", description: "Debes iniciar sesión.", variant: "destructive" });
       return;
     }
