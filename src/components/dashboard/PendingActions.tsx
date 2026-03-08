@@ -215,8 +215,52 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
         }
       }
 
+      // Fetch reclamaciones assigned to current user (as responsible or participant)
+      let reclamacionActions: PendingAction[] = [];
+      if (user) {
+        // Get reclamaciones where user is responsible
+        const { data: recResp } = await (supabase as any)
+          .from("reclamaciones")
+          .select("id, title, status, response_deadline")
+          .eq("responsible_id", user.id)
+          .in("status", ["abierta", "en_revision", "en_resolucion"]);
+
+        // Get reclamaciones where user is participant
+        const { data: recParts } = await (supabase as any)
+          .from("reclamacion_participants")
+          .select("reclamacion_id")
+          .eq("user_id", user.id);
+
+        const partRecIds = new Set((recParts as any[] || []).map((p: any) => p.reclamacion_id));
+        let partReclamaciones: any[] = [];
+        if (partRecIds.size > 0) {
+          const { data: partRecs } = await (supabase as any)
+            .from("reclamaciones")
+            .select("id, title, status, response_deadline")
+            .in("id", [...partRecIds])
+            .in("status", ["abierta", "en_revision", "en_resolucion"]);
+          partReclamaciones = partRecs || [];
+        }
+
+        // Merge unique
+        const allRecs = new Map<string, any>();
+        for (const r of [...(recResp || []), ...partReclamaciones]) {
+          allRecs.set(r.id, r);
+        }
+
+        reclamacionActions = [...allRecs.values()].map((r) => ({
+          id: r.id,
+          description: `Reclamación: ${r.title}`,
+          action_type: "reclamacion",
+          due_date: r.response_deadline,
+          status: r.status,
+          isOverdue: r.response_deadline ? new Date(r.response_deadline) < now : false,
+          source: "reclamacion" as const,
+        }));
+      }
+
       // Combine: active tasks first, waiting tasks last
-      const activeActions = [...capaActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions];
+      const activeActions = [...capaActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions, ...reclamacionActions];
       const waitingActions = docActions.filter(a => a.action_type === "waiting");
       
       const combined = [
