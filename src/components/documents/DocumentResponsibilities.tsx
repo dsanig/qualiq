@@ -319,6 +319,25 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
             </div>
           )}
 
+          {/* Transition to review button */}
+          {documentStatus === "draft" && user && responsibilities.some(r => r.action_type === "revision" && r.user_id === user.id && r.status === "pending") && (
+            <div className="border border-primary/30 rounded-lg p-3 bg-primary/5 flex items-center justify-between gap-2">
+              <p className="text-sm text-foreground">
+                El documento está en <strong>Borrador</strong>. Como responsable de revisión, puedes pasarlo a <strong>En Revisión</strong>.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-primary border-primary/30 hover:bg-primary/10 shrink-0"
+                onClick={handleTransitionToReview}
+                disabled={isTransitioning}
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
+                {isTransitioning ? "..." : "Pasar a En Revisión"}
+              </Button>
+            </div>
+          )}
+
           {/* Workflow summary */}
           {responsibilities.length > 0 && (
             <div className="border border-border rounded-lg p-4 bg-secondary/5 space-y-2">
