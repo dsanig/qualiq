@@ -96,7 +96,7 @@ export function IncidentsView({
   const [users, setUsers] = useState<UserRef[]>([]);
   const [capaPlans, setCapaPlans] = useState<CapaPlanRef[]>([]);
   const [incidentCapaLinks, setIncidentCapaLinks] = useState<Record<string, string[]>>({});
-  const [selectedCapaPlanIds, setSelectedCapaPlanIds] = useState<string[]>([]);
+  const [incidentReclamacionLinks, setIncidentReclamacionLinks] = useState<Record<string, string[]>>({});
   const [form, setForm] = useState<IncidentFormData>(defaultForm(initialIncidentType));
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
