@@ -646,6 +646,7 @@ export function DocumentsView({
     setSelectedDocument(doc);
     setChangeStatusTarget(doc.status);
     setChangeStatusComment("");
+    setChangeStatusConfirmText("");
     setIsChangeStatusOpen(true);
   };
 
