@@ -551,13 +551,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       </div>
       <div><Label>Descripción</Label><Textarea value={actionForm.description} onChange={(e) => setActionForm((p) => ({ ...p, description: e.target.value }))} /></div>
       <div>
-        <Label>Responsable</Label>
+        <Label>Responsable *</Label>
         <Select value={actionForm.responsible_id} onValueChange={(v) => setActionForm((p) => ({ ...p, responsible_id: v }))}>
           <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
           <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div><Label>Fecha vencimiento</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
+      <div><Label>Fecha vencimiento *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
       <div>
         <Label>Estado</Label>
         <Select value={actionForm.status} onValueChange={(v) => setActionForm((p) => ({ ...p, status: v }))}>
