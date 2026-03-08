@@ -34,6 +34,22 @@ interface AuditEntry {
 
 const PAGE_SIZE = 50;
 
+const detailKeyLabels: Record<string, string> = {
+  code: "Código",
+  category: "Categoría",
+  typology: "Tipología",
+  status: "Estado",
+  file_type: "Tipo archivo",
+  effective_date: "Fecha efectiva",
+  expiry_date: "Fecha caducidad",
+  old_status: "Estado anterior",
+  new_status: "Nuevo estado",
+  comment: "Comentario",
+  new_version: "Nueva versión",
+  changes: "Cambios",
+  version: "Versión",
+};
+
 const entityTypeLabels: Record<string, string> = {
   auth: "Autenticación",
   document: "Documento",
