@@ -809,28 +809,58 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                       {canEditContent && <button onClick={() => openEditNc(nc)} className="text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {nc.deadline && <span>Límite: {nc.deadline}</span>}
-                      <span>{nc.status}</span>
+                      {nc.deadline && (
+                        <span className={nc.status !== "closed" && new Date(nc.deadline) < new Date() ? "text-destructive font-medium" : ""}>
+                          Límite: {nc.deadline}
+                        </span>
+                      )}
+                      <span className="px-1.5 py-0.5 rounded bg-muted">{statusLabel(nc.status)}</span>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{nc.description ?? "Sin descripción"}</p>
                   {nc.severity && <p className="text-xs text-muted-foreground mt-1">Severidad: {nc.severity}</p>}
-                  <div className="mt-2 space-y-1">
-                    {actions.filter((a) => a.non_conformity_id === nc.id).map((action) => (
-                      <div key={action.id} className="rounded bg-muted/40 p-2 text-sm cursor-pointer hover:bg-muted/60 transition-colors" onClick={() => openEditAction(action)}>
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium">{actionTypeLabel(action.action_type)}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            {action.due_date && <span>{action.due_date}</span>}
-                            <span>{action.status}</span>
-                            {canEditContent && <Pencil className="h-3 w-3" />}
-                          </div>
+                  {nc.responsible_id && <p className="text-xs text-muted-foreground mt-1">Responsable NC: {getUserName(nc.responsible_id)}</p>}
+                  
+                  {/* Actions summary */}
+                  {(() => {
+                    const ncActions = actions.filter((a) => a.non_conformity_id === nc.id);
+                    if (ncActions.length === 0) return null;
+                    const today = new Date();
+                    return (
+                      <div className="mt-3 border-t border-border pt-2">
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">Acciones correctivas ({ncActions.length})</p>
+                        <div className="space-y-1.5">
+                          {ncActions.map((action) => {
+                            const isOverdue = action.status !== "closed" && action.due_date && new Date(action.due_date) < today;
+                            return (
+                              <div key={action.id} className="rounded bg-muted/40 p-2 text-sm cursor-pointer hover:bg-muted/60 transition-colors" onClick={() => openEditAction(action)}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium">{actionTypeLabel(action.action_type)}</p>
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted">{statusLabel(action.status)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs">
+                                    {action.due_date && (
+                                      <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
+                                        {action.due_date}
+                                      </span>
+                                    )}
+                                    {canEditContent && <Pencil className="h-3 w-3 text-muted-foreground" />}
+                                  </div>
+                                </div>
+                                <p className="text-muted-foreground">{action.description}</p>
+                                {action.responsible_id && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    Responsable: {getUserName(action.responsible_id) ?? action.responsible_id}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                        <p>{action.description}</p>
-                        {action.responsible_id && <p className="text-xs text-muted-foreground">Responsable: {getUserName(action.responsible_id) ?? action.responsible_id}</p>}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </div>
               ))}
               {filteredNcs.length === 0 && <p className="text-sm text-muted-foreground">No hay no conformidades en este plan CAPA.</p>}
