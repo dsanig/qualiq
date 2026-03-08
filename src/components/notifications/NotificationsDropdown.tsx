@@ -9,6 +9,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuditLog } from "@/hooks/useAuditLog";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -33,6 +34,7 @@ const typeConfig: Record<string, { icon: typeof Bell; class: string }> = {
 
 export function NotificationsDropdown() {
   const { user } = useAuth();
+  const { logAction } = useAuditLog();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -63,6 +65,8 @@ export function NotificationsDropdown() {
       .update({ is_read: true })
       .eq("id", id);
     
+    const notif = notifications.find(n => n.id === id);
+    logAction({ action: "mark_read", entity_type: "notification", entity_id: id, entity_title: notif?.title });
     setNotifications(prev => 
       prev.map(n => n.id === id ? { ...n, is_read: true } : n)
     );
@@ -77,6 +81,7 @@ export function NotificationsDropdown() {
       .eq("user_id", user.id)
       .eq("is_read", false);
     
+    logAction({ action: "mark_all_read", entity_type: "notification" });
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
   };
 

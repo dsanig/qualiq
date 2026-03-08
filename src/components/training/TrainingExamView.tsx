@@ -7,6 +7,7 @@ import { CheckCircle, XCircle, BookOpen, Award, ArrowRight, Loader2 } from "luci
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { useAuditLog } from "@/hooks/useAuditLog";
 
 interface TrainingSession {
   id: string;
@@ -27,6 +28,7 @@ interface Question {
 
 export function TrainingExamView() {
   const { user } = useAuth();
+  const { logAction } = useAuditLog();
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [activeSession, setActiveSession] = useState<TrainingSession | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -68,6 +70,7 @@ export function TrainingExamView() {
 
   const startExam = async (session: TrainingSession) => {
     setActiveSession(session);
+    logAction({ action: "start_exam", entity_type: "training_exam", entity_id: session.id, entity_title: session.documents?.title });
 
     if (session.status === "pending") {
       setIsGenerating(true);
@@ -159,6 +162,7 @@ export function TrainingExamView() {
           : `Has obtenido ${score}%. Se requiere 80% para aprobar.`,
         variant: passed ? "default" : "destructive",
       });
+      logAction({ action: "complete_exam", entity_type: "training_exam", entity_id: activeSession!.id, entity_title: activeSession!.documents?.title, details: { score, passed } });
 
       // Reset and refresh
       setActiveSession(null);

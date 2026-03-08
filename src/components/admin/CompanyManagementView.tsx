@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuditLog } from "@/hooks/useAuditLog";
 
 interface CompanyRow {
   id: string;
@@ -43,6 +44,7 @@ const PLAN_LABELS: Record<string, string> = {
 export function CompanyManagementView() {
   const { isSuperadmin } = usePermissions();
   const { toast } = useToast();
+  const { logAction } = useAuditLog();
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -127,6 +129,7 @@ export function CompanyManagementView() {
         return;
       }
       toast({ title: "Empresa actualizada" });
+      logAction({ action: "update", entity_type: "company", entity_id: editingCompany.id, entity_title: form.name.trim(), details: { status: form.status, plan_type: form.plan_type } });
     } else {
       const { error } = await (supabase as any)
         .from("companies")
@@ -138,6 +141,7 @@ export function CompanyManagementView() {
         return;
       }
       toast({ title: "Empresa creada" });
+      logAction({ action: "create", entity_type: "company", entity_title: form.name.trim(), details: { slug: form.slug.trim(), plan_type: form.plan_type } });
     }
 
     setIsSubmitting(false);
@@ -158,6 +162,7 @@ export function CompanyManagementView() {
     }
 
     toast({ title: `Empresa ${newStatus === "active" ? "activada" : "desactivada"}` });
+    logAction({ action: "toggle_status", entity_type: "company", entity_id: company.id, entity_title: company.name, details: { new_status: newStatus } });
     void fetchCompanies();
   };
 
@@ -180,6 +185,7 @@ export function CompanyManagementView() {
     }
 
     toast({ title: "Empresa eliminada" });
+    logAction({ action: "delete", entity_type: "company", entity_id: company.id, entity_title: company.name });
     void fetchCompanies();
   };
 

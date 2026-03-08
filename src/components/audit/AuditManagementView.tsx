@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useAuditLog } from "@/hooks/useAuditLog";
 
 type Audit = {
   id: string; title: string; description: string | null; audit_date: string | null;
@@ -52,6 +53,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [linkIncidenciaOpen, setLinkIncidenciaOpen] = useState(false);
   const [linkingCapaPlanId, setLinkingCapaPlanId] = useState<string | null>(null);
   const { canEditContent, canManageCompany } = usePermissions();
+  const { logAction } = useAuditLog();
 
   // Dialog states
   const [newAuditOpen, setNewAuditOpen] = useState(false);
@@ -203,6 +205,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     if (auditFiles) await uploadAuditAttachments(data.id, auditFiles);
     await syncParticipants(data.id, auditForm.participant_ids);
     toast({ title: "Auditoría creada" });
+    logAction({ action: "create", entity_type: "audit", entity_id: data?.id, entity_title: auditForm.title, details: { status: auditForm.status } });
     setNewAuditOpen(false);
     resetAuditForm();
     await loadData();
@@ -221,6 +224,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     if (auditFiles) await uploadAuditAttachments(editingAudit.id, auditFiles);
     await syncParticipants(editingAudit.id, auditForm.participant_ids);
     toast({ title: "Auditoría actualizada" });
+    logAction({ action: "update", entity_type: "audit", entity_id: editingAudit.id, entity_title: auditForm.title, details: { status: auditForm.status } });
     setEditAuditOpen(false);
     setEditingAudit(null);
     await loadData();
@@ -235,6 +239,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     const { error } = await (supabase as any).from("audits").delete().eq("id", auditId);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Auditoría eliminada" });
+    logAction({ action: "delete", entity_type: "audit", entity_id: auditId });
     if (selectedAuditId === auditId) setSelectedAuditId(null);
     await loadData();
   };
@@ -260,6 +265,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     await supabase.storage.from("documents").remove([attachment.object_path]);
     await (supabase as any).from("audit_attachments").delete().eq("id", attachment.id);
     toast({ title: "Adjunto eliminado" });
+    logAction({ action: "delete_attachment", entity_type: "audit", entity_id: attachment.audit_id, details: { file_name: attachment.file_name } });
     await loadData();
   };
 
@@ -304,6 +310,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     });
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Plan CAPA creado" });
+    logAction({ action: "create", entity_type: "capa_plan", entity_id: selectedAuditId, entity_title: capaForm.title });
     setNewCapaOpen(false);
     setCapaForm({ title: "", description: "", responsible_id: "" });
     await loadData();
@@ -317,6 +324,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     }).eq("id", editingCapa.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Plan CAPA actualizado" });
+    logAction({ action: "update", entity_type: "capa_plan", entity_id: editingCapa.id, entity_title: capaForm.title });
     setEditCapaOpen(false);
     setEditingCapa(null);
     await loadData();
@@ -336,6 +344,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       non_conformity_id: data.id, action_type: "corrective", description: "Acción correctiva inicial", status: "open",
     });
     toast({ title: "No conformidad creada" });
+    logAction({ action: "create", entity_type: "non_conformity", entity_id: data?.id, entity_title: ncForm.title, details: { severity: ncForm.severity, capa_plan_id: selectedCapaPlanId } });
     setNewNcOpen(false);
     setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
     await loadData();
@@ -353,6 +362,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     }).eq("id", editingNc.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "No conformidad actualizada" });
+    logAction({ action: "update", entity_type: "non_conformity", entity_id: editingNc.id, entity_title: ncForm.title, details: { severity: ncForm.severity, status: ncForm.status } });
     setEditNcOpen(false); setEditingNc(null);
     await loadData();
   };
@@ -379,6 +389,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       }
     }
     toast({ title: "Acción creada" });
+    logAction({ action: "create", entity_type: "capa_action", entity_id: data?.id, entity_title: actionForm.description, details: { action_type: actionForm.action_type, responsible_id: actionForm.responsible_id } });
     setNewActionOpen(false);
     setActionForm({ non_conformity_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open", file: null });
     await loadData();
@@ -395,6 +406,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     }).eq("id", editingAction.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Acción actualizada" });
+    logAction({ action: "update", entity_type: "capa_action", entity_id: editingAction.id, entity_title: actionForm.description, details: { action_type: actionForm.action_type, status: actionForm.status } });
     setEditActionOpen(false); setEditingAction(null);
     await loadData();
   };

@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
+import { useAuditLog } from "@/hooks/useAuditLog";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -94,6 +95,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
   const { user, profile } = useAuth();
   const { canEditContent } = usePermissions();
   const { toast } = useToast();
+  const { logAction } = useAuditLog();
 
   const fetchResponsibilities = useCallback(async () => {
     setIsLoading(true);
@@ -161,6 +163,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
       });
       if (error) throw error;
       toast({ title: "Responsable añadido" });
+      logAction({ action: "add_responsibility", entity_type: "document", entity_id: documentId, entity_title: documentCode, details: { user_id: selectedUserId, action_type: selectedActionType, due_date: selectedDueDate } });
       setSelectedUserId("");
       setSelectedDueDate("");
       fetchResponsibilities();
@@ -176,6 +179,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
       const { error } = await (supabase as any).from("document_responsibilities").delete().eq("id", id);
       if (error) throw error;
       toast({ title: "Responsable eliminado" });
+      logAction({ action: "delete_responsibility", entity_type: "document", entity_id: documentId, entity_title: documentCode, details: { responsibility_id: id } });
       fetchResponsibilities();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -197,6 +201,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
       if (error) throw error;
 
       toast({ title: "Revisión completada", description: "Has marcado tu revisión como completada." });
+      logAction({ action: "complete_responsibility", entity_type: "document", entity_id: documentId, entity_title: documentCode, details: { action_type: resp.action_type } });
       await fetchResponsibilities();
       onWorkflowChange?.();
     } catch (err: any) {
@@ -253,6 +258,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
         description: `El documento ${documentCode} ha sido devuelto a Borrador.`,
         variant: "destructive",
       });
+      logAction({ action: "reject_responsibility", entity_type: "document", entity_id: documentId, entity_title: documentCode, details: { action_type: rejectingResp.action_type, comment: rejectComment } });
 
       setRejectingResp(null);
       setRejectComment("");

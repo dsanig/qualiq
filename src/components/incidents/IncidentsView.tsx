@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useAuditLog } from "@/hooks/useAuditLog";
 import type { FiltersState } from "@/components/filters/FilterModal";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
@@ -121,6 +122,7 @@ export function IncidentsView({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
   const { user } = useAuth();
+  const { logAction } = useAuditLog();
 
   const canDeleteIncidencia = isSuperadmin;
 
@@ -379,6 +381,7 @@ export function IncidentsView({
     }
 
     toast({ title: "Incidencia creada" });
+    logAction({ action: "create", entity_type: "incidencia", entity_id: inserted?.id, entity_title: form.title, details: { type: form.incidencia_type, responsible_id: form.responsible_id } });
     onNewIncidentOpenChange(false);
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
@@ -447,6 +450,7 @@ export function IncidentsView({
     if (newAttachments.length > 0) await uploadAttachments(editingIncident.id);
     await syncCapaLinks(editingIncident.id);
     toast({ title: "Incidencia actualizada" });
+    logAction({ action: "update", entity_type: "incidencia", entity_id: editingIncident.id, entity_title: form.title, details: { type: form.incidencia_type, responsible_id: form.responsible_id } });
     setIsEditOpen(false);
     setEditingIncident(null);
     setForm(defaultForm(initialIncidentType));
@@ -547,6 +551,7 @@ export function IncidentsView({
       }
 
       toast({ title: deleteResult.message || "Incidencia eliminada correctamente" });
+      logAction({ action: "delete", entity_type: "incidencia", entity_id: pendingIncidentId, entity_title: incidentPendingDelete.title });
       setIncidentPendingDelete(null);
       setDeleteConfirmationText("");
       if (editingIncident?.id === pendingIncidentId) {

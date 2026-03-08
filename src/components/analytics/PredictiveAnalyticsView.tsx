@@ -19,6 +19,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { useAuditLog } from "@/hooks/useAuditLog";
 
 interface PredictiveInsight {
   id: string;
@@ -102,6 +103,7 @@ interface PredictiveAnalyticsViewProps {
 
 export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: PredictiveAnalyticsViewProps) {
   const { profile } = useAuth();
+  const { logAction } = useAuditLog();
   const [insights, setInsights] = useState<PredictiveInsight[]>([]);
   const [windowInsights, setWindowInsights] = useState<PredictiveInsight[]>([]);
   const [analysisWindow, setAnalysisWindow] = useState<AnalysisWindow>(DEFAULT_ANALYSIS_WINDOW);
@@ -322,6 +324,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         title: "Análisis completado",
         description: "Se han detectado nuevos patrones e insights",
       });
+      logAction({ action: "run_analysis", entity_type: "predictive_analytics", details: { window: analysisWindow, records: incidentsData.length } });
 
       fetchInsights();
     } catch (e: unknown) {
@@ -358,6 +361,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         title: "Insight marcado como leído",
         description: "El insight se ha eliminado del listado.",
       });
+      logAction({ action: "acknowledge_insight", entity_type: "predictive_insight", entity_id: insightId });
 
       fetchInsights();
     } catch (error) {
@@ -392,6 +396,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       setInsights((prev) => prev.filter((i) => i.id !== insightId));
       setWindowInsights((prev) => prev.filter((i) => i.id !== insightId));
       toast({ title: "Insight eliminado" });
+      logAction({ action: "delete", entity_type: "predictive_insight", entity_id: insightId });
     } catch (e: any) {
       toast({ title: "Error al eliminar", description: e.message ?? "Error desconocido.", variant: "destructive" });
     }
@@ -411,6 +416,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
 
       setInsights([]);
       toast({ title: "Insights eliminados", description: "Se han eliminado todos los resultados del análisis." });
+      logAction({ action: "delete_all", entity_type: "predictive_insight" });
     } catch (e: any) {
       toast({ title: "Error al eliminar", description: e.message ?? "Error desconocido.", variant: "destructive" });
     }

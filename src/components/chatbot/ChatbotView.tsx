@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuditLog } from "@/hooks/useAuditLog";
 
 interface Message {
   id: string;
@@ -166,6 +167,7 @@ export function ChatbotView() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { logAction } = useAuditLog();
 
   const activeChat = useMemo(
     () => chats.find((chat) => chat.id === activeChatId) ?? chats[0],
@@ -230,6 +232,7 @@ export function ChatbotView() {
     setChats((prev) => prev.map((chat) => (chat.id === activeChat.id ? updatedChat : chat)));
     setInput("");
     setIsLoading(true);
+    logAction({ action: "chat_message", entity_type: "qualai", entity_title: activeChat.title, details: { message_preview: input.slice(0, 100) } });
 
     let assistantSoFar = "";
     const upsertAssistant = (nextChunk: string) => {

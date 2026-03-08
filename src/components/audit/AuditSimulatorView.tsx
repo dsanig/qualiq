@@ -19,6 +19,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { useAuditLog } from "@/hooks/useAuditLog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   AlertDialog,
@@ -89,6 +90,7 @@ const formatCategory = (cat: string) =>
 
 export function AuditSimulatorView() {
   const { user, profile } = useAuth();
+  const { logAction } = useAuditLog();
   const [simulations, setSimulations] = useState<AuditSimulation[]>([]);
   const [selectedSimulation, setSelectedSimulation] = useState<AuditSimulation | null>(null);
   const [findings, setFindings] = useState<AuditFinding[]>([]);
@@ -185,6 +187,7 @@ export function AuditSimulatorView() {
         title: "Simulación completada",
         description: "Los resultados de la inspección simulada están listos",
       });
+      logAction({ action: "run_simulation", entity_type: "audit_simulation", entity_id: simulation.id, details: { simulation_type: simulationType } });
 
       fetchSimulations();
     } catch (e) {
@@ -230,6 +233,7 @@ export function AuditSimulatorView() {
       if (error) throw error;
 
       toast({ title: "Simulación eliminada" });
+      logAction({ action: "delete", entity_type: "audit_simulation", entity_id: simId });
       if (selectedSimulation?.id === simId) setSelectedSimulation(null);
       setSimulations((prev) => prev.filter((s) => s.id !== simId));
     } catch (err) {

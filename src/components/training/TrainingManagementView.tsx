@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuditLog } from "@/hooks/useAuditLog";
 import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
@@ -93,6 +94,7 @@ interface Attachment {
 
 export function TrainingManagementView() {
   const { user, profile } = useAuth();
+  const { logAction } = useAuditLog();
 
   /* List state */
   const [records, setRecords] = useState<TrainingRecord[]>([]);
@@ -265,6 +267,7 @@ export function TrainingManagementView() {
       }
 
       toast({ title: editingId ? "Formación actualizada" : "Formación creada" });
+      logAction({ action: editingId ? "update" : "create", entity_type: "training", entity_id: recordId ?? undefined, entity_title: title, details: { status: formStatus } });
       setFormOpen(false);
       fetchRecords();
     } catch (err) {
@@ -284,6 +287,7 @@ export function TrainingManagementView() {
       toast({ title: "Error", description: "No se pudo eliminar", variant: "destructive" });
     } else {
       toast({ title: "Formación eliminada" });
+      logAction({ action: "delete", entity_type: "training", entity_id: id });
       if (detailRecord?.id === id) setDetailRecord(null);
       setRecords((prev) => prev.filter((r) => r.id !== id));
     }
@@ -322,6 +326,7 @@ export function TrainingManagementView() {
       });
       if (error) throw error;
       toast({ title: "Firmado correctamente" });
+      logAction({ action: "sign", entity_type: "training", entity_id: detailRecord.id, entity_title: detailRecord.title, details: { role, signer_name: signName.trim() } });
       setSignName("");
       openDetail(detailRecord);
     } catch (err: any) {
@@ -358,6 +363,7 @@ export function TrainingManagementView() {
     }
 
     toast({ title: "Archivos subidos" });
+    logAction({ action: "upload_attachment", entity_type: "training", entity_id: detailRecord.id, entity_title: detailRecord.title });
     openDetail(detailRecord);
     setIsUploading(false);
   };

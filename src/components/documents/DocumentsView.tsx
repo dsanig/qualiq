@@ -33,6 +33,7 @@ import { ShareDocumentDialog } from "./ShareDocumentDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuditLog } from "@/hooks/useAuditLog";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   Dialog,
@@ -315,6 +316,7 @@ export function DocumentsView({
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const { canEditContent, canManageCompany, isSuperadmin, refreshPermissions } = usePermissions();
+  const { logAction } = useAuditLog();
 
   // Edit document state
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -656,6 +658,7 @@ export function DocumentsView({
       }
 
       toast({ title: "Documento actualizado" });
+      logAction({ action: "update", entity_type: "document", entity_id: editingDocId, entity_title: editDocTitle.trim(), details: { code: editDocCode.trim(), category: editDocCategory, typology: editDocTypology, status: editDocStatus } });
       setIsEditOpen(false);
       fetchDocuments();
     } catch (err: any) {
@@ -739,6 +742,7 @@ export function DocumentsView({
 
       const statusLabel = statusOptions.find(s => s.value === changeStatusTarget)?.label || statusConfig[changeStatusTarget]?.label || changeStatusTarget;
       toast({ title: "Estado actualizado", description: `El documento ahora está en "${statusLabel}".` });
+      logAction({ action: "status_change", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { old_status: selectedDocument.status, new_status: changeStatusTarget, comment: changeStatusComment.trim() } });
       setIsChangeStatusOpen(false);
       fetchDocuments();
       fetchFirmaStatus();
@@ -975,6 +979,7 @@ export function DocumentsView({
       return;
     }
     toast({ title: "Versión eliminada" });
+    logAction({ action: "delete_version", entity_type: "document", entity_id: selectedDocument?.id, entity_title: selectedDocument?.title, details: { version_id: versionId } });
     if (selectedDocument) fetchVersionHistory(selectedDocument.id);
   };
 
@@ -1101,6 +1106,7 @@ export function DocumentsView({
         });
 
         toast({ title: "Documento actualizado", description: `${selectedDocument.code} ha sido actualizado. El flujo de aprobación se ha reiniciado.` });
+        logAction({ action: "update_version_rejected", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { version: selectedDocument.versionNum } });
       } else {
         // Normal version update flow
         const createVersionArgs = {
@@ -1206,6 +1212,7 @@ export function DocumentsView({
         if (updateError) throw updateError;
 
         toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0` });
+        logAction({ action: "update_version", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { new_version: newVersion, changes: updateVersionChanges.trim() } });
       }
 
       setIsUpdateVersionOpen(false);
@@ -1356,6 +1363,7 @@ export function DocumentsView({
       }
 
       toast({ title: "Documento creado", description: "El documento se ha subido correctamente." });
+      logAction({ action: "create", entity_type: "document", entity_id: documentId, entity_title: newDocTitle.trim(), details: { code: newDocCode.trim(), category: newDocCategory, typology: newDocTypology, file_type: fileType } });
       onNewDocumentOpenChange(false);
       setNewDocCode("");
       setNewDocTitle("");
@@ -1571,6 +1579,7 @@ export function DocumentsView({
       await Promise.all([fetchDocuments(), fetchFirmaStatus()]);
 
       toast({ title: "Documento eliminado", description: `${documentToDelete.code} fue eliminado correctamente.` });
+      logAction({ action: "delete", entity_type: "document", entity_id: documentToDelete.id, entity_title: documentToDelete.title, details: { code: documentToDelete.code } });
       setIsDeleteConfirmOpen(false);
       setDocumentToDelete(null);
     } catch (err: any) {
@@ -1760,6 +1769,7 @@ export function DocumentsView({
     }));
     setSignStatus("completed");
     toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado.` });
+    logAction({ action: "sign_autofirma", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { method: "autofirma_dnie" } });
     fetchFirmaStatus();
   };
 
@@ -1838,6 +1848,7 @@ export function DocumentsView({
       [selectedDocument.id]: { signedAt, signerName: manualSignName.trim(), reason: manualSignReason.trim() || undefined },
     }));
     toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado con nombre completo.` });
+    logAction({ action: "sign_manual", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { method: "nombre_completo", signer_name: manualSignName.trim() } });
     setIsManualSignOpen(false);
     fetchFirmaStatus();
   };

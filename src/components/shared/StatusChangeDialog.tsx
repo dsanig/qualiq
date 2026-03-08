@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { logAuditAction } from "@/hooks/useAuditLog";
 
 interface StatusOption {
   value: string;
@@ -84,6 +85,9 @@ export function StatusChangeDialog({
 
     // Update entity status
     await (supabase as any).from(entityType).update({ status: newStatus }).eq("id", entityId);
+
+    // Audit log
+    logAuditAction({ userId, action: "status_change", entity_type: entityType === "incidencias" ? "incidencia" : "reclamacion", entity_id: entityId, details: { old_status: currentStatus, new_status: newStatus, comment: comment || null } });
 
     setIsSaving(false);
     onOpenChange(false);

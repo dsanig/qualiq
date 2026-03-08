@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useAuditLog } from "@/hooks/useAuditLog";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
 import { ReclamacionFormFields, type ReclamacionFormData } from "./ReclamacionFormFields";
@@ -99,6 +100,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
   const { canEditContent, isSuperadmin } = usePermissions();
   const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
   const { user } = useAuth();
+  const { logAction } = useAuditLog();
 
   useEffect(() => {
     if (isNewOpenExternal) {
@@ -232,6 +234,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     if (inserted) await syncParticipants(inserted.id);
 
     toast({ title: "Reclamación creada" });
+    logAction({ action: "create", entity_type: "reclamacion", entity_id: inserted?.id, entity_title: form.title, details: { source: form.source, responsible_id: form.responsible_id } });
     setIsNewOpen(false);
     setForm(defaultForm());
     setNewAttachments([]);
@@ -306,6 +309,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     await syncParticipants(editingReclamacion.id);
 
     toast({ title: "Reclamación actualizada" });
+    logAction({ action: "update", entity_type: "reclamacion", entity_id: editingReclamacion.id, entity_title: form.title, details: { source: form.source, responsible_id: form.responsible_id } });
     setIsEditOpen(false);
     setEditingReclamacion(null);
     setForm(defaultForm());

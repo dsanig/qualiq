@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_FEATURES } from "@/hooks/useCompanyFeatures";
+import { useAuditLog } from "@/hooks/useAuditLog";
 
 interface FeatureRow {
   id: string;
@@ -19,6 +20,7 @@ interface FeatureTogglesProps {
 
 export function FeatureToggles({ companyId }: FeatureTogglesProps) {
   const { toast } = useToast();
+  const { logAction } = useAuditLog();
   const [features, setFeatures] = useState<FeatureRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -58,6 +60,8 @@ export function FeatureToggles({ companyId }: FeatureTogglesProps) {
       toast({ title: "Error al actualizar", description: error.message, variant: "destructive" });
     } else {
       toast({ title: enabled ? "Módulo activado" : "Módulo desactivado" });
+      const feature = features.find(f => f.id === featureId);
+      logAction({ action: enabled ? "enable_feature" : "disable_feature", entity_type: "company_feature", entity_id: featureId, entity_title: feature?.feature_key, details: { company_id: companyId } });
     }
   };
 
