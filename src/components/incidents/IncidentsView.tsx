@@ -413,6 +413,7 @@ export function IncidentsView({
     setExistingAttachments([]);
     setSelectedCapaPlanIds([]);
     setSourceInsightId(null);
+    setSourceReclamacionId(null);
     await loadData();
   };
 
