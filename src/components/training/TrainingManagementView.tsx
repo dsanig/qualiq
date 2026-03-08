@@ -341,7 +341,7 @@ export function TrainingManagementView() {
     setIsUploading(true);
 
     for (const file of Array.from(files)) {
-      const path = `training/${detailRecord.id}/${Date.now()}_${file.name}`;
+      const path = `${profile?.company_id ?? "unknown"}/training/${detailRecord.id}/${Date.now()}_${file.name}`;
       const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
       if (uploadError) {
         console.error(uploadError);
