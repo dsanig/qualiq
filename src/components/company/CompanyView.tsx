@@ -790,7 +790,7 @@ export function CompanyView() {
 
         {isSuperadmin && (
           <TabsContent value="modulos" className="mt-6">
-            <FeatureToggles companyId={profile?.company_id || ""} />
+            <FeatureToggles companyId={effectiveCompanyId || ""} />
           </TabsContent>
         )}
       </Tabs>
