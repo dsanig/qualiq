@@ -1709,6 +1709,7 @@ export function DocumentsView({
                               onViewSignatureStatus={() => handleOpenSignatureStatus(doc)}
                                onChangeStatus={() => handleOpenChangeStatus(doc)}
                               onManageResponsibilities={() => { setSelectedDocument(doc); setIsResponsibilitiesOpen(true); }}
+                              onViewPendingActions={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}
                               onShare={() => handleAction("Compartir", doc.code)}
                               onToggleLock={() => handleAction("Bloquear/Desbloquear", doc.code)}
                               onDelete={() => handleRequestDelete(doc)}
