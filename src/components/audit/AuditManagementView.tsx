@@ -14,10 +14,11 @@ import { usePermissions } from "@/hooks/usePermissions";
 
 type Audit = {
   id: string; title: string; description: string | null; audit_date: string | null;
-  auditor_id: string | null; observations: string | null; findings: string | null;
-  conclusions: string | null; status: string;
+  auditor_id: string | null; responsible_id: string | null; observations: string | null;
+  findings: string | null; conclusions: string | null; status: string;
 };
 type AuditAttachment = { id: string; audit_id: string; file_name: string | null; object_path: string; file_type: string | null };
+type AuditParticipant = { id: string; audit_id: string; user_id: string };
 type CapaPlan = { id: string; audit_id: string; title: string | null; description: string | null; responsible_id: string | null };
 type NonConformity = { id: string; capa_plan_id: string; title: string; description: string | null; severity: string | null; root_cause: string | null; status: string; deadline: string | null };
 type ActionItem = { id: string; non_conformity_id: string; action_type: "corrective" | "preventive" | "immediate"; description: string; responsible_id: string | null; due_date: string | null; status: string };
