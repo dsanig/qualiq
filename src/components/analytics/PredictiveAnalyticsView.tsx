@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,10 @@ import {
   Trash2,
   CheckCircle,
   Target,
-  FilePlus2
+  FilePlus2,
+  Archive,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -105,6 +108,9 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
   const { profile } = useAuth();
   const { logAction } = useAuditLog();
   const [insights, setInsights] = useState<PredictiveInsight[]>([]);
+  const [archivedInsights, setArchivedInsights] = useState<PredictiveInsight[]>([]);
+  const [expandedArchived, setExpandedArchived] = useState<Set<string>>(new Set());
+  const [showArchived, setShowArchived] = useState(false);
   const [windowInsights, setWindowInsights] = useState<PredictiveInsight[]>([]);
   const [analysisWindow, setAnalysisWindow] = useState<AnalysisWindow>(DEFAULT_ANALYSIS_WINDOW);
   const [incidentsForWindow, setIncidentsForWindow] = useState<IncidentForAnalysis[]>([]);
@@ -185,12 +191,14 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
     setIsLoading(true);
     if (!profile?.company_id) {
       setInsights([]);
+      setArchivedInsights([]);
       setIsLoading(false);
       return;
     }
 
     const windowStart = getWindowStart(analysisWindow);
 
+    // Fetch unread insights
     const { data, error } = await supabase
       .from("predictive_insights")
        .select("*")
@@ -199,11 +207,21 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       .order("created_at", { ascending: false })
       .limit(20);
 
+    // Fetch archived (acknowledged) insights
+    const { data: archivedData } = await supabase
+      .from("predictive_insights")
+      .select("*")
+      .eq("company_id", profile.company_id)
+      .eq("is_acknowledged", true)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
     if (error) {
       console.error("Error fetching insights:", error);
     } else {
       const unreadInsights = (data ?? []) as unknown as PredictiveInsight[];
       setInsights(unreadInsights);
+      setArchivedInsights((archivedData ?? []) as unknown as PredictiveInsight[]);
       setWindowInsights(
         windowStart
           ? unreadInsights.filter((insight) => new Date(insight.created_at) >= windowStart)
@@ -355,15 +373,18 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
 
       if (error) throw error;
 
+      const markedInsight = insights.find((i) => i.id === insightId);
       setInsights((prev) => prev.filter((i) => i.id !== insightId));
+      setWindowInsights((prev) => prev.filter((i) => i.id !== insightId));
+      if (markedInsight) {
+        setArchivedInsights((prev) => [{ ...markedInsight, is_acknowledged: true }, ...prev]);
+      }
 
       toast({
         title: "Insight marcado como leído",
-        description: "El insight se ha eliminado del listado.",
+        description: "El insight se ha movido a la sección de archivados.",
       });
-      logAction({ action: "acknowledge_insight", entity_type: "predictive_insight", entity_id: insightId });
-
-      fetchInsights();
+      logAction({ action: "acknowledge", entity_type: "predictive_analytics", entity_id: insightId });
     } catch (error) {
       console.error("Error marking insight as read:", error);
       toast({
@@ -395,6 +416,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       if (error) throw error;
       setInsights((prev) => prev.filter((i) => i.id !== insightId));
       setWindowInsights((prev) => prev.filter((i) => i.id !== insightId));
+      setArchivedInsights((prev) => prev.filter((i) => i.id !== insightId));
       toast({ title: "Insight eliminado" });
       logAction({ action: "delete", entity_type: "predictive_insight", entity_id: insightId });
     } catch (e: any) {
@@ -415,6 +437,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       if (error) throw error;
 
       setInsights([]);
+      setArchivedInsights([]);
       toast({ title: "Insights eliminados", description: "Se han eliminado todos los resultados del análisis." });
       logAction({ action: "delete_all", entity_type: "predictive_insight" });
     } catch (e: any) {
@@ -635,6 +658,131 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
             );
           })}
         </div>
+      )}
+
+      {/* Archived Insights */}
+      {archivedInsights.length > 0 && (
+        <Card className="border-dashed">
+          <CardHeader
+            className="cursor-pointer pb-3"
+            onClick={() => setShowArchived(!showArchived)}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Archive className="w-4 h-4 text-muted-foreground" />
+                Insights archivados
+                <Badge variant="secondary">{archivedInsights.length}</Badge>
+              </CardTitle>
+              {showArchived ? (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          {showArchived && (
+            <CardContent className="space-y-3 pt-0">
+              {archivedInsights.map((insight) => {
+                const typeConfig = INSIGHT_TYPE_CONFIG[insight.insight_type as keyof typeof INSIGHT_TYPE_CONFIG] || INSIGHT_TYPE_CONFIG.pattern;
+                const severityConfig = SEVERITY_CONFIG[insight.severity as keyof typeof SEVERITY_CONFIG] || SEVERITY_CONFIG.medium;
+                const Icon = typeConfig.icon;
+                const isExpanded = expandedArchived.has(insight.id);
+
+                return (
+                  <div
+                    key={insight.id}
+                    className="border rounded-lg bg-muted/30 overflow-hidden"
+                  >
+                    <div
+                      className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => {
+                        setExpandedArchived((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(insight.id)) next.delete(insight.id);
+                          else next.add(insight.id);
+                          return next;
+                        });
+                      }}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <Icon className={`w-4 h-4 ${typeConfig.color} flex-shrink-0`} />
+                        <span className="text-sm font-medium truncate">{insight.title}</span>
+                        <Badge variant={severityConfig.badge} className="text-[10px] flex-shrink-0">
+                          {insight.severity === "high" ? "Alta" : insight.severity === "medium" ? "Media" : "Baja"}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => handleCreateIncident(insight)}
+                        >
+                          <FilePlus2 className="w-3 h-3 mr-1" />
+                          Crear incidencia
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteInsight(insight.id)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    {isExpanded && (
+                      <div className="px-3 pb-3 space-y-3 border-t pt-3">
+                        <p className="text-sm text-foreground">{insight.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(insight.created_at).toLocaleDateString("es-ES", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </p>
+
+                        {insight.affected_areas && insight.affected_areas.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium mb-1">Áreas Afectadas:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {insight.affected_areas.map((area, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">{area}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {insight.suggested_actions && insight.suggested_actions.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium mb-1">Acciones Sugeridas:</p>
+                            <ul className="space-y-1">
+                              {insight.suggested_actions.map((action, idx) => (
+                                <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                                  <span className="text-accent">•</span>
+                                  {action}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {insight.confidence_score && (
+                          <Badge variant="secondary" className="text-xs">{insight.confidence_score}% confianza</Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          )}
+        </Card>
       )}
     </div>
   );
