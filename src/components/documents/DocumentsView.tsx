@@ -57,7 +57,7 @@ interface Document {
   categoryId: string;
   version: string;
   versionNum: number;
-  status: "approved" | "draft" | "review" | "obsolete" | "archived";
+  status: "approved" | "draft" | "review" | "pending_signature" | "obsolete" | "archived";
   lastUpdated: string;
   owner: string;
   ownerId: string;
