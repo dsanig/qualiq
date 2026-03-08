@@ -1596,13 +1596,14 @@ export function DocumentsView({
 
   const handleDownloadForSigning = async (doc: Document) => {
     if (doc.fileUrl && !doc.fileUrl.startsWith("/docs/")) {
-      const { data, error } = await supabase.storage.from("documents").createSignedUrl(doc.fileUrl, 60);
-      if (!error && data?.signedUrl) {
+      const { data, error } = await supabase.storage.from("documents").download(doc.fileUrl);
+      if (!error && data) {
+        const url = URL.createObjectURL(data);
         const link = document.createElement("a");
-        link.href = data.signedUrl;
+        link.href = url;
         link.download = `${doc.code}-para-firmar.${doc.format}`;
-        link.target = "_blank";
         link.click();
+        URL.revokeObjectURL(url);
         return;
       }
     }
