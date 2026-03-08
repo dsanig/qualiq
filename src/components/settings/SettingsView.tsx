@@ -121,6 +121,16 @@ export function SettingsView() {
                 className="mt-1"
               />
             </div>
+            <div>
+              <Label htmlFor="settings-job-title" className="text-xs text-muted-foreground">Cargo</Label>
+              <Input
+                id="settings-job-title"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="Ej: Responsable de Calidad"
+                className="mt-1"
+              />
+            </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <p><span className="font-medium text-foreground">Rol:</span> {roleName}</p>
               <p><span className="font-medium text-foreground">Último acceso:</span> {lastSignIn}</p>
