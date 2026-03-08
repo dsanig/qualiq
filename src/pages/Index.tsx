@@ -8,6 +8,7 @@ import { IncidentsView } from "@/components/incidents/IncidentsView";
 import { ReclamacionesView } from "@/components/reclamaciones/ReclamacionesView";
 import { ChatbotView } from "@/components/chatbot/ChatbotView";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { FilterModal, type FiltersState } from "@/components/filters/FilterModal";
 import { useCompanyFeatures } from "@/hooks/useCompanyFeatures";
