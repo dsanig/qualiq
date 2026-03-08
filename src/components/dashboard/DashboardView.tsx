@@ -11,6 +11,7 @@ interface DashboardViewProps {
   onViewPendingActions: () => void;
   onViewIncidents: () => void;
   onNavigateToDocument?: (documentCode: string) => void;
+  onNavigateToModule?: (module: string) => void;
 }
 
 interface DashboardStats {
