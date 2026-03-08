@@ -218,9 +218,33 @@ export function AuditSimulatorView() {
           <Button variant="ghost" onClick={() => setSelectedSimulation(null)}>
             ← Volver a simulaciones
           </Button>
-          <Badge variant={selectedSimulation.status === "completed" ? "default" : "secondary"}>
-            {SIMULATION_TYPES.find((t) => t.value === selectedSimulation.simulation_type)?.label}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={selectedSimulation.status === "completed" ? "default" : "secondary"}>
+              {SIMULATION_TYPES.find((t) => t.value === selectedSimulation.simulation_type)?.label}
+            </Badge>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Eliminar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Eliminar esta simulación?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Se eliminarán todos los hallazgos asociados. Esta acción no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => deleteSimulation(selectedSimulation.id)}>
+                    Eliminar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
 
         {/* Summary Card */}
