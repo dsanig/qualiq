@@ -103,7 +103,10 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
   }, [fetchActions]);
 
   const handleComplete = async (action: PendingAction) => {
-    if (!user || action.user_id !== user.id) return;
+    if (!user || action.user_id !== user.id) {
+      toast({ title: "Error", description: "Solo el responsable asignado puede completar esta acción.", variant: "destructive" });
+      return;
+    }
 
     setCompletingId(action.id);
     try {
