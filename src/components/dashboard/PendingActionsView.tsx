@@ -36,7 +36,11 @@ const mapIncidentTypeToPendingType = (incidentType: string): PendingAction["type
   return "approval";
 };
 
-export function PendingActionsView() {
+interface PendingActionsViewProps {
+  onNavigateToIncident?: (incidentId: string) => void;
+}
+
+export function PendingActionsView({ onNavigateToIncident }: PendingActionsViewProps) {
   const { profile } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [actions, setActions] = useState<PendingAction[]>([]);
