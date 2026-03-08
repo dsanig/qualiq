@@ -239,6 +239,8 @@ const Index = () => {
             }}
             openReclamacionId={openReclamacionId}
             onOpenReclamacionConsumed={() => setOpenReclamacionId(null)}
+            isNewOpenExternal={isNewReclamacionOpen}
+            onNewOpenExternalConsumed={() => setIsNewReclamacionOpen(false)}
           />
         );
       case "audits":
