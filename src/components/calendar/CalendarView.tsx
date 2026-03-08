@@ -384,7 +384,7 @@ export function CalendarView({
   const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
   const selectedEvents = selectedDay ? eventsByDate.get(selectedDay) || [] : [];
-  const isOwnEvent = (ev: CalendarEvent) => ev.userId === user?.id;
+  const isOwnEvent = (ev: CalendarEvent) => ev.companyWide || ev.userId === user?.id;
 
   return (
     <div className="flex gap-4 h-full">
