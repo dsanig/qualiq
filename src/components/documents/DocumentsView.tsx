@@ -1375,6 +1375,10 @@ export function DocumentsView({
   };
 
   const handleOpenSign = (doc: Document) => {
+    if (doc.status !== "pending_signature") {
+      toast({ title: "No se puede firmar", description: "Solo se pueden firmar documentos en estado 'Pendiente de Firma'.", variant: "destructive" });
+      return;
+    }
     setSelectedDocument(doc);
     const existingSignature = signedDocuments[doc.id];
     setSignStatus(existingSignature ? "completed" : "idle");
