@@ -476,7 +476,19 @@ export function CompanyView() {
     setIsCompanySaving(true);
     const { error } = await supabase
       .from("companies")
-      .update({ name: companyName.trim() })
+      .update({
+        name: companyName.trim(),
+        legal_name: companyForm.legal_name.trim() || null,
+        cif: companyForm.cif.trim() || null,
+        address: companyForm.address.trim() || null,
+        city: companyForm.city.trim() || null,
+        postal_code: companyForm.postal_code.trim() || null,
+        province: companyForm.province.trim() || null,
+        country: companyForm.country.trim() || null,
+        phone: companyForm.phone.trim() || null,
+        email: companyForm.email.trim() || null,
+        website: companyForm.website.trim() || null,
+      } as any)
       .eq("id", profile.company_id);
 
     setIsCompanySaving(false);
@@ -492,7 +504,7 @@ export function CompanyView() {
 
     toast({
       title: "Perfil actualizado",
-      description: "Se guardaron los datos reales de la empresa.",
+      description: "Se guardaron los datos de la empresa.",
     });
   };
 
