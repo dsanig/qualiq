@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Users, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Color palette for users
@@ -25,12 +25,15 @@ const USER_COLORS = [
 
 interface CalendarEvent {
   id: string;
+  sourceId: string; // original DB record id
   title: string;
   date: string; // YYYY-MM-DD
-  type: "document" | "incident" | "reclamacion" | "audit" | "training" | "doc_responsibility";
+  type: "document" | "incident" | "reclamacion" | "audit" | "training" | "doc_responsibility" | "non_conformity";
   userId: string;
   userName: string;
   typeLabel: string;
+  /** For doc_responsibility: the document code for search navigation */
+  documentCode?: string;
 }
 
 interface UserInfo {
@@ -41,6 +44,15 @@ interface UserInfo {
   visible: boolean;
 }
 
+interface CalendarViewProps {
+  onNavigateToIncident?: (incidentId: string) => void;
+  onNavigateToReclamacion?: (reclamacionId: string) => void;
+  onNavigateToAudit?: (module: string) => void;
+  onNavigateToTraining?: (module: string) => void;
+  onNavigateToDocument?: (documentCode: string) => void;
+  onNavigateToPendingActions?: () => void;
+}
+
 const TYPE_LABELS: Record<string, string> = {
   document: "Documento",
   incident: "Incidencia",
@@ -48,9 +60,17 @@ const TYPE_LABELS: Record<string, string> = {
   audit: "Auditoría",
   training: "Formación",
   doc_responsibility: "Responsabilidad Doc.",
+  non_conformity: "No Conformidad",
 };
 
-export function CalendarView() {
+export function CalendarView({
+  onNavigateToIncident,
+  onNavigateToReclamacion,
+  onNavigateToAudit,
+  onNavigateToTraining,
+  onNavigateToDocument,
+  onNavigateToPendingActions,
+}: CalendarViewProps) {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -77,7 +97,6 @@ export function CalendarView() {
           colorIndex: i % USER_COLORS.length,
           visible: true,
         }));
-        // Put current user first
         mapped.sort((a, b) => (a.id === user.id ? -1 : b.id === user.id ? 1 : a.name.localeCompare(b.name)));
         setUsers(mapped);
       }
@@ -92,7 +111,6 @@ export function CalendarView() {
       setLoading(true);
       const allEvents: CalendarEvent[] = [];
 
-      // Build a user map for resolving names
       const { data: profiles } = await supabase
         .from("profiles")
         .select("user_id, full_name, email");
@@ -103,17 +121,19 @@ export function CalendarView() {
       // 1. Document responsibilities (deadlines)
       const { data: docResps } = await supabase
         .from("document_responsibilities")
-        .select("id, user_id, due_date, action_type, document_id, documents(title)");
+        .select("id, user_id, due_date, action_type, document_id, documents(title, code)");
       docResps?.forEach((r: any) => {
         if (r.due_date) {
           allEvents.push({
             id: `docresp-${r.id}`,
+            sourceId: r.document_id,
             title: `${r.action_type === "firma" ? "Firma" : r.action_type === "aprobacion" ? "Aprobación" : "Revisión"}: ${r.documents?.title || "Documento"}`,
             date: r.due_date,
             type: "doc_responsibility",
             userId: r.user_id,
             userName: getName(r.user_id),
             typeLabel: TYPE_LABELS.doc_responsibility,
+            documentCode: r.documents?.code,
           });
         }
       });
@@ -126,6 +146,7 @@ export function CalendarView() {
         if (inc.deadline && inc.responsible_id) {
           allEvents.push({
             id: `inc-${inc.id}`,
+            sourceId: inc.id,
             title: inc.title,
             date: inc.deadline,
             type: "incident",
@@ -144,6 +165,7 @@ export function CalendarView() {
         if (r.response_deadline && r.responsible_id) {
           allEvents.push({
             id: `rec-${r.id}`,
+            sourceId: r.id,
             title: r.title,
             date: r.response_deadline,
             type: "reclamacion",
@@ -162,6 +184,7 @@ export function CalendarView() {
         if (a.audit_date && a.responsible_id) {
           allEvents.push({
             id: `audit-${a.id}`,
+            sourceId: a.id,
             title: a.title,
             date: a.audit_date,
             type: "audit",
@@ -180,6 +203,7 @@ export function CalendarView() {
         if (t.deadline) {
           allEvents.push({
             id: `train-${t.id}`,
+            sourceId: t.id,
             title: t.title,
             date: t.deadline,
             type: "training",
@@ -198,12 +222,13 @@ export function CalendarView() {
         if (nc.deadline && nc.responsible_id) {
           allEvents.push({
             id: `nc-${nc.id}`,
+            sourceId: nc.id,
             title: nc.title,
             date: nc.deadline,
-            type: "incident",
+            type: "non_conformity",
             userId: nc.responsible_id,
             userName: getName(nc.responsible_id),
-            typeLabel: "No Conformidad",
+            typeLabel: TYPE_LABELS.non_conformity,
           });
         }
       });
@@ -213,6 +238,35 @@ export function CalendarView() {
     };
     fetchEvents();
   }, [user]);
+
+  const handleEventClick = useCallback((ev: CalendarEvent) => {
+    if (ev.userId !== user?.id) return; // Only navigate for own events
+
+    switch (ev.type) {
+      case "incident":
+        onNavigateToIncident?.(ev.sourceId);
+        break;
+      case "reclamacion":
+        onNavigateToReclamacion?.(ev.sourceId);
+        break;
+      case "audit":
+        onNavigateToAudit?.("audits");
+        break;
+      case "training":
+        onNavigateToTraining?.("training");
+        break;
+      case "doc_responsibility":
+        if (ev.documentCode) {
+          onNavigateToDocument?.(ev.documentCode);
+        } else {
+          onNavigateToPendingActions?.();
+        }
+        break;
+      case "non_conformity":
+        onNavigateToAudit?.("audits");
+        break;
+    }
+  }, [user, onNavigateToIncident, onNavigateToReclamacion, onNavigateToAudit, onNavigateToTraining, onNavigateToDocument, onNavigateToPendingActions]);
 
   const toggleUser = useCallback((userId: string) => {
     setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, visible: !u.visible } : u)));
@@ -229,9 +283,8 @@ export function CalendarView() {
     return map;
   }, [users]);
 
-  // Calendar grid computation
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayOfWeek = (new Date(year, month, 1).getDay() + 6) % 7; // Monday-start
+  const firstDayOfWeek = (new Date(year, month, 1).getDay() + 6) % 7;
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
@@ -258,6 +311,8 @@ export function CalendarView() {
   const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
   const selectedEvents = selectedDay ? eventsByDate.get(selectedDay) || [] : [];
+
+  const isOwnEvent = (ev: CalendarEvent) => ev.userId === user?.id;
 
   return (
     <div className="flex gap-4 h-full">
@@ -338,19 +393,16 @@ export function CalendarView() {
               <div className="flex items-center justify-center h-64 text-muted-foreground">Cargando calendario...</div>
             ) : (
               <div className="grid grid-cols-7 gap-px">
-                {/* Weekday headers */}
                 {weekDays.map((d) => (
                   <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2">
                     {d}
                   </div>
                 ))}
 
-                {/* Empty cells before first day */}
                 {Array.from({ length: firstDayOfWeek }).map((_, i) => (
                   <div key={`empty-${i}`} className="min-h-[80px] bg-muted/30 rounded-sm" />
                 ))}
 
-                {/* Day cells */}
                 {Array.from({ length: daysInMonth }).map((_, i) => {
                   const day = i + 1;
                   const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -413,14 +465,27 @@ export function CalendarView() {
                   {selectedEvents.map((ev) => {
                     const colorIdx = userColorMap.get(ev.userId) ?? 0;
                     const color = USER_COLORS[colorIdx];
+                    const canNavigate = isOwnEvent(ev);
                     return (
-                      <div key={ev.id} className={cn("flex items-center gap-3 p-2 rounded-md border-l-4", color.bg, color.border)}>
+                      <div
+                        key={ev.id}
+                        onClick={() => canNavigate && handleEventClick(ev)}
+                        className={cn(
+                          "flex items-center gap-3 p-2 rounded-md border-l-4",
+                          color.bg,
+                          color.border,
+                          canNavigate && "cursor-pointer hover:opacity-80 transition-opacity"
+                        )}
+                      >
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", color.dot)} />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{ev.title}</p>
                           <p className="text-xs text-muted-foreground">{ev.userName}</p>
                         </div>
                         <Badge variant="secondary" className="text-[10px] flex-shrink-0">{ev.typeLabel}</Badge>
+                        {canNavigate && (
+                          <ExternalLink className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                        )}
                       </div>
                     );
                   })}
