@@ -2647,6 +2647,25 @@ export function DocumentsView({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Version type selector - only for non-rejected docs */}
+            {selectedDocument && !(selectedDocument.status === "draft" && rejectedDocIds.has(selectedDocument.id)) && (
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/10">
+                <Checkbox checked={updateMinorOnly} onCheckedChange={(v) => setUpdateMinorOnly(!!v)} />
+                <div>
+                  <span className="text-sm font-medium">Actualización menor</span>
+                  <p className="text-xs text-muted-foreground">
+                    {updateMinorOnly
+                      ? `Se creará la versión ${selectedDocument.versionMajor}.${selectedDocument.versionMinor + 1}`
+                      : `Se creará la versión ${selectedDocument.versionMajor + 1}.0 (versión mayor)`}
+                  </p>
+                </div>
+              </div>
+            )}
+            {selectedDocument && selectedDocument.status === "draft" && rejectedDocIds.has(selectedDocument.id) && (
+              <div className="p-3 rounded-lg border border-border bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-300">
+                Documento denegado — se incrementará la versión menor: v{selectedDocument.versionMajor}.{selectedDocument.versionMinor + 1}
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Nuevo archivo</Label>
               <Input type="file" accept=".pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg,.webp" onChange={(e) => setUpdateVersionFile(e.target.files?.[0] || null)} />
