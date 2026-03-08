@@ -1346,8 +1346,26 @@ export function DocumentsView({
     setIsPreviewOpen(true);
   };
 
-  const handleToggleSummary = (docId: string) => {
+  const handleToggleSummary = async (docId: string) => {
+    const isExpanding = expandedDocumentId !== docId;
     setExpandedDocumentId((prev) => (prev === docId ? null : docId));
+    if (isExpanding && !expandedResponsibilities[docId]) {
+      const { data } = await (supabase as any)
+        .from("document_responsibilities")
+        .select("action_type, user_id, due_date, status")
+        .eq("document_id", docId);
+      if (data && data.length > 0) {
+        const userIds = [...new Set((data as any[]).map((r: any) => r.user_id))];
+        const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds);
+        const nameMap = new Map((profiles || []).map(p => [p.user_id, p.full_name || p.email || p.user_id]));
+        setExpandedResponsibilities(prev => ({
+          ...prev,
+          [docId]: (data as any[]).map((r: any) => ({ ...r, userName: nameMap.get(r.user_id) || r.user_id })),
+        }));
+      } else {
+        setExpandedResponsibilities(prev => ({ ...prev, [docId]: [] }));
+      }
+    }
   };
 
   const handleDownload = async (doc: Document) => {
