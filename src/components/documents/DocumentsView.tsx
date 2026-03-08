@@ -1610,9 +1610,7 @@ export function DocumentsView({
                     return (
                       <Fragment key={doc.id}>
                         <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => handleToggleSummary(doc.id)}>
-                          <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                            <Checkbox checked={selectedIds.includes(doc.id)} onCheckedChange={(checked) => toggleSelect(doc.id, Boolean(checked))} aria-label={`Seleccionar ${doc.code}`} />
-                          </td>
+                          <td className="px-4 py-3"><span className="font-mono text-sm text-foreground">{doc.code}</span></td>
                           <td className="px-4 py-3"><span className="font-mono text-sm text-foreground">{doc.code}</span></td>
                           <td className="px-4 py-3">
                             <div>
