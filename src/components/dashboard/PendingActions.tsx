@@ -215,6 +215,9 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                       {action.source === "document" && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">Documento</span>
                       )}
+                      {action.source === "training" && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">Formación</span>
+                      )}
                       {action.due_date && (
                         <>
                           <span className="text-xs text-muted-foreground">•</span>
