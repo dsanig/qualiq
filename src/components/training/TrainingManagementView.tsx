@@ -108,6 +108,8 @@ export function TrainingManagementView() {
   const [selectedTrainers, setSelectedTrainers] = useState<string[]>([]);
   const [selectedTrainees, setSelectedTrainees] = useState<string[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [formStatus, setFormStatus] = useState<string>("pendiente");
+  const [formDeadline, setFormDeadline] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   /* Detail dialog */
