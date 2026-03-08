@@ -70,6 +70,7 @@ export function TrainingExamView() {
 
   const startExam = async (session: TrainingSession) => {
     setActiveSession(session);
+    logAction({ action: "start_exam", entity_type: "training_exam", entity_id: session.id, entity_title: session.documents?.title });
 
     if (session.status === "pending") {
       setIsGenerating(true);
