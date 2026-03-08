@@ -20,7 +20,7 @@ interface FilterModalProps {
   activeModule?: string;
 }
 
-export function FilterModal({ open, onOpenChange, filters, onFiltersChange }: FilterModalProps) {
+export function FilterModal({ open, onOpenChange, filters, onFiltersChange, activeModule }: FilterModalProps) {
   const updateFilter = (key: keyof FiltersState, value: string) => {
     onFiltersChange({
       ...filters,
