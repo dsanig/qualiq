@@ -381,6 +381,9 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                       {action.source === "reclamacion" && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-warning/10 text-warning">Reclamación</span>
                       )}
+                      {action.source === "incidencia" && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">Incidencia</span>
+                      )}
                       {action.due_date && (
                         <>
                           <span className="text-xs text-muted-foreground">•</span>
