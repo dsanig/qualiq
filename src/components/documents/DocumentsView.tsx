@@ -1818,7 +1818,7 @@ export function DocumentsView({
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="inline-flex items-center rounded-full bg-secondary px-2 py-1 text-xs text-foreground">
+                            <span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-medium", typologyColorMap[doc.typology] || "bg-secondary text-foreground")}>
                               {typologyLabelMap[doc.typology]}
                             </span>
                           </td>
