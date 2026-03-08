@@ -295,6 +295,7 @@ const Index = () => {
       onSearchClear={handleSearchClear}
       searchPlaceholder={searchPlaceholder}
       enabledFeatures={enabledFeatures}
+      isSuperadmin={isSuperadmin}
     >
       {renderModule()}
       <FilterModal

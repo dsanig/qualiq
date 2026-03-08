@@ -98,6 +98,26 @@ export function Sidebar({ activeModule, onModuleChange, collapsed = false, onTog
         ))}
       </nav>
 
+      {/* Superadmin Section */}
+      {isSuperadmin && (
+        <div className="px-3 py-2 border-t border-sidebar-border space-y-1">
+          {superadminItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onModuleChange(item.id)}
+              className={cn(
+                "nav-item w-full",
+                activeModule === item.id && "nav-item-active"
+              )}
+              data-testid={`sidebar-${item.id}`}
+            >
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span>{item.label}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Bottom Navigation */}
       <div className="px-3 py-4 border-t border-sidebar-border space-y-1">
         {bottomItems.map((item) => (

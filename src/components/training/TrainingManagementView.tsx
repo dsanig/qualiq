@@ -248,7 +248,7 @@ export function TrainingManagementView() {
       // Upload pending files
       if (pendingFiles.length > 0 && recordId) {
         for (const file of pendingFiles) {
-          const path = `training/${recordId}/${Date.now()}_${file.name}`;
+          const path = `${profile.company_id}/training/${recordId}/${Date.now()}_${file.name}`;
           const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
           if (uploadError) {
             console.error(uploadError);

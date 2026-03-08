@@ -241,9 +241,11 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const uploadAuditAttachments = async (auditId: string, files: FileList) => {
     const user = (await supabase.auth.getUser()).data.user;
+    const { data: pData } = await supabase.from("profiles").select("company_id").eq("user_id", user?.id ?? "").maybeSingle();
+    const tenantPrefix = pData?.company_id ?? "unknown";
     for (const file of Array.from(files)) {
       const ext = file.name.split(".").pop();
-      const filePath = `audits/${auditId}/${crypto.randomUUID()}.${ext}`;
+      const filePath = `${tenantPrefix}/audits/${auditId}/${crypto.randomUUID()}.${ext}`;
       const upload = await supabase.storage.from("documents").upload(filePath, file, { upsert: false });
       if (!upload.error) {
         await (supabase as any).from("audit_attachments").insert({

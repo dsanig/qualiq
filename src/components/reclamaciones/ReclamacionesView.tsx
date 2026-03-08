@@ -161,7 +161,9 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     const userId = (await supabase.auth.getUser()).data.user?.id;
     for (const att of newAttachments) {
       if (!att.file) continue;
-      const path = `reclamaciones/${reclamacionId}/${Date.now()}_${att.file.name}`;
+      const { data: pData } = await supabase.from("profiles").select("company_id").eq("user_id", userId ?? "").maybeSingle();
+      const tenantPrefix = pData?.company_id ?? "unknown";
+      const path = `${tenantPrefix}/reclamaciones/${reclamacionId}/${Date.now()}_${att.file.name}`;
       const { error: uploadError } = await supabase.storage.from("documents").upload(path, att.file);
       if (uploadError) {
         toast({ title: "Error subiendo archivo", description: att.file.name, variant: "destructive" });
