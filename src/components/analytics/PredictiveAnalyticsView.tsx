@@ -574,6 +574,14 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
                         <CheckCircle className="w-4 h-4 mr-1" />
                         Marcar como leído
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteInsight(insight.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                   <CardDescription className="ml-12">
