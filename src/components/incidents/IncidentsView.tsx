@@ -760,7 +760,7 @@ export function IncidentsView({
                     <Trash2 className="w-4 h-4 mr-1" />Eliminar
                   </Button>
                 ) : <span />}
-                {editingIncident && (user?.id === editingIncident.responsible_id || isSuperadmin) && (
+                {editingIncident && user?.id === editingIncident.responsible_id && (
                   <Button variant="outline" onClick={() => setIsStatusChangeOpen(true)}>
                     <History className="w-4 h-4 mr-1" />Cambiar Estado
                   </Button>
