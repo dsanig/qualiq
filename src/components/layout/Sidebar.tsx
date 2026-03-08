@@ -50,7 +50,7 @@ const superadminItems = [
 
 export function Sidebar({ activeModule, onModuleChange, collapsed = false, onToggle, enabledFeatures, isSuperadmin = false }: SidebarProps) {
   const visibleNavItems = enabledFeatures
-    ? navigationItems.filter((item) => item.id === "dashboard" || enabledFeatures.has(item.id))
+    ? navigationItems.filter((item) => item.id === "dashboard" || item.id === "calendar" || enabledFeatures.has(item.id))
     : navigationItems;
 
   return (
