@@ -107,8 +107,8 @@ export default function Auth() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
-            <Shield className="w-6 h-6 text-accent-foreground" />
+          <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
+            <img src="/iQ_V1.svg" alt="QualiQ logo" className="w-7 h-7" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">QualiQ<span className="text-sm font-normal italic text-muted-foreground">, by INMEDSA</span></h1>
