@@ -371,6 +371,20 @@ export function DocumentsView({
   // Signature status per document: { docId: { totalSigners, signedCount } }
   const [firmaStatus, setFirmaStatus] = useState<Record<string, { total: number; signed: number }>>({});
 
+  // Track which documents have been rejected (have rejected responsibilities)
+  const [rejectedDocIds, setRejectedDocIds] = useState<Set<string>>(new Set());
+
+  const fetchRejectedDocs = useCallback(async () => {
+    if (!profile?.company_id) return;
+    const { data } = await (supabase as any)
+      .from("document_responsibilities")
+      .select("document_id")
+      .eq("status", "rejected");
+    if (data) {
+      setRejectedDocIds(new Set((data as any[]).map((r: any) => r.document_id)));
+    }
+  }, [profile?.company_id]);
+
   // Fetch signatures from DB
   const fetchSignatures = useCallback(async () => {
     if (!profile?.company_id || !user) return;
