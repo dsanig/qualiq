@@ -60,9 +60,8 @@ const Index = () => {
     documentTypology: "all",
     documentStatus: "all",
     signatureStatus: "all",
-    incidentArea: "all",
+    incidentType: "all",
     incidentStatus: "all",
-    incidentPriority: "all",
   });
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isNewDocumentOpen, setIsNewDocumentOpen] = useState(false);

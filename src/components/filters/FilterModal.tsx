@@ -8,9 +8,8 @@ export type FiltersState = {
   documentTypology: "all" | "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro";
   documentStatus: string;
   signatureStatus: string;
-  incidentArea: string;
+  incidentType: string;
   incidentStatus: string;
-  incidentPriority: string;
 };
 
 interface FilterModalProps {
@@ -34,9 +33,8 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange }: Fi
       documentTypology: "all",
       documentStatus: "all",
       signatureStatus: "all",
-      incidentArea: "all",
+      incidentType: "all",
       incidentStatus: "all",
-      incidentPriority: "all",
     });
   };
 
@@ -101,18 +99,17 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange }: Fi
           </div>
 
           <div className="space-y-2">
-            <Label>Área (Incidencias)</Label>
-            <Select value={filters.incidentArea} onValueChange={(value) => updateFilter("incidentArea", value)}>
+            <Label>Tipo (Incidencias)</Label>
+            <Select value={filters.incidentType} onValueChange={(value) => updateFilter("incidentType", value)}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona un área" />
+                <SelectValue placeholder="Selecciona un tipo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="almacen">Almacén</SelectItem>
-                <SelectItem value="produccion">Producción</SelectItem>
-                <SelectItem value="calidad">Calidad</SelectItem>
-                <SelectItem value="seguridad">Seguridad</SelectItem>
-                <SelectItem value="atencion">Atención Cliente</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="incidencia">Incidencia</SelectItem>
+                <SelectItem value="desviacion">Desviación</SelectItem>
+                <SelectItem value="no_conformidad">No Conformidad</SelectItem>
+                <SelectItem value="otra">Otra</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -127,24 +124,7 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange }: Fi
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="open">Abierto</SelectItem>
                 <SelectItem value="in_progress">En progreso</SelectItem>
-                <SelectItem value="pending_approval">Pendiente aprobación</SelectItem>
                 <SelectItem value="closed">Cerrado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Prioridad (Incidencias)</Label>
-            <Select value={filters.incidentPriority} onValueChange={(value) => updateFilter("incidentPriority", value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona prioridad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="critical">Crítica</SelectItem>
-                <SelectItem value="high">Alta</SelectItem>
-                <SelectItem value="medium">Media</SelectItem>
-                <SelectItem value="low">Baja</SelectItem>
               </SelectContent>
             </Select>
           </div>

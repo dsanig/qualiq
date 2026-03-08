@@ -282,9 +282,10 @@ export function IncidentsView({
       const responsibleName = getUserName(i.responsible_id);
       const matchesQuery = matchesNormalizedQuery(debouncedSearchQuery, i.title, i.description, i.incidencia_type, i.status, responsibleName);
       const matchesStatus = filters.incidentStatus === "all" || i.status === filters.incidentStatus;
-      return matchesQuery && matchesStatus;
+      const matchesType = !("incidentType" in filters) || (filters as any).incidentType === "all" || i.incidencia_type === (filters as any).incidentType;
+      return matchesQuery && matchesStatus && matchesType;
     });
-  }, [incidents, debouncedSearchQuery, filters.incidentStatus, users]);
+  }, [incidents, debouncedSearchQuery, filters, users]);
 
   const uploadAttachments = async (incidenciaId: string) => {
     const userId = (await supabase.auth.getUser()).data.user?.id;
