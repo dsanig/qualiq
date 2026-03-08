@@ -288,6 +288,8 @@ const Index = () => {
         return <CompanyView />;
       case "company-management":
         return <CompanyManagementView />;
+      case "audit-trail":
+        return <AuditTrailView />;
       case "settings":
         return <SettingsView />;
       case "pending-actions":
