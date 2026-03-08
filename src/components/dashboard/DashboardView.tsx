@@ -77,30 +77,35 @@ export function DashboardView({ onQuickAction, onViewPendingActions, onViewIncid
           subtitle={`${stats.docsInReview} pendientes de revisión`}
           icon={FileText}
           variant="default"
+          onViewDetail={() => onNavigateToModule?.("documents")}
         />
         <StatCard
           title="Incidencias Abiertas"
           value={stats.openIncidents}
           icon={AlertTriangle}
           variant="warning"
+          onViewDetail={() => onNavigateToModule?.("incidents")}
         />
         <StatCard
           title="Incidencias Vencidas"
           value={stats.overdueIncidents}
           icon={AlertTriangle}
           variant={stats.overdueIncidents > 0 ? "destructive" : "default"}
+          onViewDetail={() => onNavigateToModule?.("incidents")}
         />
         <StatCard
           title="Acciones en Curso"
           value={stats.activeCAPAs}
           icon={Clock}
           variant="accent"
+          onViewDetail={() => onNavigateToModule?.("audits")}
         />
         <StatCard
           title="SOPs Aprobados"
           value={stats.approvedDocsPct}
           icon={CheckCircle}
           variant="success"
+          onViewDetail={() => onNavigateToModule?.("documents")}
         />
       </div>
 
