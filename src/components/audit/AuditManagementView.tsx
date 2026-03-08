@@ -303,6 +303,8 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       observations: audit.observations ?? "", findings: audit.findings ?? "",
       conclusions: audit.conclusions ?? "", status: audit.status ?? "open",
       participant_ids: participantUserIds,
+      audit_type: (audit.audit_type as "interna" | "externa") ?? "interna",
+      external_entity_id: audit.external_entity_id ?? "",
     });
     setAuditFiles(null);
     setEditAuditOpen(true);
