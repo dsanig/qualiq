@@ -467,9 +467,13 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                 {reclamacionLinks[editingReclamacion.id]?.map((incId) => {
                   const inc = incidencias.find((i) => i.id === incId);
                   return (
-                    <span key={incId} className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5">
-                      <LinkIcon className="h-3 w-3" />{inc?.title || "Incidencia"}
-                    </span>
+                    <button
+                      key={incId}
+                      className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5 hover:bg-warning/20 transition-colors"
+                      onClick={() => { setIsEditOpen(false); onNavigateToIncident?.(incId); }}
+                    >
+                      <LinkIcon className="h-3 w-3" />{inc?.title || "Incidencia"} →
+                    </button>
                   );
                 })}
               </div>
