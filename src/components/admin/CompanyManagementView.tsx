@@ -289,6 +289,10 @@ export function CompanyManagementView() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button variant="outline" size="sm" onClick={() => setModulesCompany(company)}>
+                    <ToggleLeft className="w-3 h-3 mr-1" />
+                    Módulos
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => handleOpenEdit(company)}>
                     <Pencil className="w-3 h-3 mr-1" />
                     Editar
