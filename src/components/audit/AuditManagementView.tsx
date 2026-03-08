@@ -14,10 +14,11 @@ import { usePermissions } from "@/hooks/usePermissions";
 
 type Audit = {
   id: string; title: string; description: string | null; audit_date: string | null;
-  auditor_id: string | null; observations: string | null; findings: string | null;
-  conclusions: string | null; status: string;
+  auditor_id: string | null; responsible_id: string | null; observations: string | null;
+  findings: string | null; conclusions: string | null; status: string;
 };
 type AuditAttachment = { id: string; audit_id: string; file_name: string | null; object_path: string; file_type: string | null };
+type AuditParticipant = { id: string; audit_id: string; user_id: string };
 type CapaPlan = { id: string; audit_id: string; title: string | null; description: string | null; responsible_id: string | null };
 type NonConformity = { id: string; capa_plan_id: string; title: string; description: string | null; severity: string | null; root_cause: string | null; status: string; deadline: string | null };
 type ActionItem = { id: string; non_conformity_id: string; action_type: "corrective" | "preventive" | "immediate"; description: string; responsible_id: string | null; due_date: string | null; status: string };
@@ -39,6 +40,7 @@ const actionTypes = [
 export function AuditManagementView({ searchQuery = "" }: AuditManagementViewProps) {
   const [audits, setAudits] = useState<Audit[]>([]);
   const [auditAttachments, setAuditAttachments] = useState<AuditAttachment[]>([]);
+  const [auditParticipants, setAuditParticipants] = useState<AuditParticipant[]>([]);
   const [capaPlans, setCapaPlans] = useState<CapaPlan[]>([]);
   const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
@@ -65,8 +67,9 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   // Forms
   const [auditForm, setAuditForm] = useState({
-    title: "", description: "", audit_date: "", auditor_id: "",
+    title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "",
     observations: "", findings: "", conclusions: "", status: "open",
+    participant_ids: [] as string[],
   });
   const [auditFiles, setAuditFiles] = useState<FileList | null>(null);
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "" });
@@ -104,9 +107,10 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [{ data: auditsData }, { data: attachData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: incData }, { data: linksData }] = await Promise.all([
-        (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id,observations,findings,conclusions,status").order("created_at", { ascending: false }),
+      const [{ data: auditsData }, { data: attachData }, { data: participantsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: incData }, { data: linksData }] = await Promise.all([
+        (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id,responsible_id,observations,findings,conclusions,status").order("created_at", { ascending: false }),
         (supabase as any).from("audit_attachments").select("id,audit_id,file_name,object_path,file_type"),
+        (supabase as any).from("audit_participants").select("id,audit_id,user_id"),
         (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
         (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline"),
         (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
@@ -116,6 +120,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       ]);
       setAudits((auditsData ?? []) as Audit[]);
       setAuditAttachments((attachData ?? []) as AuditAttachment[]);
+      setAuditParticipants((participantsData ?? []) as AuditParticipant[]);
       setCapaPlans((capaData ?? []) as CapaPlan[]);
       setNonConformities((ncData ?? []) as NonConformity[]);
       setActions((actionData ?? []) as ActionItem[]);
@@ -132,6 +137,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const selectedAudit = audits.find((a) => a.id === selectedAuditId) ?? null;
   const selectedAuditAttachments = useMemo(() => auditAttachments.filter((a) => a.audit_id === selectedAuditId), [auditAttachments, selectedAuditId]);
+  const selectedAuditParticipants = useMemo(() => auditParticipants.filter((p) => p.audit_id === selectedAuditId), [auditParticipants, selectedAuditId]);
 
   const getUserName = (id: string | null) => {
     if (!id) return null;
@@ -187,12 +193,14 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     const { data, error } = await (supabase as any).from("audits").insert({
       title: auditForm.title, description: auditForm.description || null,
       audit_date: auditForm.audit_date || null, auditor_id: auditForm.auditor_id || null,
+      responsible_id: auditForm.responsible_id || null,
       observations: auditForm.observations || null, findings: auditForm.findings || null,
       conclusions: auditForm.conclusions || null, status: auditForm.status,
       company_id: profileData?.company_id, created_by: user?.id,
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (auditFiles) await uploadAuditAttachments(data.id, auditFiles);
+    await syncParticipants(data.id, auditForm.participant_ids);
     toast({ title: "Auditoría creada" });
     setNewAuditOpen(false);
     resetAuditForm();
@@ -204,11 +212,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     const { error } = await (supabase as any).from("audits").update({
       title: auditForm.title, description: auditForm.description || null,
       audit_date: auditForm.audit_date || null, auditor_id: auditForm.auditor_id || null,
+      responsible_id: auditForm.responsible_id || null,
       observations: auditForm.observations || null, findings: auditForm.findings || null,
       conclusions: auditForm.conclusions || null, status: auditForm.status,
     }).eq("id", editingAudit.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (auditFiles) await uploadAuditAttachments(editingAudit.id, auditFiles);
+    await syncParticipants(editingAudit.id, auditForm.participant_ids);
     toast({ title: "Auditoría actualizada" });
     setEditAuditOpen(false);
     setEditingAudit(null);
@@ -254,18 +264,30 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     const { data } = await supabase.storage.from("documents").createSignedUrl(attachment.object_path, 300);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
-
+  const syncParticipants = async (auditId: string, userIds: string[]) => {
+    // Delete existing participants
+    await (supabase as any).from("audit_participants").delete().eq("audit_id", auditId);
+    // Insert new ones
+    if (userIds.length > 0) {
+      await (supabase as any).from("audit_participants").insert(
+        userIds.map((uid) => ({ audit_id: auditId, user_id: uid }))
+      );
+    }
+  };
   const resetAuditForm = () => {
-    setAuditForm({ title: "", description: "", audit_date: "", auditor_id: "", observations: "", findings: "", conclusions: "", status: "open" });
+    setAuditForm({ title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "", observations: "", findings: "", conclusions: "", status: "open", participant_ids: [] });
     setAuditFiles(null);
   };
 
   const openEditAudit = (audit: Audit) => {
     setEditingAudit(audit);
+    const participantUserIds = auditParticipants.filter((p) => p.audit_id === audit.id).map((p) => p.user_id);
     setAuditForm({
       title: audit.title, description: audit.description ?? "", audit_date: audit.audit_date ?? "",
-      auditor_id: audit.auditor_id ?? "", observations: audit.observations ?? "",
-      findings: audit.findings ?? "", conclusions: audit.conclusions ?? "", status: audit.status ?? "open",
+      auditor_id: audit.auditor_id ?? "", responsible_id: audit.responsible_id ?? "",
+      observations: audit.observations ?? "", findings: audit.findings ?? "",
+      conclusions: audit.conclusions ?? "", status: audit.status ?? "open",
+      participant_ids: participantUserIds,
     });
     setAuditFiles(null);
     setEditAuditOpen(true);
@@ -420,6 +442,30 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         <Select value={auditForm.auditor_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, auditor_id: v }))}>
           <SelectTrigger><SelectValue placeholder="Selecciona auditor" /></SelectTrigger>
           <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Responsable de la auditoría</Label>
+        <Select value={auditForm.responsible_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, responsible_id: v }))}>
+          <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
+          <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Empleados asignados</Label>
+        <div className="flex flex-wrap gap-1 mb-2">
+          {auditForm.participant_ids.map((uid) => (
+            <span key={uid} className="inline-flex items-center gap-1 text-xs bg-secondary text-secondary-foreground rounded-full px-2 py-1">
+              {getUserName(uid) ?? uid}
+              <button type="button" onClick={() => setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== uid) }))} className="hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+        <Select value="" onValueChange={(v) => { if (v && !auditForm.participant_ids.includes(v)) setAuditForm((p) => ({ ...p, participant_ids: [...p.participant_ids, v] })); }}>
+          <SelectTrigger><SelectValue placeholder="Añadir empleado" /></SelectTrigger>
+          <SelectContent>{users.filter((u) => !auditForm.participant_ids.includes(u.id)).map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div>
@@ -597,8 +643,21 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                   <div><span className="font-medium text-muted-foreground">Título:</span> <span>{selectedAudit.title}</span></div>
                   <div><span className="font-medium text-muted-foreground">Fecha:</span> <span>{selectedAudit.audit_date ?? "Sin fecha"}</span></div>
                   <div><span className="font-medium text-muted-foreground">Auditor:</span> <span>{getUserName(selectedAudit.auditor_id) ?? "Sin asignar"}</span></div>
+                  <div><span className="font-medium text-muted-foreground">Responsable:</span> <span>{getUserName(selectedAudit.responsible_id) ?? "Sin asignar"}</span></div>
                   <div><span className="font-medium text-muted-foreground">Estado:</span> <span>{statusLabel(selectedAudit.status)}</span></div>
                 </div>
+                {selectedAuditParticipants.length > 0 && (
+                  <div>
+                    <p className="font-medium text-muted-foreground mb-1">Empleados asignados:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedAuditParticipants.map((p) => (
+                        <span key={p.id} className="text-xs bg-secondary text-secondary-foreground rounded-full px-2 py-1">
+                          {getUserName(p.user_id) ?? p.user_id}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {selectedAudit.description && (
                   <div><p className="font-medium text-muted-foreground mb-1">Descripción:</p><p className="whitespace-pre-wrap">{selectedAudit.description}</p></div>
                 )}

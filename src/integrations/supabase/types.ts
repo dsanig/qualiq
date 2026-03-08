@@ -191,6 +191,35 @@ export type Database = {
           },
         ]
       }
+      audit_participants: {
+        Row: {
+          audit_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          audit_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          audit_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_participants_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_simulations: {
         Row: {
           company_id: string
@@ -262,6 +291,7 @@ export type Database = {
           findings: string | null
           id: string
           observations: string | null
+          responsible_id: string | null
           status: string
           title: string
         }
@@ -276,6 +306,7 @@ export type Database = {
           findings?: string | null
           id?: string
           observations?: string | null
+          responsible_id?: string | null
           status?: string
           title: string
         }
@@ -290,6 +321,7 @@ export type Database = {
           findings?: string | null
           id?: string
           observations?: string | null
+          responsible_id?: string | null
           status?: string
           title?: string
         }
