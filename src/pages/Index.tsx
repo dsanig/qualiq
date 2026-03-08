@@ -41,6 +41,7 @@ const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   settings: { title: "Configuración", subtitle: "Preferencias y ajustes del sistema" },
   "pending-actions": { title: "Acciones Pendientes", subtitle: "Seguimiento completo de tareas y aprobaciones" },
   "company-management": { title: "Gestión de Empresas", subtitle: "Administración multi-tenant de la plataforma" },
+  "audit-trail": { title: "Pista de Auditoría", subtitle: "Registro completo de todas las acciones del sistema" },
 };
 
 type IncidentType = "incidencia" | "desviacion" | "no_conformidad" | "otra";
