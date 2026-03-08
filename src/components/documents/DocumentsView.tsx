@@ -1804,7 +1804,6 @@ export function DocumentsView({
                   <p>Autor: {selectedDocument.originalAuthor}</p>
                   <p>Versión: v{selectedDocument.version}</p>
                   <p>Última modificación: {selectedDocument.lastUpdated}</p>
-                  <p>Firma: {signedDocuments[selectedDocument.id] ? "Firmado con DNIe" : "Pendiente"}</p>
                 </div>
               </div>
 
