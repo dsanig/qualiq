@@ -36,7 +36,7 @@ const navigationItems = [
   { id: "training-exam", label: "Examen Formación", icon: GraduationCap },
   { id: "audit-simulator", label: "Simulador Auditoría", icon: ClipboardCheck },
   { id: "predictive-analytics", label: "Análisis Predictivo", icon: TrendingUp },
-  { id: "chatbot", label: "Asistente IA", icon: MessageSquare },
+  { id: "chatbot", label: "QualAI", icon: MessageSquare },
 ];
 
 const bottomItems = [

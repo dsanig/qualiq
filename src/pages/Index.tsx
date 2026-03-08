@@ -35,7 +35,7 @@ const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   "training-exam": { title: "Examen de Formación", subtitle: "Evaluación de comprensión de procedimientos" },
   "audit-simulator": { title: "Simulador de Auditoría", subtitle: "Simulación de inspecciones FDA/EMA" },
   "predictive-analytics": { title: "Análisis Predictivo CAPA", subtitle: "Detección de patrones y acciones preventivas" },
-  chatbot: { title: "Asistente IA", subtitle: "Consultas basadas en documentación y normativa" },
+  chatbot: { title: "QualAI", subtitle: "Consultas basadas en documentación y normativa" },
   company: { title: "Empresa", subtitle: "Configuración y datos de la organización" },
   settings: { title: "Configuración", subtitle: "Preferencias y ajustes del sistema" },
   "pending-actions": { title: "Acciones Pendientes", subtitle: "Seguimiento completo de tareas y aprobaciones" },
