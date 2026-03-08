@@ -26,7 +26,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             <div className="w-9 h-9 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
               <img src="/iQ_V1.svg" alt="QualiQ logo" className="w-5 h-5" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-foreground">QualiQ</span>
+            <span className="font-bold text-xl tracking-tight text-foreground">QualiQ<span className="text-sm font-normal italic text-muted-foreground">, by INMEDSA</span></span>
           </div>
           <Button variant="accent" size="sm" onClick={onGetStarted}>
             Acceso al Sistema
