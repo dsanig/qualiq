@@ -51,7 +51,7 @@ const superadminItems = [
   { id: "audit-trail", label: "Pista de Auditoría", icon: Shield },
 ];
 
-export function Sidebar({ activeModule, onModuleChange, collapsed = false, onToggle, enabledFeatures, isSuperadmin = false }: SidebarProps) {
+export function Sidebar({ activeModule, onModuleChange, collapsed = false, onToggle, enabledFeatures, isSuperadmin = false, isAdmin = false }: SidebarProps) {
   const visibleNavItems = enabledFeatures
     ? navigationItems.filter((item) => item.id === "dashboard" || item.id === "calendar" || enabledFeatures.has(item.id))
     : navigationItems;
