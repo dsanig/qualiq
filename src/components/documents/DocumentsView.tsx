@@ -2607,7 +2607,8 @@ export function DocumentsView({
           documentCode={selectedDocument.code}
           open={isResponsibilitiesOpen}
           onOpenChange={setIsResponsibilitiesOpen}
-          onWorkflowChange={() => { fetchDocuments(); fetchFirmaStatus(); }}
+          onWorkflowChange={() => { fetchDocuments(); fetchFirmaStatus(); fetchRejectedDocs(); }}
+          onUpdateDocument={() => handleOpenUpdateVersion(selectedDocument)}
         />
       )}
       {/* Pending Actions Dialog */}
