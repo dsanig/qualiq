@@ -93,14 +93,14 @@ const defaultForm = (type?: IncidentType): IncidentFormData => ({
 export function IncidentsView({
   searchQuery, onSearchChange, filters, onFiltersChange, onOpenFilters,
   isNewIncidentOpen, onNewIncidentOpenChange, initialIncidentType, reloadToken, prefill, onPrefillConsumed,
-  openIncidentId, onOpenIncidentConsumed,
+  openIncidentId, onOpenIncidentConsumed, onNavigateToReclamacion,
 }: IncidentsViewProps) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [audits, setAudits] = useState<AuditRef[]>([]);
   const [users, setUsers] = useState<UserRef[]>([]);
   const [capaPlans, setCapaPlans] = useState<CapaPlanRef[]>([]);
   const [incidentCapaLinks, setIncidentCapaLinks] = useState<Record<string, string[]>>({});
-  const [incidentReclamacionLinks, setIncidentReclamacionLinks] = useState<Record<string, string[]>>({});
+  const [incidentReclamacionLinks, setIncidentReclamacionLinks] = useState<Record<string, { id: string; title: string }[]>>({});
   const [selectedCapaPlanIds, setSelectedCapaPlanIds] = useState<string[]>([]);
   const [form, setForm] = useState<IncidentFormData>(defaultForm(initialIncidentType));
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
