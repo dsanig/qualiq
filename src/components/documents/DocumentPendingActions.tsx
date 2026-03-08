@@ -80,7 +80,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       const userIds = [...new Set(pendingActions.map((a: PendingAction) => a.user_id))];
 
       const [docsRes, usersRes] = await Promise.all([
-        supabase.from("documents").select("id, code, title").in("id", docIds),
+        supabase.from("documents").select("id, code, title, status").in("id", docIds),
         supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds),
       ]);
 
