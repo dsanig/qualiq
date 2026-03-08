@@ -106,6 +106,7 @@ export function IncidentsView({
   const [newAttachments, setNewAttachments] = useState<AttachmentInfo[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<AttachmentInfo[]>([]);
   const [sourceInsightId, setSourceInsightId] = useState<string | null>(null);
+  const [sourceReclamacionId, setSourceReclamacionId] = useState<string | null>(null);
   const { toast } = useToast();
   const { canEditContent, isSuperadmin } = usePermissions();
   const [incidentPendingDelete, setIncidentPendingDelete] = useState<Incident | null>(null);
