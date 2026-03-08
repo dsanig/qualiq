@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { FeatureToggles } from "./FeatureToggles";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompanyContext } from "@/hooks/useCompanyContext";
 
 type UserDirectoryEntry = {
   id: string;
