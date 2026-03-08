@@ -49,7 +49,7 @@ export function CompanyManagementView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<CompanyRow | null>(null);
-  const [form, setForm] = useState({ name: "", slug: "", status: "active", plan_type: "standard" });
+  const [form, setForm] = useState({ name: "", slug: "", status: "active", plan_type: "standard", admin_email: "", admin_password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchCompanies = useCallback(async () => {
@@ -99,13 +99,13 @@ export function CompanyManagementView() {
 
   const handleOpenCreate = () => {
     setEditingCompany(null);
-    setForm({ name: "", slug: "", status: "active", plan_type: "standard" });
+    setForm({ name: "", slug: "", status: "active", plan_type: "standard", admin_email: "", admin_password: "" });
     setIsDialogOpen(true);
   };
 
   const handleOpenEdit = (company: CompanyRow) => {
     setEditingCompany(company);
-    setForm({ name: company.name, slug: company.slug, status: company.status, plan_type: company.plan_type });
+    setForm({ name: company.name, slug: company.slug, status: company.status, plan_type: company.plan_type, admin_email: "", admin_password: "" });
     setIsDialogOpen(true);
   };
 
@@ -113,6 +113,18 @@ export function CompanyManagementView() {
     if (!form.name.trim() || !form.slug.trim()) {
       toast({ title: "Nombre y slug son obligatorios", variant: "destructive" });
       return;
+    }
+
+    // Validate admin fields for new company
+    if (!editingCompany) {
+      if (!form.admin_email.trim() || !form.admin_password.trim()) {
+        toast({ title: "Email y contraseña del administrador son obligatorios", variant: "destructive" });
+        return;
+      }
+      if (form.admin_password.trim().length < 8) {
+        toast({ title: "La contraseña debe tener al menos 8 caracteres", variant: "destructive" });
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -131,17 +143,43 @@ export function CompanyManagementView() {
       toast({ title: "Empresa actualizada" });
       logAction({ action: "update", entity_type: "company", entity_id: editingCompany.id, entity_title: form.name.trim(), details: { status: form.status, plan_type: form.plan_type } });
     } else {
-      const { error } = await (supabase as any)
+      // Create company
+      const { data: newCompany, error } = await (supabase as any)
         .from("companies")
-        .insert({ name: form.name.trim(), slug: form.slug.trim(), status: form.status, plan_type: form.plan_type });
+        .insert({ name: form.name.trim(), slug: form.slug.trim(), status: form.status, plan_type: form.plan_type })
+        .select("id")
+        .single();
 
-      if (error) {
-        toast({ title: "Error creando empresa", description: error.message, variant: "destructive" });
+      if (error || !newCompany) {
+        toast({ title: "Error creando empresa", description: error?.message, variant: "destructive" });
         setIsSubmitting(false);
         return;
       }
-      toast({ title: "Empresa creada" });
-      logAction({ action: "create", entity_type: "company", entity_title: form.name.trim(), details: { slug: form.slug.trim(), plan_type: form.plan_type } });
+
+      // Create admin user for the new company
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      if (accessToken) {
+        const { data: fnData, error: fnError } = await supabase.functions.invoke("admin-create-user", {
+          body: {
+            email: form.admin_email.trim(),
+            password: form.admin_password.trim(),
+            full_name: "Administrador",
+            roles: ["Administrador"],
+            company_id: newCompany.id,
+          },
+        });
+
+        if (fnError || (fnData && !fnData.ok)) {
+          const errorMsg = fnData?.error?.message || fnError?.message || "Error desconocido";
+          toast({ title: "Empresa creada, pero error al crear administrador", description: errorMsg, variant: "destructive" });
+        } else {
+          toast({ title: "Empresa y administrador creados correctamente" });
+        }
+      }
+
+      logAction({ action: "create", entity_type: "company", entity_title: form.name.trim(), details: { slug: form.slug.trim(), plan_type: form.plan_type, admin_email: form.admin_email.trim() } });
     }
 
     setIsSubmitting(false);
@@ -340,6 +378,29 @@ export function CompanyManagementView() {
                 </Select>
               </div>
             </div>
+            {!editingCompany && (
+              <div className="space-y-4 border-t border-border pt-4">
+                <p className="text-sm font-medium text-foreground">Administrador de la empresa</p>
+                <div className="space-y-2">
+                  <Label>Email del administrador</Label>
+                  <Input
+                    type="email"
+                    value={form.admin_email}
+                    onChange={(e) => setForm((prev) => ({ ...prev, admin_email: e.target.value }))}
+                    placeholder="admin@empresa.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contraseña</Label>
+                  <Input
+                    type="password"
+                    value={form.admin_password}
+                    onChange={(e) => setForm((prev) => ({ ...prev, admin_password: e.target.value }))}
+                    placeholder="Mínimo 8 caracteres"
+                  />
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
