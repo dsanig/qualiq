@@ -726,6 +726,10 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div><span className="font-medium text-muted-foreground">Título:</span> <span>{selectedAudit.title}</span></div>
                   <div><span className="font-medium text-muted-foreground">Fecha:</span> <span>{selectedAudit.audit_date ?? "Sin fecha"}</span></div>
+                  <div><span className="font-medium text-muted-foreground">Tipo:</span> <span className="capitalize">{selectedAudit.audit_type === "externa" ? "Externa" : "Interna"}</span></div>
+                  {selectedAudit.audit_type === "externa" && selectedAudit.external_entity_id && (
+                    <div><span className="font-medium text-muted-foreground">Cliente/Proveedor:</span> <span>{selectedAudit.external_entity_id}</span></div>
+                  )}
                   <div><span className="font-medium text-muted-foreground">Auditor:</span> <span>{getUserName(selectedAudit.auditor_id) ?? "Sin asignar"}</span></div>
                   <div><span className="font-medium text-muted-foreground">Responsable:</span> <span>{getUserName(selectedAudit.responsible_id) ?? "Sin asignar"}</span></div>
                   <div><span className="font-medium text-muted-foreground">Estado:</span> <span>{statusLabel(selectedAudit.status)}</span></div>
