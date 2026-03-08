@@ -119,6 +119,8 @@ export function IncidentsView({
   const [incidentPendingDelete, setIncidentPendingDelete] = useState<Incident | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
+  const { user } = useAuth();
 
   const canDeleteIncidencia = isSuperadmin;
 
