@@ -726,10 +726,19 @@ export function IncidentsView({
             <div className="space-y-1">
               <p className="text-sm font-medium">Reclamación de origen</p>
               <div className="flex flex-wrap gap-1">
-                {incidentReclamacionLinks[editingIncident.id].map((title, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5">
-                    <LinkIcon className="h-3 w-3" />{title}
-                  </span>
+                {incidentReclamacionLinks[editingIncident.id].map((rec) => (
+                  <button
+                    key={rec.id}
+                    type="button"
+                    className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5 hover:bg-warning/20 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setIsEditOpen(false);
+                      setEditingIncident(null);
+                      onNavigateToReclamacion?.(rec.id);
+                    }}
+                  >
+                    <LinkIcon className="h-3 w-3" />{rec.title} →
+                  </button>
                 ))}
               </div>
             </div>
