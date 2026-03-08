@@ -145,6 +145,8 @@ export function AuditTrailView() {
   const [uniqueUsers, setUniqueUsers] = useState<Array<{ id: string; name: string }>>([]);
   const [uniqueEntityTypes, setUniqueEntityTypes] = useState<string[]>([]);
   const [uniqueActions, setUniqueActions] = useState<string[]>([]);
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0); // 0=closed, 1=warning, 2=confirm text
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const loadEntries = useCallback(async () => {
     setIsLoading(true);
