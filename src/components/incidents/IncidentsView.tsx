@@ -639,7 +639,7 @@ export function IncidentsView({
       </Card>
 
       {/* New incident dialog */}
-      <Dialog open={isNewIncidentOpen} onOpenChange={(open) => { onNewIncidentOpenChange(open); if (!open) { setNewAttachments([]); setSelectedCapaPlanIds([]); setForm(defaultForm(initialIncidentType)); setSourceInsightId(null); } }}>
+      <Dialog open={isNewIncidentOpen} onOpenChange={(open) => { onNewIncidentOpenChange(open); if (!open) { setNewAttachments([]); setSelectedCapaPlanIds([]); setForm(defaultForm(initialIncidentType)); setSourceInsightId(null); setSourceReclamacionId(null); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nueva incidencia</DialogTitle>
