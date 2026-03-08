@@ -473,6 +473,66 @@ export function CompanyView() {
     });
   };
 
+  const handleOpenEditUser = async (userItem: UserDirectoryEntry) => {
+    setEditingUserId(userItem.id);
+    // Fetch full profile data including job_title
+    const { data } = await supabase
+      .from("profiles")
+      .select("full_name, job_title")
+      .or(`user_id.eq.${userItem.id},id.eq.${userItem.id}`)
+      .maybeSingle();
+
+    setEditForm({
+      fullName: (data as any)?.full_name ?? userItem.full_name ?? "",
+      jobTitle: (data as any)?.job_title ?? "",
+      role: userItem.is_superadmin ? "Superadmin" : (userItem.role ?? "Espectador"),
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEditUser = async () => {
+    if (!editingUserId) return;
+    setIsSubmitting(true);
+
+    try {
+      // Update profile (full_name, job_title)
+      const { error: profileError } = await (supabase as any)
+        .from("profiles")
+        .update({ full_name: editForm.fullName.trim() || null, job_title: editForm.jobTitle.trim() || null })
+        .eq("user_id", editingUserId);
+
+      if (profileError) throw profileError;
+
+      // Update role if not superadmin and role changed
+      const currentUser = users.find((u) => u.id === editingUserId);
+      if (currentUser && !currentUser.is_superadmin && editForm.role !== "Superadmin" && editForm.role !== currentUser.role) {
+        // Delete old role
+        await (supabase as any)
+          .from("user_roles")
+          .delete()
+          .eq("user_id", editingUserId);
+
+        // Insert new role
+        await (supabase as any)
+          .from("user_roles")
+          .insert({ user_id: editingUserId, role: editForm.role });
+      }
+
+      toast({ title: "Usuario actualizado" });
+      setIsEditDialogOpen(false);
+      setEditingUserId("");
+      void fetchUsers();
+    } catch (e: any) {
+      toast({
+        title: "No se pudo actualizar",
+        description: e.message ?? "Error desconocido.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!canManageCompany) {
     return (
       <div className="bg-card rounded-lg border border-border p-6 space-y-4">
