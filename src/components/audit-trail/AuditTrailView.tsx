@@ -296,13 +296,13 @@ export function AuditTrailView() {
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setDeleteStep(0)}>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
+                    <Button variant="outline" onClick={() => setDeleteStep(0)}>Cancelar</Button>
+                    <Button
+                      variant="destructive"
                       onClick={() => { setDeleteStep(2); setDeleteConfirmText(""); }}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                       Entiendo, continuar
-                    </AlertDialogAction>
+                    </Button>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -312,8 +312,8 @@ export function AuditTrailView() {
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
-                    <AlertDialogDescription className="space-y-3">
-                      <span>Para confirmar, escribe <strong>ELIMINAR</strong> en el campo de abajo:</span>
+                    <AlertDialogDescription>
+                      Para confirmar, escribe <strong>ELIMINAR</strong> en el campo de abajo:
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <Input
@@ -323,14 +323,14 @@ export function AuditTrailView() {
                     className="mt-2"
                   />
                   <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => { setDeleteStep(0); setDeleteConfirmText(""); }}>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
+                    <Button variant="outline" onClick={() => { setDeleteStep(0); setDeleteConfirmText(""); }}>Cancelar</Button>
+                    <Button
+                      variant="destructive"
                       disabled={deleteConfirmText !== "ELIMINAR"}
                       onClick={() => { deleteAllEntries(); setDeleteStep(0); setDeleteConfirmText(""); }}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                       Eliminar permanentemente
-                    </AlertDialogAction>
+                    </Button>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
