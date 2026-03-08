@@ -8,7 +8,8 @@ import {
   Building2,
   GraduationCap,
   ClipboardCheck,
-  TrendingUp
+  TrendingUp,
+  FileWarning
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ const navigationItems = [
   { id: "dashboard", label: "Panel de Control", icon: LayoutDashboard },
   { id: "documents", label: "Documentos", icon: FileText },
   { id: "incidents", label: "Incidencias", icon: AlertTriangle },
+  { id: "reclamaciones", label: "Reclamaciones", icon: FileWarning },
   { id: "audits", label: "Auditorías", icon: ClipboardCheck },
   { id: "training", label: "Formaciones", icon: GraduationCap },
   { id: "training-exam", label: "Examen Formación", icon: GraduationCap },

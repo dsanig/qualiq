@@ -1082,6 +1082,183 @@ export type Database = {
           },
         ]
       }
+      reclamacion_attachments: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          created_by: string | null
+          file_name: string | null
+          file_type: string | null
+          id: string
+          object_path: string
+          reclamacion_id: string
+        }
+        Insert: {
+          bucket_id?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          object_path: string
+          reclamacion_id: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          object_path?: string
+          reclamacion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclamacion_attachments_reclamacion_id_fkey"
+            columns: ["reclamacion_id"]
+            isOneToOne: false
+            referencedRelation: "reclamaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reclamacion_incidencias: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          incidencia_id: string
+          reclamacion_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          incidencia_id: string
+          reclamacion_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          incidencia_id?: string
+          reclamacion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclamacion_incidencias_incidencia_id_fkey"
+            columns: ["incidencia_id"]
+            isOneToOne: false
+            referencedRelation: "incidencias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reclamacion_incidencias_reclamacion_id_fkey"
+            columns: ["reclamacion_id"]
+            isOneToOne: false
+            referencedRelation: "reclamaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reclamacion_participants: {
+        Row: {
+          created_at: string
+          id: string
+          reclamacion_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reclamacion_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reclamacion_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclamacion_participants_reclamacion_id_fkey"
+            columns: ["reclamacion_id"]
+            isOneToOne: false
+            referencedRelation: "reclamaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reclamaciones: {
+        Row: {
+          company_id: string
+          conclusion: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          detail: string | null
+          id: string
+          investigation: string | null
+          opened_at: string
+          resolution: string | null
+          response_deadline: string | null
+          responsible_id: string | null
+          source: string
+          source_code: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          conclusion?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          detail?: string | null
+          id?: string
+          investigation?: string | null
+          opened_at?: string
+          resolution?: string | null
+          response_deadline?: string | null
+          responsible_id?: string | null
+          source?: string
+          source_code?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          conclusion?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          detail?: string | null
+          id?: string
+          investigation?: string | null
+          opened_at?: string
+          resolution?: string | null
+          response_deadline?: string | null
+          responsible_id?: string | null
+          source?: string
+          source_code?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclamaciones_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_answers: {
         Row: {
           answered_at: string

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, FileText, AlertCircle, PenTool, CheckCircle, Search as SearchIcon, GraduationCap, Eye } from "lucide-react";
+import { CheckCircle2, Clock, FileText, AlertCircle, PenTool, CheckCircle, Search as SearchIcon, GraduationCap, Eye, FileWarning } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +13,7 @@ interface PendingAction {
   due_date: string | null;
   status: string;
   isOverdue: boolean;
-  source: "capa" | "document" | "training";
+  source: "capa" | "document" | "training" | "reclamacion";
   documentCode?: string;
   documentId?: string;
   documentStatus?: string;
@@ -29,6 +29,7 @@ const typeIcons: Record<string, typeof CheckCircle2> = {
   revision: SearchIcon,
   training: GraduationCap,
   waiting: Eye,
+  reclamacion: FileWarning,
 };
 
 const typeLabels: Record<string, string> = {
@@ -40,6 +41,7 @@ const typeLabels: Record<string, string> = {
   revision: "Revisión",
   training: "Formación",
   waiting: "En espera",
+  reclamacion: "Reclamación",
 };
 
 interface PendingActionsProps {
@@ -213,8 +215,52 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
         }
       }
 
+      // Fetch reclamaciones assigned to current user (as responsible or participant)
+      let reclamacionActions: PendingAction[] = [];
+      if (user) {
+        // Get reclamaciones where user is responsible
+        const { data: recResp } = await (supabase as any)
+          .from("reclamaciones")
+          .select("id, title, status, response_deadline")
+          .eq("responsible_id", user.id)
+          .in("status", ["abierta", "en_revision", "en_resolucion"]);
+
+        // Get reclamaciones where user is participant
+        const { data: recParts } = await (supabase as any)
+          .from("reclamacion_participants")
+          .select("reclamacion_id")
+          .eq("user_id", user.id);
+
+        const partRecIds = new Set((recParts as any[] || []).map((p: any) => p.reclamacion_id));
+        let partReclamaciones: any[] = [];
+        if (partRecIds.size > 0) {
+          const { data: partRecs } = await (supabase as any)
+            .from("reclamaciones")
+            .select("id, title, status, response_deadline")
+            .in("id", [...partRecIds])
+            .in("status", ["abierta", "en_revision", "en_resolucion"]);
+          partReclamaciones = partRecs || [];
+        }
+
+        // Merge unique
+        const allRecs = new Map<string, any>();
+        for (const r of [...(recResp || []), ...partReclamaciones]) {
+          allRecs.set(r.id, r);
+        }
+
+        reclamacionActions = [...allRecs.values()].map((r) => ({
+          id: r.id,
+          description: `Reclamación: ${r.title}`,
+          action_type: "reclamacion",
+          due_date: r.response_deadline,
+          status: r.status,
+          isOverdue: r.response_deadline ? new Date(r.response_deadline) < now : false,
+          source: "reclamacion" as const,
+        }));
+      }
+
       // Combine: active tasks first, waiting tasks last
-      const activeActions = [...capaActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions];
+      const activeActions = [...capaActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions, ...reclamacionActions];
       const waitingActions = docActions.filter(a => a.action_type === "waiting");
       
       const combined = [
@@ -279,6 +325,8 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                     onNavigateToModule("audits");
                   } else if (action.source === "training" && onNavigateToModule) {
                     onNavigateToModule("training");
+                  } else if (action.source === "reclamacion" && onNavigateToModule) {
+                    onNavigateToModule("reclamaciones");
                   }
                 }}
               >
@@ -303,6 +351,9 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                       )}
                       {action.source === "training" && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">Formación</span>
+                      )}
+                      {action.source === "reclamacion" && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-warning/10 text-warning">Reclamación</span>
                       )}
                       {action.due_date && (
                         <>
