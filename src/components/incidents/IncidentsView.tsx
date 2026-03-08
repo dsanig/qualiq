@@ -329,12 +329,23 @@ export function IncidentsView({
       );
     }
 
+    // Auto-link to source reclamacion
+    if (inserted && sourceReclamacionId) {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      await (supabase as any).from("reclamacion_incidencias").insert({
+        reclamacion_id: sourceReclamacionId,
+        incidencia_id: inserted.id,
+        created_by: userId,
+      });
+    }
+
     toast({ title: "Incidencia creada" });
     onNewIncidentOpenChange(false);
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
     setSelectedCapaPlanIds([]);
     setSourceInsightId(null);
+    setSourceReclamacionId(null);
     await loadData();
   };
 
