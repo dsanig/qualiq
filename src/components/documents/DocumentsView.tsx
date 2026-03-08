@@ -469,7 +469,7 @@ export function DocumentsView({
     let query = supabase
       .from("documents")
       .select("*")
-      .eq("company_id", profile.company_id)
+      .eq("company_id", effectiveCompanyId)
       .order("created_at", { ascending: false });
 
     if (filters.documentTypology !== "all") {
