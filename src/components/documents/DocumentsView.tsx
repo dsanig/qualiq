@@ -186,10 +186,12 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; cl
   draft: { label: "Borrador", icon: Clock, class: "text-muted-foreground" },
   review: { label: "En Revisión", icon: AlertCircle, class: "text-warning" },
   pending_signature: { label: "Pendiente de Firma", icon: PenTool, class: "text-primary" },
-  pending_approval: { label: "Pendiente de Aprobación", icon: ClipboardList, class: "text-accent-foreground" },
+  pending_approval: { label: "Pendiente de Aprobación", icon: ClipboardList, class: "text-primary" },
   obsolete: { label: "Obsoleto", icon: AlertCircle, class: "text-destructive" },
   archived: { label: "Archivado", icon: AlertCircle, class: "text-muted-foreground" },
 };
+
+const defaultStatus = { label: "Desconocido", icon: AlertCircle, class: "text-muted-foreground" };
 
 const statusOptions = [
   { value: "draft", label: "Borrador" },
@@ -1712,7 +1714,7 @@ export function DocumentsView({
                 </thead>
                 <tbody className="divide-y divide-border">
                   {paginatedDocuments.map((doc) => {
-                    const status = statusConfig[doc.status];
+                    const status = statusConfig[doc.status] || defaultStatus;
                     const StatusIcon = status.icon;
                     return (
                       <Fragment key={doc.id}>
