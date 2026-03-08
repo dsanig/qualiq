@@ -438,8 +438,11 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
             </>
           )}
           </Button>
-        </div>
-      </div>
+          {windowInsights.length > 0 && (
+            <Button variant="destructive" size="icon" onClick={handleDeleteAllInsights} title="Eliminar todos los insights">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
