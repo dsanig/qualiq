@@ -175,6 +175,8 @@ export function TrainingManagementView() {
     setSelectedTrainers([]);
     setSelectedTrainees([]);
     setPendingFiles([]);
+    setFormStatus("pendiente");
+    setFormDeadline(null);
     setFormOpen(true);
   };
 
