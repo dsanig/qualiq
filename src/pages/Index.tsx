@@ -261,6 +261,8 @@ const Index = () => {
         return <PredictiveAnalyticsView onCreateIncidentFromInsight={handleCreateIncidentFromInsight} />;
       case "company":
         return <CompanyView />;
+      case "company-management":
+        return <CompanyManagementView />;
       case "settings":
         return <SettingsView />;
       case "pending-actions":
