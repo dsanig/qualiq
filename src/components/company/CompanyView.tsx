@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Building2, Mail, Plus, ToggleLeft, Trash2 } from "lucide-react";
+import { Building2, Mail, Pencil, Plus, ToggleLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +50,9 @@ export function CompanyView() {
     role: "Espectador",
   });
   const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "" });
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ fullName: "", jobTitle: "", role: "Espectador" });
+  const [editingUserId, setEditingUserId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [devDetectedRole, setDevDetectedRole] = useState<string>("Desconocido");
   const debugUserCreation = import.meta.env.DEV || import.meta.env.VITE_DEBUG_USER_CREATION === "true";
@@ -470,6 +473,66 @@ export function CompanyView() {
     });
   };
 
+  const handleOpenEditUser = async (userItem: UserDirectoryEntry) => {
+    setEditingUserId(userItem.id);
+    // Fetch full profile data including job_title
+    const { data } = await supabase
+      .from("profiles")
+      .select("full_name, job_title")
+      .or(`user_id.eq.${userItem.id},id.eq.${userItem.id}`)
+      .maybeSingle();
+
+    setEditForm({
+      fullName: (data as any)?.full_name ?? userItem.full_name ?? "",
+      jobTitle: (data as any)?.job_title ?? "",
+      role: userItem.is_superadmin ? "Superadmin" : (userItem.role ?? "Espectador"),
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEditUser = async () => {
+    if (!editingUserId) return;
+    setIsSubmitting(true);
+
+    try {
+      // Update profile (full_name, job_title)
+      const { error: profileError } = await (supabase as any)
+        .from("profiles")
+        .update({ full_name: editForm.fullName.trim() || null, job_title: editForm.jobTitle.trim() || null })
+        .eq("user_id", editingUserId);
+
+      if (profileError) throw profileError;
+
+      // Update role if not superadmin and role changed
+      const currentUser = users.find((u) => u.id === editingUserId);
+      if (currentUser && !currentUser.is_superadmin && editForm.role !== "Superadmin" && editForm.role !== currentUser.role) {
+        // Delete old role
+        await (supabase as any)
+          .from("user_roles")
+          .delete()
+          .eq("user_id", editingUserId);
+
+        // Insert new role
+        await (supabase as any)
+          .from("user_roles")
+          .insert({ user_id: editingUserId, role: editForm.role });
+      }
+
+      toast({ title: "Usuario actualizado" });
+      setIsEditDialogOpen(false);
+      setEditingUserId("");
+      void fetchUsers();
+    } catch (e: any) {
+      toast({
+        title: "No se pudo actualizar",
+        description: e.message ?? "Error desconocido.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!canManageCompany) {
     return (
       <div className="bg-card rounded-lg border border-border p-6 space-y-4">
@@ -563,6 +626,16 @@ export function CompanyView() {
                     <span className="text-xs bg-secondary px-2 py-1 rounded-full">
                       {userItem.is_superadmin ? "Superadministrador" : userItem.role}
                     </span>
+                    {isSuperadmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEditUser(userItem)}
+                      >
+                        <Pencil className="w-3 h-3 mr-1" />
+                        Editar
+                      </Button>
+                    )}
                     {canManagePasswords && (
                       <Button
                         variant="outline"
@@ -719,6 +792,63 @@ export function CompanyView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {isSuperadmin && (
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Editar usuario</DialogTitle>
+              <DialogDescription>
+                Modifica los datos del usuario seleccionado.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Nombre completo</Label>
+                <Input
+                  value={editForm.fullName}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, fullName: e.target.value }))}
+                  placeholder="Nombre y apellidos"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cargo</Label>
+                <Input
+                  value={editForm.jobTitle}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, jobTitle: e.target.value }))}
+                  placeholder="Ej: Responsable de Calidad"
+                />
+              </div>
+              {!users.find((u) => u.id === editingUserId)?.is_superadmin && (
+                <div className="space-y-2">
+                  <Label>Rol</Label>
+                  <Select
+                    value={editForm.role}
+                    onValueChange={(value) => setEditForm((prev) => ({ ...prev, role: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un rol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Administrador">Administrador</SelectItem>
+                      <SelectItem value="Editor">Editor</SelectItem>
+                      <SelectItem value="Espectador">Espectador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="accent" onClick={handleSaveEditUser} disabled={isSubmitting}>
+                {isSubmitting ? "Guardando..." : "Guardar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
