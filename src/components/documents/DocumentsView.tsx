@@ -1098,18 +1098,19 @@ export function DocumentsView({
       }
 
       if (isRejectedDraft) {
-        // Rejected draft: just replace file and reset responsibilities, no version bump
+        // Rejected draft: bump minor version, replace file and reset responsibilities
         const { data: authData, error: authError } = await supabase.auth.getUser();
         if (authError || !authData.user) throw authError ?? new Error("No se pudo obtener el usuario autenticado.");
         const actorId = authData.user.id;
 
-        // Update document file without changing version
+        // Update document file with minor version bump
         const { error: docUpdateError } = await (supabase as any)
           .from("documents")
           .update({
             file_url: filePath,
             file_type: fileType,
             status: "draft",
+            version_minor: newMinor,
           })
           .eq("id", selectedDocument.id);
         if (docUpdateError) throw docUpdateError;
