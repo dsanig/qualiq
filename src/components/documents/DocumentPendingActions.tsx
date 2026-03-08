@@ -30,6 +30,7 @@ interface PendingAction {
   completed_at: string | null;
   documentCode?: string;
   documentTitle?: string;
+  documentStatus?: string;
   responsibleName?: string;
 }
 
