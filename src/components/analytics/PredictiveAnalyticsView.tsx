@@ -380,6 +380,22 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
     });
   };
 
+  const handleDeleteInsight = async (insightId: string) => {
+    if (!profile?.company_id) return;
+    try {
+      const { error } = await supabase
+        .from("predictive_insights")
+        .delete()
+        .eq("id", insightId)
+        .eq("company_id", profile.company_id);
+      if (error) throw error;
+      setInsights((prev) => prev.filter((i) => i.id !== insightId));
+      toast({ title: "Insight eliminado" });
+    } catch (e: any) {
+      toast({ title: "Error al eliminar", description: e.message ?? "Error desconocido.", variant: "destructive" });
+    }
+  };
+
   const handleDeleteAllInsights = async () => {
     if (!profile?.company_id) return;
     if (!confirm("¿Eliminar todos los insights del análisis predictivo? Esta acción no se puede deshacer.")) return;
