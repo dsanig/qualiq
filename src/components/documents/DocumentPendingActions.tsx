@@ -1,12 +1,24 @@
 import { useEffect, useState, useCallback } from "react";
-import { ClipboardList, CheckCircle2, Clock, AlertTriangle, ArrowRightLeft } from "lucide-react";
+import { ClipboardList, CheckCircle2, Clock, AlertTriangle, ArrowRightLeft, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusLabels: Record<string, string> = {
   draft: "Borrador",
@@ -16,14 +28,11 @@ const statusLabels: Record<string, string> = {
   approved: "Aprobado",
 };
 
-/** Given the current doc status, return the next allowed manual transition for the responsible */
 function getNextStatusForAction(docStatus: string | undefined, actionType: string): { nextStatus: string; label: string } | null {
   if (!docStatus) return null;
-  // draft → review: any reviewer can trigger this
   if (docStatus === "draft" && actionType === "revision") {
     return { nextStatus: "review", label: "Pasar a En Revisión" };
   }
-  // pending_approval → approved: approval responsible triggers this
   if (docStatus === "pending_approval" && actionType === "aprobacion") {
     return { nextStatus: "approved", label: "Aprobar documento" };
   }
@@ -57,11 +66,8 @@ interface PendingAction {
 }
 
 interface DocumentPendingActionsProps {
-  /** If provided, only show actions for this document */
   documentId?: string;
-  /** Called after an action is completed so parent can refresh */
   onActionCompleted?: () => void;
-  /** Compact mode for sidebar/inline use */
   compact?: boolean;
 }
 
@@ -69,7 +75,10 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [completingId, setCompletingId] = useState<string | null>(null);
-  const { user } = useAuth();
+  const [rejectingAction, setRejectingAction] = useState<PendingAction | null>(null);
+  const [rejectComment, setRejectComment] = useState("");
+  const [isRejecting, setIsRejecting] = useState(false);
+  const { user, profile } = useAuth();
   const { toast } = useToast();
 
   const fetchActions = useCallback(async () => {
@@ -97,7 +106,6 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     const pendingActions = (data || []) as PendingAction[];
 
     if (pendingActions.length > 0) {
-      // Fetch document info and user names in parallel
       const docIds = [...new Set(pendingActions.map((a: PendingAction) => a.document_id))];
       const userIds = [...new Set(pendingActions.map((a: PendingAction) => a.user_id))];
 
@@ -132,7 +140,6 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       return;
     }
 
-    // Validate document status matches the action type
     const docStatus = action.documentStatus;
     if (action.action_type === "revision" && docStatus !== "review") {
       toast({ title: "No permitido", description: "Solo se puede revisar un documento en estado 'En Revisión'.", variant: "destructive" });
@@ -168,6 +175,57 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     }
   };
 
+  const handleReject = async () => {
+    if (!user || !rejectingAction) return;
+    setIsRejecting(true);
+    try {
+      // 1. Mark this responsibility as rejected
+      const { error: rejectError } = await (supabase as any)
+        .from("document_responsibilities")
+        .update({ status: "rejected", completed_at: new Date().toISOString() })
+        .eq("id", rejectingAction.id);
+      if (rejectError) throw rejectError;
+
+      // 2. Set document back to draft
+      const { error: docError } = await supabase
+        .from("documents")
+        .update({ status: "draft" as any })
+        .eq("id", rejectingAction.document_id);
+      if (docError) throw docError;
+
+      // 3. Record status change
+      await (supabase as any).from("document_status_changes").insert({
+        document_id: rejectingAction.document_id,
+        old_status: rejectingAction.documentStatus,
+        new_status: "draft",
+        changed_by: user.id,
+        comment: `Denegado por ${profile?.full_name || user.email}: ${rejectComment || "Sin comentario"}`,
+      });
+
+      // 4. Reset other pending responsibilities
+      await (supabase as any)
+        .from("document_responsibilities")
+        .update({ status: "pending", completed_at: null })
+        .eq("document_id", rejectingAction.document_id)
+        .eq("status", "completed");
+
+      toast({
+        title: "Documento denegado",
+        description: `${rejectingAction.documentCode} ha sido devuelto a Borrador.`,
+        variant: "destructive",
+      });
+
+      setRejectingAction(null);
+      setRejectComment("");
+      fetchActions();
+      onActionCompleted?.();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
   const [changingStatusDocId, setChangingStatusDocId] = useState<string | null>(null);
 
   const handleChangeDocumentStatus = async (action: PendingAction, nextStatus: string) => {
@@ -183,7 +241,6 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       }).eq("id", action.document_id);
       if (updateError) throw updateError;
 
-      // Record the status change
       const { error: insertError } = await (supabase as any).from("document_status_changes").insert({
         document_id: action.document_id,
         old_status: action.documentStatus,
@@ -197,7 +254,6 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       const toLabel = statusLabels[nextStatus] || nextStatus;
       toast({ title: "Estado actualizado", description: `${action.documentCode}: ${fromLabel} → ${toLabel}` });
 
-      // If approving, also complete the action
       if (nextStatus === "approved" && action.action_type === "aprobacion") {
         await (supabase as any)
           .from("document_responsibilities")
@@ -205,7 +261,6 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
           .eq("id", action.id);
         setActions(prev => prev.filter(a => a.id !== action.id));
       } else {
-        // Refresh to pick up new document status
         fetchActions();
       }
 
@@ -237,104 +292,155 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
   }
 
   return (
-    <div className={cn("space-y-2", compact && "space-y-1.5")}>
-      {actions.map(action => {
-        const isOverdue = new Date(action.due_date) < now;
-        const isActionableStatus =
-          (action.action_type === "revision" && action.documentStatus === "review") ||
-          (action.action_type === "firma" && action.documentStatus === "pending_signature") ||
-          (action.action_type === "aprobacion" && action.documentStatus === "pending_approval");
-        const canComplete = isActionableStatus;
-        const nextTransition = getNextStatusForAction(action.documentStatus, action.action_type);
-        const canChangeStatus = !isActionableStatus && nextTransition && user && action.user_id === user.id;
+    <>
+      <div className={cn("space-y-2", compact && "space-y-1.5")}>
+        {actions.map(action => {
+          const isOverdue = new Date(action.due_date) < now;
+          const isActionableStatus =
+            (action.action_type === "revision" && action.documentStatus === "review") ||
+            (action.action_type === "firma" && action.documentStatus === "pending_signature") ||
+            (action.action_type === "aprobacion" && action.documentStatus === "pending_approval");
+          const canComplete = isActionableStatus;
+          const canReject = isActionableStatus && user && action.user_id === user.id;
+          const nextTransition = getNextStatusForAction(action.documentStatus, action.action_type);
+          const canChangeStatus = !isActionableStatus && nextTransition && user && action.user_id === user.id;
 
-        return (
-          <div
-            key={action.id}
-            className={cn(
-              "border rounded-lg p-3 flex flex-col gap-2",
-              isOverdue ? "border-destructive/30 bg-destructive/5" : "border-border bg-card",
-              compact && "p-2"
-            )}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                {!documentId && (
-                  <p className={cn("font-medium text-foreground truncate", compact ? "text-xs" : "text-sm")}>
-                    {action.documentCode} — {action.documentTitle}
-                  </p>
-                )}
-                <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                  <Badge variant="outline" className={cn("text-xs", actionTypeColors[action.action_type])}>
-                    {actionTypeLabels[action.action_type] || action.action_type}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs bg-secondary/50">
-                    {statusLabels[action.documentStatus || ""] || action.documentStatus}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    → {action.responsibleName}
-                  </span>
-                  <span className={cn(
-                    "text-xs flex items-center gap-1",
-                    isOverdue ? "text-destructive font-medium" : "text-muted-foreground"
-                  )}>
-                    {isOverdue ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                    {format(new Date(action.due_date), "dd/MM/yyyy")}
-                  </span>
+          return (
+            <div
+              key={action.id}
+              className={cn(
+                "border rounded-lg p-3 flex flex-col gap-2",
+                isOverdue ? "border-destructive/30 bg-destructive/5" : "border-border bg-card",
+                compact && "p-2"
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  {!documentId && (
+                    <p className={cn("font-medium text-foreground truncate", compact ? "text-xs" : "text-sm")}>
+                      {action.documentCode} — {action.documentTitle}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                    <Badge variant="outline" className={cn("text-xs", actionTypeColors[action.action_type])}>
+                      {actionTypeLabels[action.action_type] || action.action_type}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs bg-secondary/50">
+                      {statusLabels[action.documentStatus || ""] || action.documentStatus}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      → {action.responsibleName}
+                    </span>
+                    <span className={cn(
+                      "text-xs flex items-center gap-1",
+                      isOverdue ? "text-destructive font-medium" : "text-muted-foreground"
+                    )}>
+                      {isOverdue ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                      {format(new Date(action.due_date), "dd/MM/yyyy")}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {canChangeStatus && nextTransition && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "text-primary border-primary/30 hover:bg-primary/10",
+                        compact && "h-7 text-xs px-2"
+                      )}
+                      onClick={() => handleChangeDocumentStatus(action, nextTransition.nextStatus)}
+                      disabled={changingStatusDocId === action.document_id}
+                    >
+                      <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
+                      {changingStatusDocId === action.document_id ? "..." : nextTransition.label}
+                    </Button>
+                  )}
+                  {canComplete && user && action.user_id === user.id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "text-success border-success/30 hover:bg-success/10",
+                        compact && "h-7 text-xs px-2"
+                      )}
+                      onClick={() => handleComplete(action)}
+                      disabled={completingId === action.id}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                      {completingId === action.id
+                        ? "..."
+                        : action.action_type === "firma"
+                        ? "Firmado"
+                        : action.action_type === "revision"
+                        ? "Revisado"
+                        : action.action_type === "aprobacion"
+                        ? "Aprobado"
+                        : "Completar"}
+                    </Button>
+                  )}
+                  {canReject && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "text-destructive border-destructive/30 hover:bg-destructive/10",
+                        compact && "h-7 text-xs px-2"
+                      )}
+                      onClick={() => setRejectingAction(action)}
+                    >
+                      <XCircle className="w-3.5 h-3.5 mr-1" />
+                      Denegar
+                    </Button>
+                  )}
+                  {!isActionableStatus && !canChangeStatus && (
+                    <span className={cn("text-xs text-muted-foreground italic", compact && "text-[10px]")}>
+                      {action.action_type === "revision" ? "Esperando estado 'En Revisión'" 
+                       : action.action_type === "firma" ? "Esperando estado 'Pendiente de Firma'"
+                       : action.action_type === "aprobacion" ? "Esperando estado 'Pendiente de Aprobación'"
+                       : "No disponible"}
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                {canChangeStatus && nextTransition && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "text-primary border-primary/30 hover:bg-primary/10",
-                      compact && "h-7 text-xs px-2"
-                    )}
-                    onClick={() => handleChangeDocumentStatus(action, nextTransition.nextStatus)}
-                    disabled={changingStatusDocId === action.document_id}
-                  >
-                    <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
-                    {changingStatusDocId === action.document_id ? "..." : nextTransition.label}
-                  </Button>
-                )}
-                {canComplete && user && action.user_id === user.id && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "text-success border-success/30 hover:bg-success/10",
-                      compact && "h-7 text-xs px-2"
-                    )}
-                    onClick={() => handleComplete(action)}
-                    disabled={completingId === action.id}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                    {completingId === action.id
-                      ? "..."
-                      : action.action_type === "firma"
-                      ? "Firmado"
-                      : action.action_type === "revision"
-                      ? "Revisado"
-                      : action.action_type === "aprobacion"
-                      ? "Aprobado"
-                      : "Completar"}
-                  </Button>
-                )}
-                {!isActionableStatus && !canChangeStatus && (
-                  <span className={cn("text-xs text-muted-foreground italic", compact && "text-[10px]")}>
-                    {action.action_type === "revision" ? "Esperando estado 'En Revisión'" 
-                     : action.action_type === "firma" ? "Esperando estado 'Pendiente de Firma'"
-                     : action.action_type === "aprobacion" ? "Esperando estado 'Pendiente de Aprobación'"
-                     : "No disponible"}
-                  </span>
-                )}
-              </div>
             </div>
+          );
+        })}
+      </div>
+
+      {/* Reject confirmation dialog */}
+      <AlertDialog open={!!rejectingAction} onOpenChange={(open) => { if (!open) { setRejectingAction(null); setRejectComment(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-destructive" />
+              Denegar documento
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Al denegar, el documento <strong>{rejectingAction?.documentCode}</strong> volverá al estado <strong>Borrador</strong> y todas las revisiones/firmas/aprobaciones se reiniciarán.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label className="text-sm">Motivo de la denegación (opcional)</Label>
+            <Textarea
+              placeholder="Indica el motivo por el que deniegas este documento..."
+              value={rejectComment}
+              onChange={(e) => setRejectComment(e.target.value)}
+              rows={3}
+            />
           </div>
-        );
-      })}
-    </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRejecting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleReject(); }}
+              disabled={isRejecting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRejecting ? "Denegando..." : "Confirmar denegación"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
