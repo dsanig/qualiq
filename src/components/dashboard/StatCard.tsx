@@ -11,6 +11,7 @@ interface StatCardProps {
     isPositive: boolean;
   };
   variant?: "default" | "accent" | "warning" | "success" | "destructive";
+  onViewDetail?: () => void;
 }
 
 const variantStyles = {
