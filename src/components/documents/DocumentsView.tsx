@@ -622,6 +622,10 @@ export function DocumentsView({
     setEditDocCategory(doc.categoryId);
     setEditDocTypology(doc.typology);
     setEditDocStatus(doc.status);
+    setEditDocEffectiveImmediate(!doc.effectiveDate);
+    setEditDocEffectiveDate(doc.effectiveDate || "");
+    setEditDocNoExpiry(!doc.expiryDate);
+    setEditDocExpiryDate(doc.expiryDate || "");
     setIsEditOpen(true);
   };
 
