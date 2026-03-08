@@ -276,7 +276,6 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
       investigation: form.investigation || null,
       resolution: form.resolution || null,
       conclusion: form.conclusion || null,
-      status: form.status,
       responsible_id: form.responsible_id === "none" ? null : form.responsible_id,
     }).eq("id", editingReclamacion.id);
 
