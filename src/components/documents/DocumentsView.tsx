@@ -417,7 +417,7 @@ export function DocumentsView({
 
   // Fetch signatures from DB
   const fetchSignatures = useCallback(async () => {
-    if (!profile?.company_id || !user) return;
+    if (!effectiveCompanyId || !user) return;
     const { data } = await supabase
       .from("document_signatures")
       .select("*")
