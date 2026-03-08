@@ -31,6 +31,7 @@ const App = () => (
             <Route path="/register" element={<Navigate to="/login" replace />} />
             <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route path="/create-account" element={<Navigate to="/login" replace />} />
+            <Route path="/share" element={<ShareDownload />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
