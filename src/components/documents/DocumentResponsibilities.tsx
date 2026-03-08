@@ -282,7 +282,7 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
               const isOverdue = r.status === "pending" && new Date(r.due_date) < now;
               const isCompleted = r.status === "completed";
               const isCurrentUser = user?.id === r.user_id;
-              const canComplete = isCurrentUser && r.status === "pending" && r.action_type === "revision";
+              const canComplete = isCurrentUser && r.status === "pending" && (r.action_type === "revision" || r.action_type === "firma");
 
               return (
                 <div

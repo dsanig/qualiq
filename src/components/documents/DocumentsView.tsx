@@ -2324,7 +2324,17 @@ export function DocumentsView({
               <Select value={changeStatusTarget} onValueChange={setChangeStatusTarget}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {statusOptions.map(opt => (
+                  {statusOptions
+                    .filter(opt => {
+                      if (!selectedDocument) return false;
+                      const cs = selectedDocument.status;
+                      // Only show valid transitions for the current status
+                      if (cs === "draft") return opt.value === "draft" || opt.value === "review";
+                      if (cs === "review") return opt.value === "review"; // pending_signature is automatic
+                      if (cs === "pending_signature") return opt.value === "pending_signature" || opt.value === "approved";
+                      return opt.value === cs;
+                    })
+                    .map(opt => (
                     <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
