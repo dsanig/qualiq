@@ -742,6 +742,7 @@ export function DocumentsView({
 
       const statusLabel = statusOptions.find(s => s.value === changeStatusTarget)?.label || statusConfig[changeStatusTarget]?.label || changeStatusTarget;
       toast({ title: "Estado actualizado", description: `El documento ahora está en "${statusLabel}".` });
+      logAction({ action: "status_change", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { old_status: selectedDocument.status, new_status: changeStatusTarget, comment: changeStatusComment.trim() } });
       setIsChangeStatusOpen(false);
       fetchDocuments();
       fetchFirmaStatus();
