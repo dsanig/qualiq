@@ -185,6 +185,7 @@ export function CompanyManagementView() {
     }
 
     toast({ title: "Empresa eliminada" });
+    logAction({ action: "delete", entity_type: "company", entity_id: company.id, entity_title: company.name });
     void fetchCompanies();
   };
 

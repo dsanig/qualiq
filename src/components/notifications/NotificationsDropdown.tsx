@@ -81,6 +81,7 @@ export function NotificationsDropdown() {
       .eq("user_id", user.id)
       .eq("is_read", false);
     
+    logAction({ action: "mark_all_read", entity_type: "notification" });
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
   };
 

@@ -201,6 +201,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
       if (error) throw error;
 
       toast({ title: "Revisión completada", description: "Has marcado tu revisión como completada." });
+      logAction({ action: "complete_responsibility", entity_type: "document", entity_id: documentId, entity_title: documentCode, details: { action_type: resp.action_type } });
       await fetchResponsibilities();
       onWorkflowChange?.();
     } catch (err: any) {

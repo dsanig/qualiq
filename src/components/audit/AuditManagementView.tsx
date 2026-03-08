@@ -406,6 +406,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     }).eq("id", editingAction.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Acción actualizada" });
+    logAction({ action: "update", entity_type: "capa_action", entity_id: editingAction.id, entity_title: actionForm.description, details: { action_type: actionForm.action_type, status: actionForm.status } });
     setEditActionOpen(false); setEditingAction(null);
     await loadData();
   };

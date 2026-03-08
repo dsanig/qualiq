@@ -232,6 +232,7 @@ export function ChatbotView() {
     setChats((prev) => prev.map((chat) => (chat.id === activeChat.id ? updatedChat : chat)));
     setInput("");
     setIsLoading(true);
+    logAction({ action: "chat_message", entity_type: "qualai", entity_title: activeChat.title, details: { message_preview: input.slice(0, 100) } });
 
     let assistantSoFar = "";
     const upsertAssistant = (nextChunk: string) => {

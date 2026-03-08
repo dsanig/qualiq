@@ -162,6 +162,7 @@ export function TrainingExamView() {
           : `Has obtenido ${score}%. Se requiere 80% para aprobar.`,
         variant: passed ? "default" : "destructive",
       });
+      logAction({ action: "complete_exam", entity_type: "training_exam", entity_id: activeSession!.id, entity_title: activeSession!.documents?.title, details: { score, passed } });
 
       // Reset and refresh
       setActiveSession(null);

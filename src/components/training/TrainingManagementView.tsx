@@ -363,6 +363,7 @@ export function TrainingManagementView() {
     }
 
     toast({ title: "Archivos subidos" });
+    logAction({ action: "upload_attachment", entity_type: "training", entity_id: detailRecord.id, entity_title: detailRecord.title });
     openDetail(detailRecord);
     setIsUploading(false);
   };

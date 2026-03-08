@@ -233,6 +233,7 @@ export function AuditSimulatorView() {
       if (error) throw error;
 
       toast({ title: "Simulación eliminada" });
+      logAction({ action: "delete", entity_type: "audit_simulation", entity_id: simId });
       if (selectedSimulation?.id === simId) setSelectedSimulation(null);
       setSimulations((prev) => prev.filter((s) => s.id !== simId));
     } catch (err) {
