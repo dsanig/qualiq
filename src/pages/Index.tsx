@@ -210,6 +210,8 @@ const Index = () => {
               reloadToken={incidentViewResetSeed}
               prefill={incidentPrefill}
               onPrefillConsumed={() => setIncidentPrefill(null)}
+              openIncidentId={openIncidentId}
+              onOpenIncidentConsumed={() => setOpenIncidentId(null)}
             />
           </ErrorBoundary>
         );
