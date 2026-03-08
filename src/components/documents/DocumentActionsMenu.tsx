@@ -93,10 +93,6 @@ export function DocumentActionsMenu({
           <History className="w-4 h-4 mr-2" />
           Historial de Versiones
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onViewOwners} className="cursor-pointer">
-          <Users className="w-4 h-4 mr-2" />
-          Ver Propietarios
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onDownload} className="cursor-pointer">
           <Download className="w-4 h-4 mr-2" />

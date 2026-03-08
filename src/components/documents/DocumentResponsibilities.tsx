@@ -70,13 +70,14 @@ interface CompanyUser {
 interface DocumentResponsibilitiesProps {
   documentId: string;
   documentCode: string;
+  ownerName?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onWorkflowChange?: () => void;
   onUpdateDocument?: () => void;
 }
 
-export function DocumentResponsibilities({ documentId, documentCode, open, onOpenChange, onWorkflowChange, onUpdateDocument }: DocumentResponsibilitiesProps) {
+export function DocumentResponsibilities({ documentId, documentCode, ownerName, open, onOpenChange, onWorkflowChange, onUpdateDocument }: DocumentResponsibilitiesProps) {
   const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -314,6 +315,14 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
               Asigna responsables con acciones y fechas límite para {documentCode}.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Document owner */}
+          {ownerName && (
+            <div className="border border-border rounded-lg p-3 bg-secondary/5 flex items-center gap-2">
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm"><strong>Propietario:</strong> {ownerName}</span>
+            </div>
+          )}
 
           {/* Rejection banner */}
           {hasRejection && (

@@ -2518,26 +2518,6 @@ export function DocumentsView({
         </DialogContent>
       </Dialog>
 
-      {/* Owners Dialog */}
-      <Dialog open={isOwnersOpen} onOpenChange={setIsOwnersOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Propietarios del documento</DialogTitle>
-            <DialogDescription>Responsables y aprobadores asignados.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <div className="flex items-center justify-between border border-border rounded-lg p-3">
-              <div>
-                <p className="font-medium text-foreground">{selectedDocument?.owner ?? "—"}</p>
-                <p>Propietario principal</p>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsOwnersOpen(false)}>Cerrar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Change Status Dialog */}
       <Dialog open={isChangeStatusOpen} onOpenChange={setIsChangeStatusOpen}>
@@ -2681,6 +2661,7 @@ export function DocumentsView({
         <DocumentResponsibilities
           documentId={selectedDocument.id}
           documentCode={selectedDocument.code}
+          ownerName={selectedDocument.owner}
           open={isResponsibilitiesOpen}
           onOpenChange={setIsResponsibilitiesOpen}
           onWorkflowChange={() => { fetchDocuments(); fetchFirmaStatus(); fetchRejectedDocs(); }}
