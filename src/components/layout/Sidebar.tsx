@@ -67,7 +67,7 @@ export function Sidebar({ activeModule, onModuleChange, collapsed = false, onTog
             <img src="/iQ_V1.svg" alt="QualiQ logo" className="w-5 h-5" />
           </div>
           {!collapsed && (
-            <span className="font-bold text-lg tracking-tight">QualiQ</span>
+            <span className="font-bold text-lg tracking-tight">QualiQ<span className="text-xs font-normal italic text-muted-foreground">, by INMEDSA</span></span>
           )}
         </div>
         {onToggle && (
