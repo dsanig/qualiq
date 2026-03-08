@@ -51,7 +51,7 @@ export function CompanyView() {
   });
   const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "" });
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ fullName: "", jobTitle: "", role: "Espectador" });
+  const [editForm, setEditForm] = useState({ fullName: "", jobTitle: "", role: "Espectador", email: "" });
   const [editingUserId, setEditingUserId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [devDetectedRole, setDevDetectedRole] = useState<string>("Desconocido");
@@ -486,6 +486,7 @@ export function CompanyView() {
       fullName: (data as any)?.full_name ?? userItem.full_name ?? "",
       jobTitle: (data as any)?.job_title ?? "",
       role: userItem.is_superadmin ? "Superadmin" : (userItem.role ?? "Espectador"),
+      email: userItem.email ?? "",
     });
     setIsEditDialogOpen(true);
   };
@@ -503,16 +504,22 @@ export function CompanyView() {
 
       if (profileError) throw profileError;
 
-      // Update role if not superadmin and role changed
+      // Update email if changed (superadmin only, via edge function)
       const currentUser = users.find((u) => u.id === editingUserId);
+      if (currentUser && editForm.email.trim() && editForm.email.trim() !== currentUser.email) {
+        const { error: emailError } = await supabase.functions.invoke("admin-update-user-email", {
+          body: { target_user_id: editingUserId, new_email: editForm.email.trim() },
+        });
+        if (emailError) throw new Error(emailError.message || "No se pudo actualizar el email.");
+      }
+
+      // Update role if not superadmin and role changed
       if (currentUser && !currentUser.is_superadmin && editForm.role !== "Superadmin" && editForm.role !== currentUser.role) {
-        // Delete old role
         await (supabase as any)
           .from("user_roles")
           .delete()
           .eq("user_id", editingUserId);
 
-        // Insert new role
         await (supabase as any)
           .from("user_roles")
           .insert({ user_id: editingUserId, role: editForm.role });
@@ -803,6 +810,15 @@ export function CompanyView() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Correo electrónico</Label>
+                <Input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="correo@ejemplo.com"
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Nombre completo</Label>
                 <Input
