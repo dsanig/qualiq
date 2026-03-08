@@ -207,7 +207,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   </span>
                 </div>
               </div>
-              {canComplete && user && action.user_id === user.id && (
+              {canComplete && user && action.user_id === user.id ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -225,9 +225,18 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                     ? "Firmado"
                     : action.action_type === "revision"
                     ? "Revisado"
+                    : action.action_type === "aprobacion"
+                    ? "Aprobado"
                     : "Completar"}
                 </Button>
-              )}
+              ) : !isActionableStatus ? (
+                <span className={cn("text-xs text-muted-foreground italic shrink-0", compact && "text-[10px]")}>
+                  {action.action_type === "revision" ? "Esperando estado 'En Revisión'" 
+                   : action.action_type === "firma" ? "Esperando estado 'Pendiente de Firma'"
+                   : action.action_type === "aprobacion" ? "Esperando estado 'En Aprobación'"
+                   : "No disponible"}
+                </span>
+              ) : null}
             </div>
           </div>
         );
