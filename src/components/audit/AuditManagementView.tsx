@@ -264,8 +264,17 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     const { data } = await supabase.storage.from("documents").createSignedUrl(attachment.object_path, 300);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
+  const syncParticipants = async (auditId: string, userIds: string[]) => {
+    // Delete existing participants
+    await (supabase as any).from("audit_participants").delete().eq("audit_id", auditId);
+    // Insert new ones
+    if (userIds.length > 0) {
+      await (supabase as any).from("audit_participants").insert(
+        userIds.map((uid) => ({ audit_id: auditId, user_id: uid }))
+      );
+    }
+  };
 
-  const resetAuditForm = () => {
     setAuditForm({ title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "", observations: "", findings: "", conclusions: "", status: "open", participant_ids: [] });
     setAuditFiles(null);
   };
