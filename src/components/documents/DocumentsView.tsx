@@ -540,6 +540,8 @@ export function DocumentsView({
         originalAuthor: ownerUserMap.get(d.owner_id) || d.owner_id,
         lastModifiedBy: ownerUserMap.get(d.owner_id) || d.owner_id,
         fileUrl: d.file_url,
+        effectiveDate: (d as any).effective_date ?? null,
+        expiryDate: (d as any).expiry_date ?? null,
       }));
       setDbDocuments(mapped);
       return;
