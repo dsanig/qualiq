@@ -2336,7 +2336,7 @@ export function DocumentsView({
                   </div>
                 </div>
                 <p className="text-xs mt-1">Por {v.creatorName} el {new Date(v.created_at).toLocaleDateString("es-ES")}</p>
-                {v.changes_description && <p className="text-xs mt-1">Cambios: {v.changes_description}</p>}
+                {v.changes_description && <p className="text-xs mt-1 text-muted-foreground">Cambios respecto v{v.version - 1}.0: {v.changes_description}</p>}
               </div>
             ))}
           </div>
