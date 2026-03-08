@@ -1247,7 +1247,19 @@ export function DocumentsView({
         )
       );
 
-      const { error: deleteDocumentError } = await supabase.from("documents").delete().eq("id", documentToDelete.id);
+      // Delete dependent records first to avoid FK constraint violations
+      const docId = documentToDelete.id;
+      await Promise.all([
+        supabase.from("training_record_documents").delete().eq("document_id", docId),
+        supabase.from("document_responsibilities").delete().eq("document_id", docId),
+        supabase.from("document_signatures").delete().eq("document_id", docId),
+        supabase.from("document_status_changes").delete().eq("document_id", docId),
+        supabase.from("document_owners").delete().eq("document_id", docId),
+        supabase.from("document_versions").delete().eq("document_id", docId),
+        supabase.from("audit_findings").delete().eq("document_id", docId),
+      ]);
+
+      const { error: deleteDocumentError } = await supabase.from("documents").delete().eq("id", docId);
       if (deleteDocumentError) {
         throw deleteDocumentError;
       }
