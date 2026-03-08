@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Clock, Filter, Plus, Search, Pencil, X, CalendarIcon, Trash2, AlertTriangle, Link as LinkIcon, Eye, FileWarning, Users } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Filter, Plus, Search, Pencil, X, CalendarIcon, Trash2, AlertTriangle, Link as LinkIcon, Eye, FileWarning, Users, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { StatusChangeDialog } from "@/components/shared/StatusChangeDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -93,6 +95,8 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
   const [existingAttachments, setExistingAttachments] = useState<AttachmentInfo[]>([]);
   const { toast } = useToast();
   const { canEditContent, isSuperadmin } = usePermissions();
+  const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
+  const { user } = useAuth();
 
   const getUserName = (userId: string | null | undefined) => {
     if (!userId) return null;
@@ -272,7 +276,6 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
       investigation: form.investigation || null,
       resolution: form.resolution || null,
       conclusion: form.conclusion || null,
-      status: form.status,
       responsible_id: form.responsible_id === "none" ? null : form.responsible_id,
     }).eq("id", editingReclamacion.id);
 
@@ -493,13 +496,19 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
           )}
 
           <DialogFooter>
-            <div className="w-full flex items-center justify-between gap-2">
-              {canEditContent && editingReclamacion && onOpenNewIncident && (
-                <Button variant="outline" onClick={() => handleOpenNewIncident(editingReclamacion)}>
-                  <AlertTriangle className="w-4 h-4 mr-1" />Crear incidencia
-                </Button>
-              )}
-              {!onOpenNewIncident && <span />}
+            <div className="w-full flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {canEditContent && editingReclamacion && onOpenNewIncident && (
+                  <Button variant="outline" onClick={() => handleOpenNewIncident(editingReclamacion)}>
+                    <AlertTriangle className="w-4 h-4 mr-1" />Crear incidencia
+                  </Button>
+                )}
+                {editingReclamacion && (user?.id === editingReclamacion.responsible_id || isSuperadmin) && (
+                  <Button variant="outline" onClick={() => setIsStatusChangeOpen(true)}>
+                    <History className="w-4 h-4 mr-1" />Cambiar Estado
+                  </Button>
+                )}
+              </div>
               {canEditContent ? (
                 <Button onClick={updateReclamacion}>Guardar cambios</Button>
               ) : (
@@ -509,6 +518,31 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Status Change Dialog */}
+      {editingReclamacion && (
+        <StatusChangeDialog
+          open={isStatusChangeOpen}
+          onOpenChange={setIsStatusChangeOpen}
+          currentStatus={editingReclamacion.status}
+          statusOptions={[
+            { value: "abierta", label: "Abierta" },
+            { value: "en_revision", label: "En Revisión" },
+            { value: "en_resolucion", label: "En Resolución" },
+            { value: "cerrada", label: "Cerrada" },
+          ]}
+          entityId={editingReclamacion.id}
+          entityType="reclamaciones"
+          historyTable="reclamacion_status_changes"
+          foreignKey="reclamacion_id"
+          onStatusChanged={async () => {
+            setIsEditOpen(false);
+            setEditingReclamacion(null);
+            await loadData();
+          }}
+          getUserName={getUserName}
+        />
+      )}
     </div>
   );
 }

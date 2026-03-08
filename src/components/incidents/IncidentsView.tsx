@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Clock, Filter, Link as LinkIcon, Plus, Search, Pencil, X, CalendarIcon, ClipboardList, Trash2, AlertTriangle } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Filter, Link as LinkIcon, Plus, Search, Pencil, X, CalendarIcon, ClipboardList, Trash2, AlertTriangle, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,6 +14,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
 import { IncidentFormFields, type IncidentFormData, type CapaPlanRef } from "./IncidentFormFields";
 import { format } from "date-fns";
+import { StatusChangeDialog } from "@/components/shared/StatusChangeDialog";
 
 type IncidentType = "incidencia" | "desviacion" | "no_conformidad" | "otra";
 
@@ -117,6 +119,8 @@ export function IncidentsView({
   const [incidentPendingDelete, setIncidentPendingDelete] = useState<Incident | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
+  const { user } = useAuth();
 
   const canDeleteIncidencia = isSuperadmin;
 
@@ -427,7 +431,6 @@ export function IncidentsView({
       title: form.title, description: form.description || null, incidencia_type: form.incidencia_type,
       audit_id: form.audit_id === "none" ? null : form.audit_id,
       responsible_id: form.responsible_id === "none" ? null : form.responsible_id,
-      status: form.status,
       deadline: form.deadline ? format(form.deadline, "yyyy-MM-dd") : null,
       resolution_notes: form.resolution_notes || null,
     }).eq("id", editingIncident.id);
@@ -744,12 +747,19 @@ export function IncidentsView({
             </div>
           )}
           <DialogFooter>
-            <div className="w-full flex items-center justify-between gap-2">
-              {canDeleteIncidencia && editingIncident ? (
-                <Button variant="destructive" onClick={() => promptDeleteIncident(editingIncident)}>
-                  <Trash2 className="w-4 h-4 mr-1" />Eliminar
-                </Button>
-              ) : <span />}
+            <div className="w-full flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {canDeleteIncidencia && editingIncident ? (
+                  <Button variant="destructive" onClick={() => promptDeleteIncident(editingIncident)}>
+                    <Trash2 className="w-4 h-4 mr-1" />Eliminar
+                  </Button>
+                ) : <span />}
+                {editingIncident && (user?.id === editingIncident.responsible_id || isSuperadmin) && (
+                  <Button variant="outline" onClick={() => setIsStatusChangeOpen(true)}>
+                    <History className="w-4 h-4 mr-1" />Cambiar Estado
+                  </Button>
+                )}
+              </div>
               {canEditContent ? (
                 <Button onClick={updateIncident}>Guardar cambios</Button>
               ) : (
@@ -759,6 +769,31 @@ export function IncidentsView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Status Change Dialog */}
+      {editingIncident && (
+        <StatusChangeDialog
+          open={isStatusChangeOpen}
+          onOpenChange={setIsStatusChangeOpen}
+          currentStatus={editingIncident.status}
+          statusOptions={[
+            { value: "open", label: "Abierto" },
+            { value: "in_progress", label: "En progreso" },
+            { value: "closed", label: "Cerrado" },
+            { value: "overdue", label: "Vencido" },
+          ]}
+          entityId={editingIncident.id}
+          entityType="incidencias"
+          historyTable="incidencia_status_changes"
+          foreignKey="incidencia_id"
+          onStatusChanged={async () => {
+            setIsEditOpen(false);
+            setEditingIncident(null);
+            await loadData();
+          }}
+          getUserName={getUserName}
+        />
+      )}
 
       <AlertDialog open={Boolean(incidentPendingDelete)} onOpenChange={(open) => {
         if (!open && !isDeleting) {

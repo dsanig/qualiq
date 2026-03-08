@@ -794,6 +794,44 @@ export type Database = {
           },
         ]
       }
+      incidencia_status_changes: {
+        Row: {
+          changed_at: string
+          changed_by: string
+          comment: string | null
+          id: string
+          incidencia_id: string
+          new_status: string
+          old_status: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by: string
+          comment?: string | null
+          id?: string
+          incidencia_id: string
+          new_status: string
+          old_status?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string
+          comment?: string | null
+          id?: string
+          incidencia_id?: string
+          new_status?: string
+          old_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidencia_status_changes_incidencia_id_fkey"
+            columns: ["incidencia_id"]
+            isOneToOne: false
+            referencedRelation: "incidencias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incidencias: {
         Row: {
           audit_id: string | null
@@ -1184,6 +1222,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "reclamacion_participants_reclamacion_id_fkey"
+            columns: ["reclamacion_id"]
+            isOneToOne: false
+            referencedRelation: "reclamaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reclamacion_status_changes: {
+        Row: {
+          changed_at: string
+          changed_by: string
+          comment: string | null
+          id: string
+          new_status: string
+          old_status: string | null
+          reclamacion_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by: string
+          comment?: string | null
+          id?: string
+          new_status: string
+          old_status?: string | null
+          reclamacion_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string
+          comment?: string | null
+          id?: string
+          new_status?: string
+          old_status?: string | null
+          reclamacion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclamacion_status_changes_reclamacion_id_fkey"
             columns: ["reclamacion_id"]
             isOneToOne: false
             referencedRelation: "reclamaciones"
