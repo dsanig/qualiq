@@ -430,6 +430,9 @@ export function IncidentsView({
 
   const updateIncident = async () => {
     if (!editingIncident) return;
+    if (!form.responsible_id || form.responsible_id === "none") {
+      toast({ title: "Error", description: "Debe asignar un responsable.", variant: "destructive" }); return;
+    }
     const { error } = await (supabase as any).from("incidencias").update({
       title: form.title, description: form.description || null, incidencia_type: form.incidencia_type,
       audit_id: form.audit_id === "none" ? null : form.audit_id,

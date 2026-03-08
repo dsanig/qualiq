@@ -269,6 +269,9 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
 
   const updateReclamacion = async () => {
     if (!editingReclamacion) return;
+    if (!form.responsible_id || form.responsible_id === "none") {
+      toast({ title: "Error", description: "Debe asignar un responsable.", variant: "destructive" }); return;
+    }
     const { error } = await (supabase as any).from("reclamaciones").update({
       title: form.title,
       description: form.description || null,
