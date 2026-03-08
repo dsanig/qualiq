@@ -450,6 +450,7 @@ export function IncidentsView({
     if (newAttachments.length > 0) await uploadAttachments(editingIncident.id);
     await syncCapaLinks(editingIncident.id);
     toast({ title: "Incidencia actualizada" });
+    logAction({ action: "update", entity_type: "incidencia", entity_id: editingIncident.id, entity_title: form.title, details: { type: form.incidencia_type, responsible_id: form.responsible_id } });
     setIsEditOpen(false);
     setEditingIncident(null);
     setForm(defaultForm(initialIncidentType));
