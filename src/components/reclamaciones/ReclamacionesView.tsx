@@ -72,6 +72,7 @@ interface ReclamacionesViewProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onOpenNewIncident?: (reclamacionId: string, reclamacionTitle: string) => void;
+  onNavigateToIncident?: (incidenciaId: string) => void;
 }
 
 export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncident }: ReclamacionesViewProps) {
