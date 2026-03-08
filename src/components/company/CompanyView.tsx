@@ -153,7 +153,7 @@ export function CompanyView() {
 
       const { data, error } = await supabase
         .from("companies")
-        .select("name")
+        .select("name, legal_name, cif, address, city, postal_code, province, country, phone, email, website")
         .eq("id", profile.company_id)
         .maybeSingle();
 
@@ -166,7 +166,19 @@ export function CompanyView() {
         return;
       }
 
-      setCompanyName(data?.name ?? "");
+      setCompanyName((data as any)?.name ?? "");
+      setCompanyForm({
+        legal_name: (data as any)?.legal_name ?? "",
+        cif: (data as any)?.cif ?? "",
+        address: (data as any)?.address ?? "",
+        city: (data as any)?.city ?? "",
+        postal_code: (data as any)?.postal_code ?? "",
+        province: (data as any)?.province ?? "",
+        country: (data as any)?.country ?? "España",
+        phone: (data as any)?.phone ?? "",
+        email: (data as any)?.email ?? "",
+        website: (data as any)?.website ?? "",
+      });
     };
 
     void fetchCompany();
