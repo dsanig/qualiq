@@ -217,14 +217,14 @@ export function IncidentsView({
         }
       }
 
-      // Build reclamacion links map: incidencia_id -> reclamacion titles
+      // Build reclamacion links map: incidencia_id -> { id, title }[]
       const recTitleMap = new Map((Array.isArray(recData) ? recData : []).map((r: any) => [r.id, r.title]));
-      const recLinksMap: Record<string, string[]> = {};
+      const recLinksMap: Record<string, { id: string; title: string }[]> = {};
       if (Array.isArray(recLinksData)) {
         for (const link of recLinksData as any[]) {
           if (!recLinksMap[link.incidencia_id]) recLinksMap[link.incidencia_id] = [];
           const title = recTitleMap.get(link.reclamacion_id);
-          if (title) recLinksMap[link.incidencia_id].push(title);
+          if (title) recLinksMap[link.incidencia_id].push({ id: link.reclamacion_id, title });
         }
       }
 
