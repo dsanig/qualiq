@@ -6,10 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Users, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Users, ExternalLink, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Color palette for users
 const USER_COLORS = [
   { bg: "bg-blue-100 dark:bg-blue-900/40", text: "text-blue-700 dark:text-blue-300", border: "border-blue-400", dot: "bg-blue-500" },
   { bg: "bg-emerald-100 dark:bg-emerald-900/40", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-400", dot: "bg-emerald-500" },
@@ -23,16 +22,17 @@ const USER_COLORS = [
   { bg: "bg-teal-100 dark:bg-teal-900/40", text: "text-teal-700 dark:text-teal-300", border: "border-teal-400", dot: "bg-teal-500" },
 ];
 
+type EventType = "doc_responsibility" | "incident" | "reclamacion" | "audit" | "training" | "non_conformity" | "capa_action";
+
 interface CalendarEvent {
   id: string;
-  sourceId: string; // original DB record id
+  sourceId: string;
   title: string;
-  date: string; // YYYY-MM-DD
-  type: "document" | "incident" | "reclamacion" | "audit" | "training" | "doc_responsibility" | "non_conformity";
+  date: string;
+  type: EventType;
   userId: string;
   userName: string;
   typeLabel: string;
-  /** For doc_responsibility: the document code for search navigation */
   documentCode?: string;
 }
 
@@ -53,15 +53,17 @@ interface CalendarViewProps {
   onNavigateToPendingActions?: () => void;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  document: "Documento",
-  incident: "Incidencia",
-  reclamacion: "Reclamación",
-  audit: "Auditoría",
-  training: "Formación",
-  doc_responsibility: "Responsabilidad Doc.",
-  non_conformity: "No Conformidad",
+const EVENT_TYPE_CONFIG: Record<EventType, { label: string; color: string }> = {
+  doc_responsibility: { label: "Resp. Documental", color: "bg-sky-500" },
+  incident: { label: "Incidencias", color: "bg-amber-500" },
+  reclamacion: { label: "Reclamaciones", color: "bg-rose-500" },
+  audit: { label: "Auditorías", color: "bg-indigo-500" },
+  training: { label: "Formaciones", color: "bg-emerald-500" },
+  non_conformity: { label: "No Conformidades", color: "bg-orange-500" },
+  capa_action: { label: "Acciones CAPA", color: "bg-purple-500" },
 };
+
+const ALL_EVENT_TYPES = Object.keys(EVENT_TYPE_CONFIG) as EventType[];
 
 export function CalendarView({
   onNavigateToIncident,
@@ -78,11 +80,11 @@ export function CalendarView({
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showUserPanel, setShowUserPanel] = useState(true);
+  const [activeTypeFilters, setActiveTypeFilters] = useState<Set<EventType>>(new Set(ALL_EVENT_TYPES));
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  // Fetch users in same company
   useEffect(() => {
     if (!user) return;
     const fetchUsers = async () => {
@@ -104,7 +106,6 @@ export function CalendarView({
     fetchUsers();
   }, [user]);
 
-  // Fetch all deadline events
   useEffect(() => {
     if (!user) return;
     const fetchEvents = async () => {
@@ -118,7 +119,7 @@ export function CalendarView({
       profiles?.forEach((p) => userMap.set(p.user_id, p.full_name || p.email));
       const getName = (uid: string | null) => (uid ? userMap.get(uid) || "Sin asignar" : "Sin asignar");
 
-      // 1. Document responsibilities (deadlines)
+      // 1. Document responsibilities
       const { data: docResps } = await supabase
         .from("document_responsibilities")
         .select("id, user_id, due_date, action_type, document_id, documents(title, code)");
@@ -132,13 +133,13 @@ export function CalendarView({
             type: "doc_responsibility",
             userId: r.user_id,
             userName: getName(r.user_id),
-            typeLabel: TYPE_LABELS.doc_responsibility,
+            typeLabel: EVENT_TYPE_CONFIG.doc_responsibility.label,
             documentCode: r.documents?.code,
           });
         }
       });
 
-      // 2. Incidencias (deadline)
+      // 2. Incidencias
       const { data: incidents } = await supabase
         .from("incidencias")
         .select("id, title, deadline, responsible_id");
@@ -152,12 +153,12 @@ export function CalendarView({
             type: "incident",
             userId: inc.responsible_id,
             userName: getName(inc.responsible_id),
-            typeLabel: TYPE_LABELS.incident,
+            typeLabel: EVENT_TYPE_CONFIG.incident.label,
           });
         }
       });
 
-      // 3. Reclamaciones (response_deadline)
+      // 3. Reclamaciones
       const { data: recs } = await supabase
         .from("reclamaciones")
         .select("id, title, response_deadline, responsible_id");
@@ -171,12 +172,12 @@ export function CalendarView({
             type: "reclamacion",
             userId: r.responsible_id,
             userName: getName(r.responsible_id),
-            typeLabel: TYPE_LABELS.reclamacion,
+            typeLabel: EVENT_TYPE_CONFIG.reclamacion.label,
           });
         }
       });
 
-      // 4. Audits (audit_date)
+      // 4. Audits
       const { data: audits } = await supabase
         .from("audits")
         .select("id, title, audit_date, responsible_id");
@@ -190,12 +191,12 @@ export function CalendarView({
             type: "audit",
             userId: a.responsible_id,
             userName: getName(a.responsible_id),
-            typeLabel: TYPE_LABELS.audit,
+            typeLabel: EVENT_TYPE_CONFIG.audit.label,
           });
         }
       });
 
-      // 5. Training records (deadline)
+      // 5. Training records
       const { data: trainings } = await supabase
         .from("training_records")
         .select("id, title, deadline, created_by");
@@ -209,12 +210,12 @@ export function CalendarView({
             type: "training",
             userId: t.created_by,
             userName: getName(t.created_by),
-            typeLabel: TYPE_LABELS.training,
+            typeLabel: EVENT_TYPE_CONFIG.training.label,
           });
         }
       });
 
-      // 6. Non-conformities (deadline)
+      // 6. Non-conformities
       const { data: ncs } = await supabase
         .from("non_conformities")
         .select("id, title, deadline, responsible_id");
@@ -228,7 +229,27 @@ export function CalendarView({
             type: "non_conformity",
             userId: nc.responsible_id,
             userName: getName(nc.responsible_id),
-            typeLabel: TYPE_LABELS.non_conformity,
+            typeLabel: EVENT_TYPE_CONFIG.non_conformity.label,
+          });
+        }
+      });
+
+      // 7. CAPA Actions (corrective/preventive actions)
+      const { data: actions } = await supabase
+        .from("actions")
+        .select("id, description, due_date, responsible_id, action_type, status");
+      actions?.forEach((a) => {
+        if (a.due_date && a.responsible_id) {
+          const typeStr = a.action_type === "preventiva" ? "Acción Preventiva" : a.action_type === "correctiva" ? "Acción Correctiva" : "Acción CAPA";
+          allEvents.push({
+            id: `action-${a.id}`,
+            sourceId: a.id,
+            title: `${typeStr}: ${a.description?.substring(0, 60) || "Sin descripción"}`,
+            date: a.due_date,
+            type: "capa_action",
+            userId: a.responsible_id,
+            userName: getName(a.responsible_id),
+            typeLabel: EVENT_TYPE_CONFIG.capa_action.label,
           });
         }
       });
@@ -240,7 +261,7 @@ export function CalendarView({
   }, [user]);
 
   const handleEventClick = useCallback((ev: CalendarEvent) => {
-    if (ev.userId !== user?.id) return; // Only navigate for own events
+    if (ev.userId !== user?.id) return;
 
     switch (ev.type) {
       case "incident":
@@ -250,6 +271,8 @@ export function CalendarView({
         onNavigateToReclamacion?.(ev.sourceId);
         break;
       case "audit":
+      case "non_conformity":
+      case "capa_action":
         onNavigateToAudit?.("audits");
         break;
       case "training":
@@ -262,11 +285,21 @@ export function CalendarView({
           onNavigateToPendingActions?.();
         }
         break;
-      case "non_conformity":
-        onNavigateToAudit?.("audits");
-        break;
     }
   }, [user, onNavigateToIncident, onNavigateToReclamacion, onNavigateToAudit, onNavigateToTraining, onNavigateToDocument, onNavigateToPendingActions]);
+
+  const toggleTypeFilter = useCallback((type: EventType) => {
+    setActiveTypeFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }, []);
+
+  const toggleAllTypes = useCallback((on: boolean) => {
+    setActiveTypeFilters(on ? new Set(ALL_EVENT_TYPES) : new Set());
+  }, []);
 
   const toggleUser = useCallback((userId: string) => {
     setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, visible: !u.visible } : u)));
@@ -289,8 +322,8 @@ export function CalendarView({
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   const filteredEvents = useMemo(
-    () => events.filter((e) => visibleUserIds.has(e.userId)),
-    [events, visibleUserIds]
+    () => events.filter((e) => visibleUserIds.has(e.userId) && activeTypeFilters.has(e.type)),
+    [events, visibleUserIds, activeTypeFilters]
   );
 
   const eventsByDate = useMemo(() => {
@@ -311,7 +344,6 @@ export function CalendarView({
   const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
   const selectedEvents = selectedDay ? eventsByDate.get(selectedDay) || [] : [];
-
   const isOwnEvent = (ev: CalendarEvent) => ev.userId === user?.id;
 
   return (
@@ -346,10 +378,7 @@ export function CalendarView({
                         !u.visible && "opacity-50"
                       )}
                     >
-                      <Checkbox
-                        checked={u.visible}
-                        onCheckedChange={() => toggleUser(u.id)}
-                      />
+                      <Checkbox checked={u.visible} onCheckedChange={() => toggleUser(u.id)} />
                       <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", color.dot)} />
                       <span className="truncate">
                         {u.id === user?.id ? `${u.name} (Tú)` : u.name}
@@ -365,7 +394,7 @@ export function CalendarView({
 
       {/* Main calendar area */}
       <div className="flex-1 flex flex-col gap-4 min-w-0">
-        {/* Header */}
+        {/* Header with nav */}
         <Card>
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -383,6 +412,45 @@ export function CalendarView({
             <Button variant="outline" size="sm" onClick={goToday}>
               Hoy
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Type filters */}
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1 mr-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Filtrar:</span>
+              </div>
+              {ALL_EVENT_TYPES.map((type) => {
+                const config = EVENT_TYPE_CONFIG[type];
+                const isActive = activeTypeFilters.has(type);
+                return (
+                  <button
+                    key={type}
+                    onClick={() => toggleTypeFilter(type)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all border",
+                      isActive
+                        ? "bg-foreground/10 border-foreground/20 text-foreground"
+                        : "bg-muted/50 border-transparent text-muted-foreground opacity-50"
+                    )}
+                  >
+                    <span className={cn("w-2 h-2 rounded-full", config.color)} />
+                    {config.label}
+                  </button>
+                );
+              })}
+              <div className="ml-auto flex gap-1">
+                <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => toggleAllTypes(true)}>
+                  Todos
+                </Button>
+                <Button variant="ghost" size="sm" className="text-xs h-7 px-2" onClick={() => toggleAllTypes(false)}>
+                  Ninguno
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -483,7 +551,11 @@ export function CalendarView({
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", color.dot)} />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{ev.title}</p>
-                          <p className="text-xs text-muted-foreground">{ev.userName}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-muted-foreground">{ev.userName}</p>
+                            <span className={cn("inline-block w-1.5 h-1.5 rounded-full", EVENT_TYPE_CONFIG[ev.type].color)} />
+                            <span className="text-[10px] text-muted-foreground">{ev.typeLabel}</span>
+                          </div>
                         </div>
                         <Badge variant="secondary" className="text-[10px] flex-shrink-0">{ev.typeLabel}</Badge>
                         {canNavigate && (
