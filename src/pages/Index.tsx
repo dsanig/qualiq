@@ -66,6 +66,7 @@ const Index = () => {
   const [incidentTypeSeed, setIncidentTypeSeed] = useState<IncidentType | undefined>(undefined);
   const [incidentPrefill, setIncidentPrefill] = useState<IncidentPrefillPayload | null>(null);
   const [openIncidentId, setOpenIncidentId] = useState<string | null>(null);
+  const [openReclamacionId, setOpenReclamacionId] = useState<string | null>(null);
   const { user, isLoading } = useAuth();
   const { enabledFeatures } = useCompanyFeatures();
   const navigate = useNavigate();
