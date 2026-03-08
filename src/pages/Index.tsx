@@ -73,6 +73,7 @@ const Index = () => {
   const [isNewReclamacionOpen, setIsNewReclamacionOpen] = useState(false);
   const { user, isLoading } = useAuth();
   const { enabledFeatures } = useCompanyFeatures();
+  const { isSuperadmin } = usePermissions();
   const navigate = useNavigate();
   
   // Auto-logout after 10 minutes of inactivity
