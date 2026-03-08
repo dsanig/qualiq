@@ -777,16 +777,17 @@ export function DocumentsView({
   };
 
   const handleDownloadVersion = async (fileUrl: string, version: number, docCode: string) => {
-    const { data, error } = await supabase.storage.from("documents").createSignedUrl(fileUrl, 60);
-    if (error || !data?.signedUrl) {
-      toast({ title: "Error", description: "No se pudo generar el enlace.", variant: "destructive" });
+    const { data, error } = await supabase.storage.from("documents").download(fileUrl);
+    if (error || !data) {
+      toast({ title: "Error", description: "No se pudo descargar el archivo.", variant: "destructive" });
       return;
     }
+    const url = URL.createObjectURL(data);
     const link = document.createElement("a");
-    link.href = data.signedUrl;
+    link.href = url;
     link.download = `${docCode}-v${version}`;
-    link.target = "_blank";
     link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleDeleteVersion = async (versionId: string) => {
