@@ -639,6 +639,8 @@ export function DocumentsView({
         category: editDocCategory.charAt(0).toUpperCase() + editDocCategory.slice(1),
         typology: editDocTypology,
         status: editDocStatus as any,
+        effective_date: editDocEffectiveImmediate ? null : (editDocEffectiveDate || null),
+        expiry_date: editDocNoExpiry ? null : (editDocExpiryDate || null),
       };
 
       console.log("UPDATE payload", updatePayload);
