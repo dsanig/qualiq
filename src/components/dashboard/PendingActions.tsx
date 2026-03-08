@@ -325,6 +325,8 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                     onNavigateToModule("audits");
                   } else if (action.source === "training" && onNavigateToModule) {
                     onNavigateToModule("training");
+                  } else if (action.source === "reclamacion" && onNavigateToModule) {
+                    onNavigateToModule("reclamaciones");
                   }
                 }}
               >
