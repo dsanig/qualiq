@@ -40,6 +40,7 @@ const actionTypes = [
 export function AuditManagementView({ searchQuery = "" }: AuditManagementViewProps) {
   const [audits, setAudits] = useState<Audit[]>([]);
   const [auditAttachments, setAuditAttachments] = useState<AuditAttachment[]>([]);
+  const [auditParticipants, setAuditParticipants] = useState<AuditParticipant[]>([]);
   const [capaPlans, setCapaPlans] = useState<CapaPlan[]>([]);
   const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
