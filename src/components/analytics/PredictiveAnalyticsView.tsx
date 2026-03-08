@@ -188,12 +188,14 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
     setIsLoading(true);
     if (!profile?.company_id) {
       setInsights([]);
+      setArchivedInsights([]);
       setIsLoading(false);
       return;
     }
 
     const windowStart = getWindowStart(analysisWindow);
 
+    // Fetch unread insights
     const { data, error } = await supabase
       .from("predictive_insights")
        .select("*")
@@ -202,11 +204,21 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       .order("created_at", { ascending: false })
       .limit(20);
 
+    // Fetch archived (acknowledged) insights
+    const { data: archivedData } = await supabase
+      .from("predictive_insights")
+      .select("*")
+      .eq("company_id", profile.company_id)
+      .eq("is_acknowledged", true)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
     if (error) {
       console.error("Error fetching insights:", error);
     } else {
       const unreadInsights = (data ?? []) as unknown as PredictiveInsight[];
       setInsights(unreadInsights);
+      setArchivedInsights((archivedData ?? []) as unknown as PredictiveInsight[]);
       setWindowInsights(
         windowStart
           ? unreadInsights.filter((insight) => new Date(insight.created_at) >= windowStart)
