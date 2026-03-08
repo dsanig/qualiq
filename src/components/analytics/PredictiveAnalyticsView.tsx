@@ -325,11 +325,12 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       });
 
       fetchInsights();
-    } catch (e) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "No se pudo ejecutar el análisis predictivo";
       console.error("Error running analysis:", e);
       toast({
-        title: "Error",
-        description: "No se pudo ejecutar el análisis predictivo",
+        title: "Error en el análisis",
+        description: msg,
         variant: "destructive",
       });
     }
