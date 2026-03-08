@@ -49,7 +49,7 @@ export function CompanyManagementView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<CompanyRow | null>(null);
-  const [form, setForm] = useState({ name: "", slug: "", status: "active", plan_type: "standard" });
+  const [form, setForm] = useState({ name: "", slug: "", status: "active", plan_type: "standard", admin_email: "", admin_password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchCompanies = useCallback(async () => {
