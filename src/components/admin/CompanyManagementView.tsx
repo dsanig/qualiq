@@ -313,7 +313,30 @@ export function CompanyManagementView() {
             ))}
           </div>
         )}
-      </div>
+            </div>
+            {!editingCompany && (
+              <div className="space-y-4 border-t border-border pt-4">
+                <p className="text-sm font-medium text-foreground">Administrador de la empresa</p>
+                <div className="space-y-2">
+                  <Label>Email del administrador</Label>
+                  <Input
+                    type="email"
+                    value={form.admin_email}
+                    onChange={(e) => setForm((prev) => ({ ...prev, admin_email: e.target.value }))}
+                    placeholder="admin@empresa.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contraseña</Label>
+                  <Input
+                    type="password"
+                    value={form.admin_password}
+                    onChange={(e) => setForm((prev) => ({ ...prev, admin_password: e.target.value }))}
+                    placeholder="Mínimo 8 caracteres"
+                  />
+                </div>
+              </div>
+            )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-lg">
