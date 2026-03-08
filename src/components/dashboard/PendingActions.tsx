@@ -352,6 +352,9 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                       {action.source === "training" && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">Formación</span>
                       )}
+                      {action.source === "reclamacion" && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-warning/10 text-warning">Reclamación</span>
+                      )}
                       {action.due_date && (
                         <>
                           <span className="text-xs text-muted-foreground">•</span>
