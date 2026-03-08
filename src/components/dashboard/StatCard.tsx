@@ -30,7 +30,7 @@ const iconVariantStyles = {
   destructive: "bg-destructive/10 text-destructive",
 };
 
-export function StatCard({ title, value, subtitle, icon: Icon, trend, variant = "default" }: StatCardProps) {
+export function StatCard({ title, value, subtitle, icon: Icon, trend, variant = "default", onViewDetail }: StatCardProps) {
   return (
     <div className={cn("stat-card", variantStyles[variant])}>
       <div className="flex items-start justify-between">
@@ -53,6 +53,14 @@ export function StatCard({ title, value, subtitle, icon: Icon, trend, variant = 
           <Icon className="w-5 h-5" />
         </div>
       </div>
+      {onViewDetail && (
+        <button
+          onClick={onViewDetail}
+          className="mt-3 w-full text-xs font-medium text-accent hover:text-accent/80 transition-colors text-center py-1.5 rounded-md border border-border hover:bg-secondary/50"
+        >
+          Ver detalle
+        </button>
+      )}
     </div>
   );
 }
