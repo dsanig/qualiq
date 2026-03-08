@@ -574,7 +574,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const actionTypeLabel = (t: string) => actionTypes.find((at) => at.value === t)?.label ?? t;
   const statusLabel = (s: string) => {
-    const map: Record<string, string> = { open: "Abierta", in_progress: "En curso", closed: "Cerrada" };
+    const map: Record<string, string> = { open: "Abierta", in_progress: "En proceso", closed: "Cerrada" };
     return map[s] ?? s;
   };
 
