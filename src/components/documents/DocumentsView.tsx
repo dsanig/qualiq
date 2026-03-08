@@ -19,6 +19,7 @@ import {
   ArrowRightLeft,
   UserCheck,
   PenTool,
+  ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -347,6 +348,18 @@ export function DocumentsView({
   const [statusHistory, setStatusHistory] = useState<StatusChangeRecord[]>([]);
   const [isStatusHistoryOpen, setIsStatusHistoryOpen] = useState(false);
   const [isLoadingStatusHistory, setIsLoadingStatusHistory] = useState(false);
+
+  // Full history state
+  interface FullHistoryEvent {
+    timestamp: string;
+    type: "status_change" | "version" | "signature" | "responsibility" | "creation";
+    description: string;
+    userName: string;
+    detail?: string;
+  }
+  const [isFullHistoryOpen, setIsFullHistoryOpen] = useState(false);
+  const [fullHistory, setFullHistory] = useState<FullHistoryEvent[]>([]);
+  const [isLoadingFullHistory, setIsLoadingFullHistory] = useState(false);
   
   // Responsibilities state
   const [isResponsibilitiesOpen, setIsResponsibilitiesOpen] = useState(false);
@@ -761,7 +774,159 @@ export function DocumentsView({
     fetchStatusHistory(doc.id);
   };
 
-  // --- Version history ---
+  // --- Full document history ---
+  const fetchFullHistory = async (docId: string) => {
+    setIsLoadingFullHistory(true);
+    const events: FullHistoryEvent[] = [];
+
+    // Collect all user IDs for name resolution
+    const allUserIds = new Set<string>();
+
+    // 1. Status changes
+    const { data: statusData } = await (supabase as any)
+      .from("document_status_changes")
+      .select("old_status, new_status, changed_by, changed_at, comment")
+      .eq("document_id", docId)
+      .order("changed_at", { ascending: false });
+
+    if (statusData) {
+      for (const s of statusData) {
+        allUserIds.add(s.changed_by);
+      }
+    }
+
+    // 2. Version changes
+    const { data: versionData } = await (supabase as any)
+      .from("document_versions")
+      .select("version, created_by, created_at, changes_description")
+      .eq("document_id", docId)
+      .order("created_at", { ascending: false });
+
+    if (versionData) {
+      for (const v of versionData) {
+        allUserIds.add(v.created_by);
+      }
+    }
+
+    // 3. Signatures
+    const { data: sigData } = await (supabase as any)
+      .from("document_signatures")
+      .select("signed_by, signed_at, signer_name, signature_method")
+      .eq("document_id", docId)
+      .order("signed_at", { ascending: false });
+
+    if (sigData) {
+      for (const s of sigData) {
+        allUserIds.add(s.signed_by);
+      }
+    }
+
+    // 4. Responsibility completions
+    const { data: respData } = await (supabase as any)
+      .from("document_responsibilities")
+      .select("user_id, action_type, status, completed_at, created_at, created_by")
+      .eq("document_id", docId);
+
+    if (respData) {
+      for (const r of respData) {
+        allUserIds.add(r.user_id);
+        if (r.created_by) allUserIds.add(r.created_by);
+      }
+    }
+
+    // Resolve names
+    const userIds = [...allUserIds].filter(Boolean);
+    const { data: profiles } = userIds.length
+      ? await supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds)
+      : { data: [] };
+    const nameMap = new Map((profiles || []).map(p => [p.user_id, p.full_name || p.email || p.user_id]));
+    const getName = (id: string) => nameMap.get(id) || id;
+
+    const statusLabel = (s: string) => statusConfig[s]?.label || s;
+
+    // Build events
+    if (statusData) {
+      for (const s of statusData) {
+        const oldLabel = s.old_status ? statusLabel(s.old_status) : "—";
+        const newLabel = statusLabel(s.new_status);
+        events.push({
+          timestamp: s.changed_at,
+          type: "status_change",
+          description: `Estado cambiado: ${oldLabel} → ${newLabel}`,
+          userName: getName(s.changed_by),
+          detail: s.comment || undefined,
+        });
+      }
+    }
+
+    if (versionData) {
+      for (const v of versionData) {
+        events.push({
+          timestamp: v.created_at,
+          type: "version",
+          description: `Nueva versión archivada: v${v.version}.0`,
+          userName: getName(v.created_by),
+          detail: v.changes_description || undefined,
+        });
+      }
+    }
+
+    if (sigData) {
+      for (const s of sigData) {
+        const method = s.signature_method === "manual_name" ? "firma manual" : "DNIe/AutoFirma";
+        events.push({
+          timestamp: s.signed_at,
+          type: "signature",
+          description: `Documento firmado (${method})`,
+          userName: s.signer_name || getName(s.signed_by),
+        });
+      }
+    }
+
+    if (respData) {
+      for (const r of respData) {
+        const actionLabels: Record<string, string> = { revision: "Revisión", firma: "Firma", aprobacion: "Aprobación" };
+        const actionLabel = actionLabels[r.action_type] || r.action_type;
+
+        // Responsibility assigned
+        events.push({
+          timestamp: r.created_at,
+          type: "responsibility",
+          description: `Responsabilidad asignada: ${actionLabel}`,
+          userName: getName(r.user_id),
+          detail: r.created_by ? `Asignada por ${getName(r.created_by)}` : undefined,
+        });
+
+        // Responsibility completed or rejected
+        if (r.status === "completed" && r.completed_at) {
+          events.push({
+            timestamp: r.completed_at,
+            type: "responsibility",
+            description: `${actionLabel} completada`,
+            userName: getName(r.user_id),
+          });
+        } else if (r.status === "rejected" && r.completed_at) {
+          events.push({
+            timestamp: r.completed_at,
+            type: "responsibility",
+            description: `${actionLabel} denegada`,
+            userName: getName(r.user_id),
+          });
+        }
+      }
+    }
+
+    // Sort by timestamp descending
+    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    setFullHistory(events);
+    setIsLoadingFullHistory(false);
+  };
+
+  const handleOpenFullHistory = (doc: Document) => {
+    setSelectedDocument(doc);
+    setIsFullHistoryOpen(true);
+    fetchFullHistory(doc.id);
+  };
   const fetchVersionHistory = async (docId: string) => {
     setIsLoadingHistory(true);
     const { data, error } = await (supabase as any)
@@ -1834,6 +1999,7 @@ export function DocumentsView({
                               onView={() => handleOpenPreview(doc)}
                               onEdit={() => handleOpenEdit(doc)}
                               onViewHistory={() => handleOpenHistory(doc)}
+                              onViewFullHistory={() => handleOpenFullHistory(doc)}
                               onViewOwners={() => handleOpenOwners(doc)}
                               onDownload={() => handleDownload(doc)}
                                onSign={() => handleOpenSign(doc)}
@@ -2716,6 +2882,53 @@ export function DocumentsView({
           </DialogContent>
         </Dialog>
       )}
+      {/* Full History Dialog */}
+      <Dialog open={isFullHistoryOpen} onOpenChange={setIsFullHistoryOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ScrollText className="w-5 h-5" />
+              Historial completo — {selectedDocument?.code}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1">
+            {isLoadingFullHistory && <p className="text-center py-4 text-muted-foreground">Cargando historial...</p>}
+            {!isLoadingFullHistory && fullHistory.length === 0 && <p className="text-center py-4 text-muted-foreground">No hay eventos registrados.</p>}
+            {!isLoadingFullHistory && fullHistory.length > 0 && (
+              <div className="relative pl-6 border-l-2 border-border space-y-4">
+                {fullHistory.map((event, idx) => {
+                  const typeConfig: Record<string, { color: string; label: string }> = {
+                    status_change: { color: "bg-accent", label: "Estado" },
+                    version: { color: "bg-primary", label: "Versión" },
+                    signature: { color: "bg-success", label: "Firma" },
+                    responsibility: { color: "bg-warning", label: "Responsabilidad" },
+                    creation: { color: "bg-muted-foreground", label: "Creación" },
+                  };
+                  const cfg = typeConfig[event.type] || typeConfig.creation;
+                  const date = new Date(event.timestamp);
+                  return (
+                    <div key={idx} className="relative">
+                      <div className={`absolute -left-[calc(0.75rem+1px)] top-1 w-3 h-3 rounded-full ${cfg.color}`} />
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">{cfg.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })} {date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                          </span>
+                        </div>
+                        <p className="text-sm text-foreground">{event.description}</p>
+                        <p className="text-xs text-muted-foreground">por {event.userName}</p>
+                        {event.detail && <p className="text-xs text-muted-foreground italic">{event.detail}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Share Document Dialog */}
       {selectedDocument && (
         <ShareDocumentDialog
