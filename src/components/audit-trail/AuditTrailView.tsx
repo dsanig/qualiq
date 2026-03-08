@@ -281,24 +281,55 @@ export function AuditTrailView() {
               <Badge variant="secondary" className="ml-2">{totalCount} registros</Badge>
             </CardTitle>
             <div className="flex gap-2">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" disabled={totalCount === 0}>
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Eliminar todo
-                  </Button>
-                </AlertDialogTrigger>
+              <Button variant="destructive" size="sm" disabled={totalCount === 0} onClick={() => setDeleteStep(1)}>
+                <Trash2 className="w-4 h-4 mr-1" />
+                Eliminar todo
+              </Button>
+
+              {/* Step 1: Warning */}
+              <AlertDialog open={deleteStep === 1} onOpenChange={(open) => { if (!open) setDeleteStep(0); }}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>¿Eliminar toda la pista de auditoría?</AlertDialogTitle>
+                    <AlertDialogTitle>⚠️ Atención: acción irreversible</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Esta acción eliminará permanentemente los <strong>{totalCount} registros</strong> de la pista de auditoría. Esta acción no se puede deshacer.
+                      Estás a punto de eliminar permanentemente <strong>{totalCount} registros</strong> de la pista de auditoría. Esta acción <strong>NO se puede deshacer</strong> y los datos se perderán para siempre.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={deleteAllEntries} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      Eliminar todo
+                    <AlertDialogCancel onClick={() => setDeleteStep(0)}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => { setDeleteStep(2); setDeleteConfirmText(""); }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Entiendo, continuar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              {/* Step 2: Type ELIMINAR */}
+              <AlertDialog open={deleteStep === 2} onOpenChange={(open) => { if (!open) { setDeleteStep(0); setDeleteConfirmText(""); } }}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-3">
+                      <span>Para confirmar, escribe <strong>ELIMINAR</strong> en el campo de abajo:</span>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <Input
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="Escribe ELIMINAR"
+                    className="mt-2"
+                  />
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => { setDeleteStep(0); setDeleteConfirmText(""); }}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={deleteConfirmText !== "ELIMINAR"}
+                      onClick={() => { deleteAllEntries(); setDeleteStep(0); setDeleteConfirmText(""); }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Eliminar permanentemente
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
