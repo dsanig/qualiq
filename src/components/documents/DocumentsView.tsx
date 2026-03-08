@@ -979,6 +979,7 @@ export function DocumentsView({
       return;
     }
     toast({ title: "Versión eliminada" });
+    logAction({ action: "delete_version", entity_type: "document", entity_id: selectedDocument?.id, entity_title: selectedDocument?.title, details: { version_id: versionId } });
     if (selectedDocument) fetchVersionHistory(selectedDocument.id);
   };
 
