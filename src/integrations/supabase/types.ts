@@ -1728,6 +1728,7 @@ export type Database = {
         | "obsolete"
         | "archived"
         | "pending_signature"
+        | "pending_approval"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1872,6 +1873,7 @@ export const Constants = {
         "obsolete",
         "archived",
         "pending_signature",
+        "pending_approval",
       ],
     },
   },
