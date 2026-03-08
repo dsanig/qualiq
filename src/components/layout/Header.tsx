@@ -61,6 +61,9 @@ export function Header({ title, subtitle, searchQuery, onSearchChange, onSearchS
           )}
         </div>
 
+        {/* Company Switcher for superadmins */}
+        <CompanySwitcher />
+
         {/* Actions */}
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="text-muted-foreground">
