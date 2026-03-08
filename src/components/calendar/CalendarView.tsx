@@ -360,7 +360,7 @@ export function CalendarView({
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   const filteredEvents = useMemo(
-    () => events.filter((e) => visibleUserIds.has(e.userId) && activeTypeFilters.has(e.type)),
+    () => events.filter((e) => (e.companyWide || visibleUserIds.has(e.userId)) && activeTypeFilters.has(e.type)),
     [events, visibleUserIds, activeTypeFilters]
   );
 
