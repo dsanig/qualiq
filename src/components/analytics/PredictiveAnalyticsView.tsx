@@ -361,6 +361,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         title: "Insight marcado como leído",
         description: "El insight se ha eliminado del listado.",
       });
+      logAction({ action: "acknowledge_insight", entity_type: "predictive_insight", entity_id: insightId });
 
       fetchInsights();
     } catch (error) {
