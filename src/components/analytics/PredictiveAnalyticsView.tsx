@@ -305,7 +305,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         });
       }
 
-      const { error } = await supabase.functions.invoke("analyze-capa-patterns", {
+      const { data: fnData, error } = await supabase.functions.invoke("analyze-capa-patterns", {
         body: {
           companyId: profile.company_id,
           incidentsData,
@@ -313,7 +313,11 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Try to extract backend error message
+        const backendMsg = fnData?.error || error.message;
+        throw new Error(backendMsg);
+      }
 
       toast({
         title: "Análisis completado",
@@ -321,11 +325,12 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       });
 
       fetchInsights();
-    } catch (e) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "No se pudo ejecutar el análisis predictivo";
       console.error("Error running analysis:", e);
       toast({
-        title: "Error",
-        description: "No se pudo ejecutar el análisis predictivo",
+        title: "Error en el análisis",
+        description: msg,
         variant: "destructive",
       });
     }
