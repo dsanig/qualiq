@@ -73,9 +73,11 @@ interface ReclamacionesViewProps {
   onSearchChange: (value: string) => void;
   onOpenNewIncident?: (reclamacionId: string, reclamacionTitle: string) => void;
   onNavigateToIncident?: (incidenciaId: string) => void;
+  openReclamacionId?: string | null;
+  onOpenReclamacionConsumed?: () => void;
 }
 
-export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncident, onNavigateToIncident }: ReclamacionesViewProps) {
+export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncident, onNavigateToIncident, openReclamacionId, onOpenReclamacionConsumed }: ReclamacionesViewProps) {
   const [reclamaciones, setReclamaciones] = useState<Reclamacion[]>([]);
   const [users, setUsers] = useState<UserRef[]>([]);
   const [incidencias, setIncidencias] = useState<IncidenciaRef[]>([]);
