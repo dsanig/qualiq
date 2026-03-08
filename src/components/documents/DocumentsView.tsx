@@ -464,7 +464,7 @@ export function DocumentsView({
   }, [effectiveCompanyId]);
 
   const fetchDocuments = useCallback(async () => {
-    if (!profile?.company_id) return;
+    if (!effectiveCompanyId) return;
 
     let query = supabase
       .from("documents")
