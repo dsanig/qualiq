@@ -13,6 +13,7 @@ import { useAuditLog } from "@/hooks/useAuditLog";
 export function SettingsView() {
   const { user, profile } = useAuth();
   const { isSuperadmin, isAdministrador, isEditor, canManageCompany } = usePermissions();
+  const { logAction } = useAuditLog();
 
   const roleName = isSuperadmin ? "Superadmin" : isAdministrador ? "Administrador" : isEditor ? "Editor" : "Espectador";
 
