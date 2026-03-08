@@ -7,14 +7,13 @@ const corsHeaders = {
 };
 
 
-const PREDICTION_MIN_RECORDS = 10;
-const PREDICTION_MIN_RANGE_DAYS = 30;
+const PREDICTION_MIN_RECORDS = 3;
 
-function validateIncidentsForPrediction(incidentsData: Array<{ created_at?: string | null }>) {
-  if (incidentsData.length < PREDICTION_MIN_RECORDS) {
+function validateIncidentsForPrediction(incidentsData: Array<{ created_at?: string | null }>, minRecords: number) {
+  if (incidentsData.length < minRecords) {
     return {
       ok: false,
-      reason: `Se requieren al menos ${PREDICTION_MIN_RECORDS} incidencias reales para ejecutar el análisis predictivo.`,
+      reason: `Se requieren al menos ${minRecords} incidencias reales para ejecutar el análisis predictivo.`,
     };
   }
 
@@ -24,7 +23,7 @@ function validateIncidentsForPrediction(incidentsData: Array<{ created_at?: stri
     .map((date) => new Date(date).getTime())
     .filter((timestamp) => Number.isFinite(timestamp));
 
-  if (timestamps.length !== incidentsData.length) {
+  if (timestamps.length === 0) {
     return {
       ok: false,
       reason: "Existen incidencias con fechas inválidas; no se puede ejecutar el análisis predictivo.",
@@ -34,13 +33,6 @@ function validateIncidentsForPrediction(incidentsData: Array<{ created_at?: stri
   const minDate = Math.min(...timestamps);
   const maxDate = Math.max(...timestamps);
   const rangeDays = Math.floor((maxDate - minDate) / (1000 * 60 * 60 * 24));
-
-  if (rangeDays < PREDICTION_MIN_RANGE_DAYS) {
-    return {
-      ok: false,
-      reason: `Se requiere un histórico mínimo de ${PREDICTION_MIN_RANGE_DAYS} días para generar predicciones confiables.`,
-    };
-  }
 
   return {
     ok: true,
