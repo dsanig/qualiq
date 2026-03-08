@@ -30,7 +30,7 @@ interface AuditManagementViewProps {
   searchQuery?: string;
 }
 
-const actionStatus = ["open", "in_progress", "closed", "overdue"] as const;
+const actionStatus = ["open", "in_progress", "closed"] as const;
 const actionTypes = [
   { value: "immediate", label: "Inmediata" },
   { value: "corrective", label: "Correctiva" },
