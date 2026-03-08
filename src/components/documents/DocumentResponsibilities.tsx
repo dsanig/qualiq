@@ -316,6 +316,14 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
             </DialogDescription>
           </DialogHeader>
 
+          {/* Document owner */}
+          {ownerName && (
+            <div className="border border-border rounded-lg p-3 bg-secondary/5 flex items-center gap-2">
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm"><strong>Propietario:</strong> {ownerName}</span>
+            </div>
+          )}
+
           {/* Rejection banner */}
           {hasRejection && (
             <div className="border border-destructive/30 rounded-lg p-3 bg-destructive/5 space-y-2">
