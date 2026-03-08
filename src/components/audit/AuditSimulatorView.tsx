@@ -13,12 +13,24 @@ import {
   Loader2, 
   FileSearch,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface AuditSimulation {
   id: string;
@@ -175,6 +187,23 @@ export function AuditSimulatorView() {
     setExpandedFindings(newExpanded);
   };
 
+  const deleteSimulation = async (simId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      // Delete findings first (FK constraint)
+      await supabase.from("audit_findings").delete().eq("simulation_id", simId);
+      const { error } = await supabase.from("audit_simulations").delete().eq("id", simId);
+      if (error) throw error;
+
+      toast({ title: "Simulación eliminada" });
+      if (selectedSimulation?.id === simId) setSelectedSimulation(null);
+      setSimulations((prev) => prev.filter((s) => s.id !== simId));
+    } catch (err) {
+      console.error("Error deleting simulation:", err);
+      toast({ title: "Error", description: "No se pudo eliminar la simulación", variant: "destructive" });
+    }
+  };
+
   const getRiskColor = (score: number) => {
     if (score >= 80) return "text-destructive";
     if (score >= 60) return "text-warning";
@@ -189,9 +218,33 @@ export function AuditSimulatorView() {
           <Button variant="ghost" onClick={() => setSelectedSimulation(null)}>
             ← Volver a simulaciones
           </Button>
-          <Badge variant={selectedSimulation.status === "completed" ? "default" : "secondary"}>
-            {SIMULATION_TYPES.find((t) => t.value === selectedSimulation.simulation_type)?.label}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={selectedSimulation.status === "completed" ? "default" : "secondary"}>
+              {SIMULATION_TYPES.find((t) => t.value === selectedSimulation.simulation_type)?.label}
+            </Badge>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Eliminar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Eliminar esta simulación?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Se eliminarán todos los hallazgos asociados. Esta acción no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => deleteSimulation(selectedSimulation.id)}>
+                    Eliminar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
 
         {/* Summary Card */}
@@ -428,6 +481,35 @@ export function AuditSimulatorView() {
                     )}
                   </div>
                 </CardContent>
+                <CardFooter className="pt-0 justify-end">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Eliminar
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Eliminar esta simulación?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Se eliminarán todos los hallazgos asociados. Esta acción no se puede deshacer.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={(e) => deleteSimulation(sim.id, e)}>
+                          Eliminar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardFooter>
               </Card>
             ))}
           </div>
