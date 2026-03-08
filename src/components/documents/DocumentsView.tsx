@@ -2881,6 +2881,53 @@ export function DocumentsView({
           </DialogContent>
         </Dialog>
       )}
+      {/* Full History Dialog */}
+      <Dialog open={isFullHistoryOpen} onOpenChange={setIsFullHistoryOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Historial completo — {selectedDocument?.code}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1">
+            {isLoadingFullHistory && <p className="text-center py-4 text-muted-foreground">Cargando historial...</p>}
+            {!isLoadingFullHistory && fullHistory.length === 0 && <p className="text-center py-4 text-muted-foreground">No hay eventos registrados.</p>}
+            {!isLoadingFullHistory && fullHistory.length > 0 && (
+              <div className="relative pl-6 border-l-2 border-border space-y-4">
+                {fullHistory.map((event, idx) => {
+                  const typeConfig: Record<string, { color: string; label: string }> = {
+                    status_change: { color: "bg-accent", label: "Estado" },
+                    version: { color: "bg-primary", label: "Versión" },
+                    signature: { color: "bg-success", label: "Firma" },
+                    responsibility: { color: "bg-warning", label: "Responsabilidad" },
+                    creation: { color: "bg-muted-foreground", label: "Creación" },
+                  };
+                  const cfg = typeConfig[event.type] || typeConfig.creation;
+                  const date = new Date(event.timestamp);
+                  return (
+                    <div key={idx} className="relative">
+                      <div className={`absolute -left-[calc(0.75rem+1px)] top-1 w-3 h-3 rounded-full ${cfg.color}`} />
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">{cfg.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })} {date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                          </span>
+                        </div>
+                        <p className="text-sm text-foreground">{event.description}</p>
+                        <p className="text-xs text-muted-foreground">por {event.userName}</p>
+                        {event.detail && <p className="text-xs text-muted-foreground italic">{event.detail}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Share Document Dialog */}
       {selectedDocument && (
         <ShareDocumentDialog
