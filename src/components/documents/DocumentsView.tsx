@@ -289,6 +289,7 @@ export function DocumentsView({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   const [expandedDocumentId, setExpandedDocumentId] = useState<string | null>(null);
+  const [expandedResponsibilities, setExpandedResponsibilities] = useState<Record<string, Array<{ action_type: string; user_id: string; due_date: string; status: string; userName?: string }>>>({});
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isOwnersOpen, setIsOwnersOpen] = useState(false);
   const [isSignOpen, setIsSignOpen] = useState(false);
@@ -1345,8 +1346,26 @@ export function DocumentsView({
     setIsPreviewOpen(true);
   };
 
-  const handleToggleSummary = (docId: string) => {
+  const handleToggleSummary = async (docId: string) => {
+    const isExpanding = expandedDocumentId !== docId;
     setExpandedDocumentId((prev) => (prev === docId ? null : docId));
+    if (isExpanding && !expandedResponsibilities[docId]) {
+      const { data } = await (supabase as any)
+        .from("document_responsibilities")
+        .select("action_type, user_id, due_date, status")
+        .eq("document_id", docId);
+      if (data && data.length > 0) {
+        const userIds = [...new Set((data as any[]).map((r: any) => r.user_id))];
+        const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds);
+        const nameMap = new Map((profiles || []).map(p => [p.user_id, p.full_name || p.email || p.user_id]));
+        setExpandedResponsibilities(prev => ({
+          ...prev,
+          [docId]: (data as any[]).map((r: any) => ({ ...r, userName: nameMap.get(r.user_id) || r.user_id })),
+        }));
+      } else {
+        setExpandedResponsibilities(prev => ({ ...prev, [docId]: [] }));
+      }
+    }
   };
 
   const handleDownload = async (doc: Document) => {
@@ -1760,7 +1779,34 @@ export function DocumentsView({
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Última modificación</p><p className="text-sm font-medium text-foreground">{doc.lastUpdated}</p></div>
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Modificado por</p><p className="text-sm font-medium text-foreground">{doc.lastModifiedBy}</p></div>
                                 </div>
-                                <div className="flex flex-wrap gap-2">
+
+                                {/* Responsibilities */}
+                                {expandedResponsibilities[doc.id] && expandedResponsibilities[doc.id].length > 0 && (
+                                  <div className="mt-3 border-t border-border pt-3">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Responsables asignados</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                      {expandedResponsibilities[doc.id].map((r, idx) => {
+                                        const actionLabel = r.action_type === "revision" ? "Revisión" : r.action_type === "firma" ? "Firma" : r.action_type === "aprobacion" ? "Aprobación" : r.action_type;
+                                        const isOverdue = new Date(r.due_date) < new Date() && r.status !== "completed";
+                                        const isCompleted = r.status === "completed";
+                                        return (
+                                          <div key={idx} className="flex items-center gap-2 text-xs bg-card border border-border rounded px-2 py-1.5">
+                                            <span className="font-medium text-foreground">{actionLabel}:</span>
+                                            <span className="text-muted-foreground truncate">{r.userName}</span>
+                                            <span className={cn(
+                                              "ml-auto shrink-0",
+                                              isCompleted ? "text-success" : isOverdue ? "text-destructive font-medium" : "text-muted-foreground"
+                                            )}>
+                                              {isCompleted ? "✓" : new Date(r.due_date).toLocaleDateString("es-ES")}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="flex flex-wrap gap-2 mt-3">
                                   <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
                                   <Button variant="outline" onClick={() => handleOpenUpdateVersion(doc)} disabled={!canEditContent}>Actualizar versión</Button>
                                   <Button variant="outline" onClick={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}>
