@@ -234,6 +234,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     if (inserted) await syncParticipants(inserted.id);
 
     toast({ title: "Reclamación creada" });
+    logAction({ action: "create", entity_type: "reclamacion", entity_id: inserted?.id, entity_title: form.title, details: { source: form.source, responsible_id: form.responsible_id } });
     setIsNewOpen(false);
     setForm(defaultForm());
     setNewAttachments([]);
