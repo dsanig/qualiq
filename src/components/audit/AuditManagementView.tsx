@@ -341,9 +341,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const updateNonConformity = async () => {
     if (!editingNc) return;
+    if (!ncForm.deadline || !ncForm.responsible_id) {
+      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
+    }
     const { error } = await (supabase as any).from("non_conformities").update({
       title: ncForm.title, description: ncForm.description || null, severity: ncForm.severity || null,
-      root_cause: ncForm.root_cause || null, status: ncForm.status, deadline: ncForm.deadline || null,
+      root_cause: ncForm.root_cause || null, status: ncForm.status, deadline: ncForm.deadline,
+      responsible_id: ncForm.responsible_id,
     }).eq("id", editingNc.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "No conformidad actualizada" });
