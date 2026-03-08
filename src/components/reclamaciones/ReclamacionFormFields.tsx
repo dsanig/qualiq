@@ -88,9 +88,8 @@ export function ReclamacionFormFields({
       <div>
         <Label>Responsable *</Label>
         <Select value={form.responsible_id} onValueChange={(v) => onFormChange((p) => ({ ...p, responsible_id: v }))}>
-          <SelectTrigger><SelectValue placeholder="Sin responsable" /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder="Seleccionar responsable" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">Sin responsable</SelectItem>
             {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}
           </SelectContent>
         </Select>
