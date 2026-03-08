@@ -381,9 +381,12 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const updateAction = async () => {
     if (!editingAction) return;
+    if (!actionForm.responsible_id || !actionForm.due_date) {
+      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
+    }
     const { error } = await (supabase as any).from("actions").update({
       action_type: actionForm.action_type, description: actionForm.description,
-      responsible_id: actionForm.responsible_id || null, due_date: actionForm.due_date || null, status: actionForm.status,
+      responsible_id: actionForm.responsible_id, due_date: actionForm.due_date, status: actionForm.status,
     }).eq("id", editingAction.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Acción actualizada" });
