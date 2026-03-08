@@ -239,6 +239,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     const { error } = await (supabase as any).from("audits").delete().eq("id", auditId);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Auditoría eliminada" });
+    logAction({ action: "delete", entity_type: "audit", entity_id: auditId });
     if (selectedAuditId === auditId) setSelectedAuditId(null);
     await loadData();
   };
