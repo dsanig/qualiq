@@ -287,6 +287,7 @@ export function TrainingManagementView() {
       toast({ title: "Error", description: "No se pudo eliminar", variant: "destructive" });
     } else {
       toast({ title: "Formación eliminada" });
+      logAction({ action: "delete", entity_type: "training", entity_id: id });
       if (detailRecord?.id === id) setDetailRecord(null);
       setRecords((prev) => prev.filter((r) => r.id !== id));
     }
