@@ -235,6 +235,8 @@ const Index = () => {
               setOpenIncidentId(incidenciaId);
               setActiveModule("incidents");
             }}
+            openReclamacionId={openReclamacionId}
+            onOpenReclamacionConsumed={() => setOpenReclamacionId(null)}
           />
         );
       case "audits":
