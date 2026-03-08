@@ -193,12 +193,14 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     const { data, error } = await (supabase as any).from("audits").insert({
       title: auditForm.title, description: auditForm.description || null,
       audit_date: auditForm.audit_date || null, auditor_id: auditForm.auditor_id || null,
+      responsible_id: auditForm.responsible_id || null,
       observations: auditForm.observations || null, findings: auditForm.findings || null,
       conclusions: auditForm.conclusions || null, status: auditForm.status,
       company_id: profileData?.company_id, created_by: user?.id,
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (auditFiles) await uploadAuditAttachments(data.id, auditFiles);
+    await syncParticipants(data.id, auditForm.participant_ids);
     toast({ title: "Auditoría creada" });
     setNewAuditOpen(false);
     resetAuditForm();
@@ -210,11 +212,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     const { error } = await (supabase as any).from("audits").update({
       title: auditForm.title, description: auditForm.description || null,
       audit_date: auditForm.audit_date || null, auditor_id: auditForm.auditor_id || null,
+      responsible_id: auditForm.responsible_id || null,
       observations: auditForm.observations || null, findings: auditForm.findings || null,
       conclusions: auditForm.conclusions || null, status: auditForm.status,
     }).eq("id", editingAudit.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (auditFiles) await uploadAuditAttachments(editingAudit.id, auditFiles);
+    await syncParticipants(editingAudit.id, auditForm.participant_ids);
     toast({ title: "Auditoría actualizada" });
     setEditAuditOpen(false);
     setEditingAudit(null);
