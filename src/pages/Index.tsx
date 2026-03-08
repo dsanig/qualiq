@@ -43,6 +43,7 @@ interface IncidentPrefillPayload {
   title: string;
   description: string;
   sourceInsightId?: string;
+  sourceReclamacionId?: string;
 }
 
 const Index = () => {
