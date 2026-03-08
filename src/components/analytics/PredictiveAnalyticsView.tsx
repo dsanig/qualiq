@@ -443,8 +443,10 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
               <Trash2 className="w-4 h-4" />
             </Button>
           )}
+        </div>
+      </div>
 
-      {/* Summary Cards */}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
