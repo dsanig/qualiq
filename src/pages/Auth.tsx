@@ -8,6 +8,7 @@ import { Shield, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { MfaVerifyStep } from "@/components/auth/MfaVerifyStep";
+import { logAuditAction } from "@/hooks/useAuditLog";
 
 const emailSchema = z.string().email("Email inválido");
 const passwordSchema = z.string().min(6, "La contraseña debe tener al menos 6 caracteres");
