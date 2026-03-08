@@ -5,6 +5,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { DashboardView } from "@/components/dashboard/DashboardView";
 import { DocumentsView } from "@/components/documents/DocumentsView";
 import { IncidentsView } from "@/components/incidents/IncidentsView";
+import { ReclamacionesView } from "@/components/reclamaciones/ReclamacionesView";
 import { ChatbotView } from "@/components/chatbot/ChatbotView";
 import { useAuth } from "@/hooks/useAuth";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
