@@ -445,6 +445,30 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         </Select>
       </div>
       <div>
+        <Label>Responsable de la auditoría</Label>
+        <Select value={auditForm.responsible_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, responsible_id: v }))}>
+          <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
+          <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Empleados asignados</Label>
+        <div className="flex flex-wrap gap-1 mb-2">
+          {auditForm.participant_ids.map((uid) => (
+            <span key={uid} className="inline-flex items-center gap-1 text-xs bg-secondary text-secondary-foreground rounded-full px-2 py-1">
+              {getUserName(uid) ?? uid}
+              <button type="button" onClick={() => setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== uid) }))} className="hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+        <Select value="" onValueChange={(v) => { if (v && !auditForm.participant_ids.includes(v)) setAuditForm((p) => ({ ...p, participant_ids: [...p.participant_ids, v] })); }}>
+          <SelectTrigger><SelectValue placeholder="Añadir empleado" /></SelectTrigger>
+          <SelectContent>{users.filter((u) => !auditForm.participant_ids.includes(u.id)).map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      <div>
         <Label>Estado</Label>
         <Select value={auditForm.status} onValueChange={(v) => setAuditForm((p) => ({ ...p, status: v }))}>
           <SelectTrigger><SelectValue /></SelectTrigger>
