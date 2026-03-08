@@ -25,6 +25,7 @@ const typeIcons: Record<string, typeof CheckCircle2> = {
   firma: PenTool,
   aprobacion: CheckCircle,
   revision: SearchIcon,
+  training: GraduationCap,
 };
 
 const typeLabels: Record<string, string> = {
