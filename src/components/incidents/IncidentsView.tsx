@@ -62,6 +62,7 @@ interface IncidentsViewProps {
   onPrefillConsumed?: () => void;
   openIncidentId?: string | null;
   onOpenIncidentConsumed?: () => void;
+  onNavigateToReclamacion?: (reclamacionId: string) => void;
 }
 
 const typeLabels: Record<IncidentType, string> = {
