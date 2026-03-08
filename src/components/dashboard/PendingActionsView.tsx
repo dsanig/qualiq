@@ -41,6 +41,7 @@ export function PendingActionsView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const fetchActions = async () => {
@@ -99,12 +100,21 @@ export function PendingActionsView() {
         })
       );
 
+      // Sort: overdue first, then by due date ascending
+      mappedActions.sort((a, b) => {
+        if (a.isOverdue && !b.isOverdue) return -1;
+        if (!a.isOverdue && b.isOverdue) return 1;
+        if (a.dueDate === "Sin fecha límite") return 1;
+        if (b.dueDate === "Sin fecha límite") return -1;
+        return a.dueDate.localeCompare(b.dueDate);
+      });
+
       setActions(mappedActions);
       setIsLoading(false);
     };
 
     void fetchActions();
-  }, [profile?.company_id]);
+  }, [profile?.company_id, refreshKey]);
 
   const filteredActions = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -125,7 +135,10 @@ export function PendingActionsView() {
             className="pl-9"
           />
         </div>
-        <Button variant="accent">Actualizar prioridades</Button>
+        <Button variant="accent" onClick={() => setRefreshKey((k) => k + 1)} disabled={isLoading}>
+          {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+          Actualizar prioridades
+        </Button>
       </div>
 
       <div className="bg-card rounded-lg border border-border p-6 space-y-4">
