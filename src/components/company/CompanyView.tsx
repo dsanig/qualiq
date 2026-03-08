@@ -811,6 +811,15 @@ export function CompanyView() {
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-2">
+                <Label>Correo electrónico</Label>
+                <Input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="correo@ejemplo.com"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>Nombre completo</Label>
                 <Input
                   value={editForm.fullName}
