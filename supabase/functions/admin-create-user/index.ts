@@ -17,6 +17,7 @@ type CreateUserPayload = {
   full_name?: string;
   roles?: string[];
   role?: string;
+  company_id?: string;
 };
 
 type CallerProfile = {
