@@ -475,7 +475,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="open">Abierta</SelectItem>
-            <SelectItem value="in_progress">En curso</SelectItem>
+            <SelectItem value="in_progress">En proceso</SelectItem>
             <SelectItem value="closed">Cerrada</SelectItem>
           </SelectContent>
         </Select>
