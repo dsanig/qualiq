@@ -430,10 +430,22 @@ export function TrainingManagementView() {
 
           <div className="space-y-5">
             {/* Status */}
-            <div className="flex gap-2">
-              <Badge variant={allSigned ? "default" : "secondary"}>
-                {allSigned ? "Completada" : "Pendiente de firmas"}
+            <div className="flex gap-2 flex-wrap">
+              <Badge variant={statusVariant(detailRecord.status, detailRecord.deadline)}>
+                {statusLabel(detailRecord.status)}
+                {detailRecord.status !== "completa" && detailRecord.deadline && new Date(detailRecord.deadline) < new Date() && " — Vencida"}
               </Badge>
+              {detailRecord.deadline && (
+                <Badge variant="outline" className="text-xs gap-1">
+                  <CalendarIcon className="w-3 h-3" />
+                  Límite: {format(new Date(detailRecord.deadline), "dd/MM/yyyy")}
+                </Badge>
+              )}
+              {allSigned && (
+                <Badge variant="default" className="text-xs gap-1">
+                  <CheckCircle className="w-3 h-3" /> Todas las firmas completadas
+                </Badge>
+              )}
             </div>
 
             {/* Description */}
