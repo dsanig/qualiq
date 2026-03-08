@@ -360,7 +360,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
               )}
             </div>
             {canEditContent && (
-              <Button onClick={() => setIsNewOpen(true)}><Plus className="w-4 h-4 mr-1" />Nueva reclamación</Button>
+              <Button onClick={() => { setForm(defaultForm()); setNewAttachments([]); setSelectedIncidenciaIds([]); setParticipantIds([]); setIsNewOpen(true); }}><Plus className="w-4 h-4 mr-1" />Nueva reclamación</Button>
             )}
           </div>
         </CardHeader>
