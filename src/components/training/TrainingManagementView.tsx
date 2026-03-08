@@ -635,6 +635,7 @@ export function TrainingManagementView() {
                   />
                   <span className="truncate">{u.full_name || u.email}</span>
                 </label>
+              ))}
             </div>
           </div>
 
