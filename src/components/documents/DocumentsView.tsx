@@ -638,30 +638,34 @@ export function DocumentsView({
       // Get responsibilities for validation
       const { data: resps } = await (supabase as any)
         .from("document_responsibilities")
-        .select("action_type, status")
+        .select("action_type, status, user_id")
         .eq("document_id", selectedDocument.id);
 
-      const allResps = (resps as { action_type: string; status: string }[]) || [];
+      const allResps = (resps as { action_type: string; status: string; user_id: string }[]) || [];
       const reviews = allResps.filter(r => r.action_type === "revision");
       const signatures = allResps.filter(r => r.action_type === "firma");
       const completedReviews = reviews.filter(r => r.status === "completed");
       const completedSignatures = signatures.filter(r => r.status === "completed");
 
-      // Validate transitions
+      // Validate transitions — only assigned responsible users can perform each action
       if (changeStatusTarget === "review" && currentStatus !== "draft") {
         toast({ title: "Transición no permitida", description: "Solo se puede pasar a 'En Revisión' desde 'Borrador'.", variant: "destructive" });
         return;
       }
 
+      // draft → review: only document owner or users with edit permissions
+      if (changeStatusTarget === "review" && currentStatus === "draft") {
+        const isOwner = selectedDocument.ownerId === user.id;
+        if (!isOwner && !canEditContent) {
+          toast({ title: "Permisos insuficientes", description: "Solo el propietario del documento o un editor puede enviarlo a revisión.", variant: "destructive" });
+          return;
+        }
+      }
+
       if (changeStatusTarget === "pending_signature") {
-        if (currentStatus !== "review") {
-          toast({ title: "Transición no permitida", description: "Solo se puede pasar a 'Pendiente de Firma' desde 'En Revisión'.", variant: "destructive" });
-          return;
-        }
-        if (reviews.length > 0 && completedReviews.length < reviews.length) {
-          toast({ title: "Revisiones pendientes", description: `Faltan ${reviews.length - completedReviews.length} revisores por completar su revisión.`, variant: "destructive" });
-          return;
-        }
+        // This transition is automatic via trigger, manual not allowed
+        toast({ title: "Transición automática", description: "El documento pasará a 'Pendiente de Firma' automáticamente cuando todos los revisores completen su revisión.", variant: "destructive" });
+        return;
       }
 
       if (changeStatusTarget === "approved") {
@@ -673,10 +677,10 @@ export function DocumentsView({
           toast({ title: "Firmas pendientes", description: `Faltan ${signatures.length - completedSignatures.length} firmantes por completar su firma.`, variant: "destructive" });
           return;
         }
-        // Check if user has aprobacion responsibility
+        // Check if user has aprobacion responsibility — no exceptions
         const allowed = await canPerformAction(user.id, selectedDocument.id, "aprobacion");
         if (!allowed) {
-          toast({ title: "Permisos insuficientes", description: "Solo el responsable de aprobación puede aprobar este documento.", variant: "destructive" });
+          toast({ title: "Permisos insuficientes", description: "Solo el responsable de aprobación asignado puede aprobar este documento.", variant: "destructive" });
           return;
         }
       }
