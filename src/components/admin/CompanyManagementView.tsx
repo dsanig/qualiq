@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Building2, Plus, Pencil, Trash2, Users, FileText, AlertTriangle, Power } from "lucide-react";
+import { Building2, Plus, Pencil, Trash2, Users, FileText, AlertTriangle, Power, ToggleLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuditLog } from "@/hooks/useAuditLog";
+import { FeatureToggles } from "@/components/company/FeatureToggles";
 
 interface CompanyRow {
   id: string;
@@ -51,6 +52,7 @@ export function CompanyManagementView() {
   const [editingCompany, setEditingCompany] = useState<CompanyRow | null>(null);
   const [form, setForm] = useState({ name: "", slug: "", status: "active", plan_type: "standard", admin_email: "", admin_password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modulesCompany, setModulesCompany] = useState<CompanyRow | null>(null);
 
   const fetchCompanies = useCallback(async () => {
     setIsLoading(true);
@@ -287,6 +289,10 @@ export function CompanyManagementView() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button variant="outline" size="sm" onClick={() => setModulesCompany(company)}>
+                    <ToggleLeft className="w-3 h-3 mr-1" />
+                    Módulos
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => handleOpenEdit(company)}>
                     <Pencil className="w-3 h-3 mr-1" />
                     Editar
@@ -410,6 +416,18 @@ export function CompanyManagementView() {
               {isSubmitting ? "Guardando..." : "Guardar"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!modulesCompany} onOpenChange={(open) => !open && setModulesCompany(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Módulos — {modulesCompany?.name}</DialogTitle>
+            <DialogDescription>
+              Activa o desactiva funcionalidades para esta empresa.
+            </DialogDescription>
+          </DialogHeader>
+          {modulesCompany && <FeatureToggles companyId={modulesCompany.id} />}
         </DialogContent>
       </Dialog>
     </div>
