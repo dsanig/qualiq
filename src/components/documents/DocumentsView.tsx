@@ -1798,6 +1798,27 @@ export function DocumentsView({
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Modificado por</p><p className="font-medium text-foreground">{doc.lastModifiedBy}</p></div>
                                 </div>
 
+                                {/* Rejected document banner */}
+                                {doc.status === "draft" && rejectedDocIds.has(doc.id) && (
+                                  <div className="border border-destructive/30 rounded-lg p-3 bg-destructive/5 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                      <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
+                                      <p className="text-sm text-destructive font-medium">
+                                        Este documento fue <strong>denegado</strong> y devuelto a Borrador. Actualiza el archivo adjunto para reiniciar el flujo de aprobación.
+                                      </p>
+                                    </div>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => handleOpenUpdateVersion(doc)}
+                                      disabled={!canEditContent}
+                                    >
+                                      <UploadCloud className="w-4 h-4 mr-1" />
+                                      Actualizar documento
+                                    </Button>
+                                  </div>
+                                )}
+
                                 {/* Actions */}
                                 <div className="flex flex-wrap gap-2">
                                   <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
