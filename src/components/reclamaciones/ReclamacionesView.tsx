@@ -309,6 +309,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     await syncParticipants(editingReclamacion.id);
 
     toast({ title: "Reclamación actualizada" });
+    logAction({ action: "update", entity_type: "reclamacion", entity_id: editingReclamacion.id, entity_title: form.title, details: { source: form.source, responsible_id: form.responsible_id } });
     setIsEditOpen(false);
     setEditingReclamacion(null);
     setForm(defaultForm());

@@ -324,6 +324,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     }).eq("id", editingCapa.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Plan CAPA actualizado" });
+    logAction({ action: "update", entity_type: "capa_plan", entity_id: editingCapa.id, entity_title: capaForm.title });
     setEditCapaOpen(false);
     setEditingCapa(null);
     await loadData();

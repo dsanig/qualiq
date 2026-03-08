@@ -1363,6 +1363,7 @@ export function DocumentsView({
       }
 
       toast({ title: "Documento creado", description: "El documento se ha subido correctamente." });
+      logAction({ action: "create", entity_type: "document", entity_id: documentId, entity_title: newDocTitle.trim(), details: { code: newDocCode.trim(), category: newDocCategory, typology: newDocTypology, file_type: fileType } });
       onNewDocumentOpenChange(false);
       setNewDocCode("");
       setNewDocTitle("");

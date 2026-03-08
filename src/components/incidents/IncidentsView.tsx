@@ -551,6 +551,7 @@ export function IncidentsView({
       }
 
       toast({ title: deleteResult.message || "Incidencia eliminada correctamente" });
+      logAction({ action: "delete", entity_type: "incidencia", entity_id: pendingIncidentId, entity_title: incidentPendingDelete.title });
       setIncidentPendingDelete(null);
       setDeleteConfirmationText("");
       if (editingIncident?.id === pendingIncidentId) {
