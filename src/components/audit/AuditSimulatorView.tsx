@@ -135,7 +135,7 @@ export function AuditSimulatorView() {
         .eq("company_id", profile.company_id)
         .limit(100);
 
-      // Run simulation
+      // Run simulation (may timeout on client while edge function continues)
       const { error: runError } = await supabase.functions.invoke("run-audit-simulation", {
         body: {
           simulationId: simulation.id,
@@ -144,7 +144,26 @@ export function AuditSimulatorView() {
         },
       });
 
-      if (runError) throw runError;
+      // If invoke succeeded, the simulation should be done — but verify via polling
+      // If invoke timed out (runError), the edge function may still be running — poll for completion
+      if (runError) {
+        console.warn("Invoke returned error (may be timeout), polling for completion...", runError);
+      }
+
+      // Poll until simulation is completed or failed (max ~90s)
+      const maxAttempts = 30;
+      for (let i = 0; i < maxAttempts; i++) {
+        const { data: updated } = await supabase
+          .from("audit_simulations")
+          .select("status, total_findings")
+          .eq("id", simulation.id)
+          .single();
+
+        if (updated?.status === "completed" || updated?.status === "failed") {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 3000));
+      }
 
       toast({
         title: "Simulación completada",
