@@ -1,7 +1,6 @@
 import { 
   MoreVertical, 
   Pencil, 
-  History, 
   Users, 
   Download, 
   Share2, 
@@ -95,10 +94,6 @@ export function DocumentActionsMenu({
         <DropdownMenuItem onClick={onViewFullHistory} className="cursor-pointer">
           <ScrollText className="w-4 h-4 mr-2" />
           Ver Historial
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onViewHistory} className="cursor-pointer">
-          <History className="w-4 h-4 mr-2" />
-          Historial de Versiones
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onDownload} className="cursor-pointer">
