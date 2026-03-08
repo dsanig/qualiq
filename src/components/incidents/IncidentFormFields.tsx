@@ -65,8 +65,8 @@ export function IncidentFormFields({
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="incidencia">Incidencia</SelectItem>
-            <SelectItem value="reclamacion">Reclamación</SelectItem>
             <SelectItem value="desviacion">Desviación</SelectItem>
+            <SelectItem value="no_conformidad">No Conformidad</SelectItem>
             <SelectItem value="otra">Otra</SelectItem>
           </SelectContent>
         </Select>

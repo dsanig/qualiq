@@ -63,8 +63,8 @@ interface IncidentsViewProps {
 
 const typeLabels: Record<IncidentType, string> = {
   incidencia: "Incidencia",
-  reclamacion: "Reclamación",
   desviacion: "Desviación",
+  no_conformidad: "No Conformidad",
   otra: "Otra",
 };
 
