@@ -368,8 +368,11 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (actionForm.file) {
+      const user = (await supabase.auth.getUser()).data.user;
+      const { data: pData2 } = await supabase.from("profiles").select("company_id").eq("user_id", user?.id ?? "").maybeSingle();
+      const tp = pData2?.company_id ?? "unknown";
       const ext = actionForm.file.name.split(".").pop();
-      const filePath = `actions/${data.id}/${crypto.randomUUID()}.${ext}`;
+      const filePath = `${tp}/actions/${data.id}/${crypto.randomUUID()}.${ext}`;
       const upload = await supabase.storage.from("documents").upload(filePath, actionForm.file, { upsert: false });
       if (!upload.error) {
         await (supabase as any).from("action_attachments").insert({ action_id: data.id, bucket_id: "documents", object_path: filePath });
