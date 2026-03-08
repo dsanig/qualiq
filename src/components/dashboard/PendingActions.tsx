@@ -39,6 +39,7 @@ const typeLabels: Record<string, string> = {
 interface PendingActionsProps {
   onViewAll: () => void;
   onNavigateToDocument?: (documentCode: string) => void;
+  onNavigateToModule?: (module: string) => void;
 }
 
 export function PendingActions({ onViewAll, onNavigateToDocument }: PendingActionsProps) {
