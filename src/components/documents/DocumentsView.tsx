@@ -2661,6 +2661,7 @@ export function DocumentsView({
         <DocumentResponsibilities
           documentId={selectedDocument.id}
           documentCode={selectedDocument.code}
+          ownerName={selectedDocument.owner}
           open={isResponsibilitiesOpen}
           onOpenChange={setIsResponsibilitiesOpen}
           onWorkflowChange={() => { fetchDocuments(); fetchFirmaStatus(); fetchRejectedDocs(); }}
