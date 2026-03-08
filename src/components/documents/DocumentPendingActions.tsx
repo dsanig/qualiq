@@ -30,6 +30,7 @@ interface PendingAction {
   completed_at: string | null;
   documentCode?: string;
   documentTitle?: string;
+  responsibleName?: string;
 }
 
 interface DocumentPendingActionsProps {
@@ -55,7 +56,6 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     let query = (supabase as any)
       .from("document_responsibilities")
       .select("id, document_id, user_id, action_type, due_date, status, completed_at")
-      .eq("user_id", user.id)
       .eq("status", "pending")
       .order("due_date", { ascending: true });
 
@@ -73,19 +73,24 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
 
     const pendingActions = (data || []) as PendingAction[];
 
-    // Fetch document info
     if (pendingActions.length > 0) {
+      // Fetch document info and user names in parallel
       const docIds = [...new Set(pendingActions.map((a: PendingAction) => a.document_id))];
-      const { data: docs } = await supabase
-        .from("documents")
-        .select("id, code, title")
-        .in("id", docIds);
+      const userIds = [...new Set(pendingActions.map((a: PendingAction) => a.user_id))];
 
-      const docMap = new Map((docs || []).map(d => [d.id, { code: d.code, title: d.title }]));
+      const [docsRes, usersRes] = await Promise.all([
+        supabase.from("documents").select("id, code, title").in("id", docIds),
+        supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds),
+      ]);
+
+      const docMap = new Map((docsRes.data || []).map(d => [d.id, { code: d.code, title: d.title }]));
+      const userMap = new Map((usersRes.data || []).map(u => [u.user_id, u.full_name || u.email || u.user_id]));
+
       for (const action of pendingActions) {
         const doc = docMap.get(action.document_id);
         action.documentCode = doc?.code || "";
         action.documentTitle = doc?.title || "";
+        action.responsibleName = userMap.get(action.user_id) || action.user_id;
       }
     }
 
@@ -98,7 +103,10 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
   }, [fetchActions]);
 
   const handleComplete = async (action: PendingAction) => {
-    if (!user || action.user_id !== user.id) return;
+    if (!user || action.user_id !== user.id) {
+      toast({ title: "Error", description: "Solo el responsable asignado puede completar esta acción.", variant: "destructive" });
+      return;
+    }
 
     setCompletingId(action.id);
     try {
@@ -166,6 +174,9 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   <Badge variant="outline" className={cn("text-xs", actionTypeColors[action.action_type])}>
                     {actionTypeLabels[action.action_type] || action.action_type}
                   </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    → {action.responsibleName}
+                  </span>
                   <span className={cn(
                     "text-xs flex items-center gap-1",
                     isOverdue ? "text-destructive font-medium" : "text-muted-foreground"
@@ -175,7 +186,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   </span>
                 </div>
               </div>
-              {canComplete && (
+              {canComplete && user && action.user_id === user.id && (
                 <Button
                   variant="outline"
                   size="sm"
