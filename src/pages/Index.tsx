@@ -211,6 +211,19 @@ const Index = () => {
             />
           </ErrorBoundary>
         );
+      case "reclamaciones":
+        return (
+          <ReclamacionesView
+            searchQuery={activeSearchQuery}
+            onSearchChange={handleSearchChange}
+            onOpenNewIncident={(reclamacionId, reclamacionTitle) => {
+              setIncidentTypeSeed("incidencia");
+              setIncidentPrefill({ title: `Incidencia desde reclamación: ${reclamacionTitle}`, description: `Incidencia generada a partir de la reclamación "${reclamacionTitle}".` });
+              setActiveModule("incidents");
+              setIsNewIncidentOpen(true);
+            }}
+          />
+        );
       case "audits":
         return <AuditManagementView searchQuery={activeSearchQuery} />;
       case "chatbot":
