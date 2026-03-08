@@ -576,25 +576,44 @@ export function CompanyView() {
     }
   };
 
+  const canEdit = canManageCompany || isSuperadmin;
+
   if (!canManageCompany) {
+    // Non-admin users: show read-only company profile
     return (
-      <div className="bg-card rounded-lg border border-border p-6 space-y-4">
-        <div className="flex items-start gap-3">
-          <Building2 className="w-6 h-6 text-accent" />
+      <div className="space-y-6 animate-fade-in">
+        <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+          <h3 className="font-semibold text-foreground">Perfil de la empresa</h3>
+
           <div>
-            <h3 className="font-semibold text-foreground">Acceso restringido a Empresa</h3>
-            <p className="text-sm text-muted-foreground">
-              Los datos completos de la empresa están disponibles solo para Administrador o Superadmin.
-            </p>
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Datos generales</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ReadOnlyField label="Nombre comercial" value={companyName} />
+              <ReadOnlyField label="Razón social" value={companyForm.legal_name} />
+              <ReadOnlyField label="CIF / NIF" value={companyForm.cif} />
+              <ReadOnlyField label="Sitio web" value={companyForm.website} />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Contacto</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ReadOnlyField label="Email de contacto" value={companyForm.email} />
+              <ReadOnlyField label="Teléfono" value={companyForm.phone} />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Dirección fiscal</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ReadOnlyField label="Dirección" value={companyForm.address} />
+              <ReadOnlyField label="Ciudad" value={companyForm.city} />
+              <ReadOnlyField label="Código postal" value={companyForm.postal_code} />
+              <ReadOnlyField label="Provincia" value={companyForm.province} />
+              <ReadOnlyField label="País" value={companyForm.country} />
+            </div>
           </div>
         </div>
-        <Button
-          variant="accent"
-          onClick={() => (window.location.href = "mailto:admin@qualiq.ai?subject=Solicitud%20de%20acceso%20a%20Empresa")}
-        >
-          <Mail className="w-4 h-4 mr-2" />
-          Solicitar acceso por email
-        </Button>
       </div>
     );
   }
