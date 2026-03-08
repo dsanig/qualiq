@@ -15,6 +15,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
 import { IncidentFormFields, type IncidentFormData, type CapaPlanRef } from "./IncidentFormFields";
 import { format } from "date-fns";
+import { StatusChangeDialog } from "@/components/shared/StatusChangeDialog";
 
 type IncidentType = "incidencia" | "desviacion" | "no_conformidad" | "otra";
 
