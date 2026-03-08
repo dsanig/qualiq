@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Paperclip, Pencil, AlertCircle, X } from "lucide-react";
+import { Plus, Paperclip, Pencil, AlertCircle, X, Trash2, Upload, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 
-type Audit = { id: string; title: string; description: string | null; audit_date: string | null; auditor_id: string | null };
+type Audit = {
+  id: string; title: string; description: string | null; audit_date: string | null;
+  auditor_id: string | null; observations: string | null; findings: string | null;
+  conclusions: string | null; status: string;
+};
+type AuditAttachment = { id: string; audit_id: string; file_name: string | null; object_path: string; file_type: string | null };
 type CapaPlan = { id: string; audit_id: string; title: string | null; description: string | null; responsible_id: string | null };
 type NonConformity = { id: string; capa_plan_id: string; title: string; description: string | null; severity: string | null; root_cause: string | null; status: string; deadline: string | null };
 type ActionItem = { id: string; non_conformity_id: string; action_type: "corrective" | "preventive" | "immediate"; description: string; responsible_id: string | null; due_date: string | null; status: string };
@@ -32,6 +38,7 @@ const actionTypes = [
 
 export function AuditManagementView({ searchQuery = "" }: AuditManagementViewProps) {
   const [audits, setAudits] = useState<Audit[]>([]);
+  const [auditAttachments, setAuditAttachments] = useState<AuditAttachment[]>([]);
   const [capaPlans, setCapaPlans] = useState<CapaPlan[]>([]);
   const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
@@ -42,10 +49,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [selectedCapaPlanId, setSelectedCapaPlanId] = useState<string | null>(null);
   const [linkIncidenciaOpen, setLinkIncidenciaOpen] = useState(false);
   const [linkingCapaPlanId, setLinkingCapaPlanId] = useState<string | null>(null);
-  const { canEditContent } = usePermissions();
+  const { canEditContent, canManageCompany } = usePermissions();
 
   // Dialog states
   const [newAuditOpen, setNewAuditOpen] = useState(false);
+  const [editAuditOpen, setEditAuditOpen] = useState(false);
+  const [deleteAuditConfirmOpen, setDeleteAuditConfirmOpen] = useState(false);
+  const [deletingAuditId, setDeletingAuditId] = useState<string | null>(null);
   const [newCapaOpen, setNewCapaOpen] = useState(false);
   const [newNcOpen, setNewNcOpen] = useState(false);
   const [newActionOpen, setNewActionOpen] = useState(false);
@@ -54,7 +64,11 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [editActionOpen, setEditActionOpen] = useState(false);
 
   // Forms
-  const [auditForm, setAuditForm] = useState({ title: "", description: "", audit_date: "" });
+  const [auditForm, setAuditForm] = useState({
+    title: "", description: "", audit_date: "", auditor_id: "",
+    observations: "", findings: "", conclusions: "", status: "open",
+  });
+  const [auditFiles, setAuditFiles] = useState<FileList | null>(null);
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "" });
   const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "" });
   const [actionForm, setActionForm] = useState({
@@ -64,17 +78,14 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [editingNc, setEditingNc] = useState<NonConformity | null>(null);
   const [editingAction, setEditingAction] = useState<ActionItem | null>(null);
   const [editingCapa, setEditingCapa] = useState<CapaPlan | null>(null);
+  const [editingAudit, setEditingAudit] = useState<Audit | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
 
   const normalizeText = (value: string | null | undefined) =>
-    (value ?? "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .trim();
+    (value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
   const normalizedQuery = useMemo(() => normalizeText(searchQuery), [searchQuery]);
 
@@ -82,7 +93,6 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const selectedCapaPlan = useMemo(() => capaPlans.find((p) => p.id === selectedCapaPlanId) ?? null, [capaPlans, selectedCapaPlanId]);
   const filteredNcs = useMemo(() => nonConformities.filter((nc) => nc.capa_plan_id === selectedCapaPlanId), [nonConformities, selectedCapaPlanId]);
 
-  // Auto-select first CAPA plan when audit changes
   useEffect(() => {
     if (auditCapaPlans.length > 0) {
       setSelectedCapaPlanId(auditCapaPlans[0].id);
@@ -94,8 +104,9 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [{ data: auditsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: incData }, { data: linksData }] = await Promise.all([
-        (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id").order("created_at", { ascending: false }),
+      const [{ data: auditsData }, { data: attachData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: incData }, { data: linksData }] = await Promise.all([
+        (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id,observations,findings,conclusions,status").order("created_at", { ascending: false }),
+        (supabase as any).from("audit_attachments").select("id,audit_id,file_name,object_path,file_type"),
         (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
         (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline"),
         (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
@@ -104,6 +115,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
       ]);
       setAudits((auditsData ?? []) as Audit[]);
+      setAuditAttachments((attachData ?? []) as AuditAttachment[]);
       setCapaPlans((capaData ?? []) as CapaPlan[]);
       setNonConformities((ncData ?? []) as NonConformity[]);
       setActions((actionData ?? []) as ActionItem[]);
@@ -119,6 +131,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   useEffect(() => { void loadData(); }, []);
 
   const selectedAudit = audits.find((a) => a.id === selectedAuditId) ?? null;
+  const selectedAuditAttachments = useMemo(() => auditAttachments.filter((a) => a.audit_id === selectedAuditId), [auditAttachments, selectedAuditId]);
 
   const getUserName = (id: string | null) => {
     if (!id) return null;
@@ -128,39 +141,18 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const auditsFiltered = useMemo(() => {
     if (!normalizedQuery) return audits;
-
-    const filtered = audits.filter((audit) => {
+    return audits.filter((audit) => {
       const relatedCapa = capaPlans.filter((plan) => plan.audit_id === audit.id);
       const searchFields = [
-        audit.id,
-        audit.title,
-        audit.description,
-        audit.audit_date,
+        audit.title, audit.description, audit.audit_date, audit.observations,
+        audit.findings, audit.conclusions, audit.status,
         getUserName(audit.auditor_id),
         ...relatedCapa.map((plan) => plan.title),
         ...relatedCapa.map((plan) => plan.description),
-        ...relatedCapa.map((plan) => getUserName(plan.responsible_id)),
-        (audit as unknown as { code?: string }).code,
-        (audit as unknown as { reference?: string }).reference,
-        (audit as unknown as { norma?: string }).norma,
-        (audit as unknown as { status?: string }).status,
-        (audit as unknown as { company?: string }).company,
-        (audit as unknown as { center?: string }).center,
       ];
-
       return searchFields.some((field) => normalizeText(field).includes(normalizedQuery));
     });
-
-    if (import.meta.env.DEV) {
-      console.debug("[AuditManagementView] search", {
-        query: searchQuery,
-        total: audits.length,
-        filtered: filtered.length,
-      });
-    }
-
-    return filtered;
-  }, [audits, capaPlans, normalizedQuery, searchQuery, users]);
+  }, [audits, capaPlans, normalizedQuery, users]);
 
   const auditsSorted = useMemo(() => {
     return [...auditsFiltered].sort((left, right) => {
@@ -177,51 +169,113 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     return auditsSorted.slice(start, start + PAGE_SIZE);
   }, [auditsSorted, currentPage]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [normalizedQuery]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
+  useEffect(() => { setCurrentPage(1); }, [normalizedQuery]);
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
   useEffect(() => {
     if (!selectedAuditId) {
-      if (paginatedAudits[0]?.id) {
-        setSelectedAuditId(paginatedAudits[0].id);
-      }
+      if (paginatedAudits[0]?.id) setSelectedAuditId(paginatedAudits[0].id);
       return;
     }
-
     const auditStillVisible = auditsSorted.some((audit) => audit.id === selectedAuditId);
-    if (!auditStillVisible) {
-      setSelectedAuditId(paginatedAudits[0]?.id ?? null);
-    }
+    if (!auditStillVisible) setSelectedAuditId(paginatedAudits[0]?.id ?? null);
   }, [auditsSorted, paginatedAudits, selectedAuditId]);
 
   // --- CRUD ---
   const createAudit = async () => {
-    const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "").maybeSingle();
-    const { error } = await (supabase as any).from("audits").insert({
-      title: auditForm.title, description: auditForm.description || null, audit_date: auditForm.audit_date || null,
-      company_id: profileData?.company_id, created_by: (await supabase.auth.getUser()).data.user?.id,
-    });
+    const user = (await supabase.auth.getUser()).data.user;
+    const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", user?.id ?? "").maybeSingle();
+    const { data, error } = await (supabase as any).from("audits").insert({
+      title: auditForm.title, description: auditForm.description || null,
+      audit_date: auditForm.audit_date || null, auditor_id: auditForm.auditor_id || null,
+      observations: auditForm.observations || null, findings: auditForm.findings || null,
+      conclusions: auditForm.conclusions || null, status: auditForm.status,
+      company_id: profileData?.company_id, created_by: user?.id,
+    }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    if (auditFiles) await uploadAuditAttachments(data.id, auditFiles);
     toast({ title: "Auditoría creada" });
     setNewAuditOpen(false);
-    setAuditForm({ title: "", description: "", audit_date: "" });
+    resetAuditForm();
     await loadData();
+  };
+
+  const updateAudit = async () => {
+    if (!editingAudit) return;
+    const { error } = await (supabase as any).from("audits").update({
+      title: auditForm.title, description: auditForm.description || null,
+      audit_date: auditForm.audit_date || null, auditor_id: auditForm.auditor_id || null,
+      observations: auditForm.observations || null, findings: auditForm.findings || null,
+      conclusions: auditForm.conclusions || null, status: auditForm.status,
+    }).eq("id", editingAudit.id);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    if (auditFiles) await uploadAuditAttachments(editingAudit.id, auditFiles);
+    toast({ title: "Auditoría actualizada" });
+    setEditAuditOpen(false);
+    setEditingAudit(null);
+    await loadData();
+  };
+
+  const deleteAudit = async (auditId: string) => {
+    // Delete attachments from storage first
+    const attachments = auditAttachments.filter((a) => a.audit_id === auditId);
+    if (attachments.length > 0) {
+      await supabase.storage.from("documents").remove(attachments.map((a) => a.object_path));
+    }
+    const { error } = await (supabase as any).from("audits").delete().eq("id", auditId);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Auditoría eliminada" });
+    if (selectedAuditId === auditId) setSelectedAuditId(null);
+    await loadData();
+  };
+
+  const uploadAuditAttachments = async (auditId: string, files: FileList) => {
+    const user = (await supabase.auth.getUser()).data.user;
+    for (const file of Array.from(files)) {
+      const ext = file.name.split(".").pop();
+      const filePath = `audits/${auditId}/${crypto.randomUUID()}.${ext}`;
+      const upload = await supabase.storage.from("documents").upload(filePath, file, { upsert: false });
+      if (!upload.error) {
+        await (supabase as any).from("audit_attachments").insert({
+          audit_id: auditId, bucket_id: "documents", object_path: filePath,
+          file_name: file.name, file_type: file.type, created_by: user?.id,
+        });
+      }
+    }
+  };
+
+  const deleteAuditAttachment = async (attachment: AuditAttachment) => {
+    await supabase.storage.from("documents").remove([attachment.object_path]);
+    await (supabase as any).from("audit_attachments").delete().eq("id", attachment.id);
+    toast({ title: "Adjunto eliminado" });
+    await loadData();
+  };
+
+  const downloadAttachment = async (attachment: AuditAttachment) => {
+    const { data } = await supabase.storage.from("documents").createSignedUrl(attachment.object_path, 300);
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+  };
+
+  const resetAuditForm = () => {
+    setAuditForm({ title: "", description: "", audit_date: "", auditor_id: "", observations: "", findings: "", conclusions: "", status: "open" });
+    setAuditFiles(null);
+  };
+
+  const openEditAudit = (audit: Audit) => {
+    setEditingAudit(audit);
+    setAuditForm({
+      title: audit.title, description: audit.description ?? "", audit_date: audit.audit_date ?? "",
+      auditor_id: audit.auditor_id ?? "", observations: audit.observations ?? "",
+      findings: audit.findings ?? "", conclusions: audit.conclusions ?? "", status: audit.status ?? "open",
+    });
+    setAuditFiles(null);
+    setEditAuditOpen(true);
   };
 
   const createCapaPlan = async () => {
     if (!selectedAuditId) return;
     const { error } = await (supabase as any).from("capa_plans").insert({
-      audit_id: selectedAuditId,
-      title: capaForm.title || null,
-      description: capaForm.description || null,
-      responsible_id: capaForm.responsible_id || null,
+      audit_id: selectedAuditId, title: capaForm.title || null,
+      description: capaForm.description || null, responsible_id: capaForm.responsible_id || null,
     });
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Plan CAPA creado" });
@@ -233,8 +287,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const updateCapaPlan = async () => {
     if (!editingCapa) return;
     const { error } = await (supabase as any).from("capa_plans").update({
-      title: capaForm.title || null,
-      description: capaForm.description || null,
+      title: capaForm.title || null, description: capaForm.description || null,
       responsible_id: capaForm.responsible_id || null,
     }).eq("id", editingCapa.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
@@ -345,9 +398,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const unlinkIncidencia = async (capaId: string, incidenciaId: string) => {
     const { error } = await (supabase as any).from("incidencia_capa_plans")
-      .delete()
-      .eq("capa_plan_id", capaId)
-      .eq("incidencia_id", incidenciaId);
+      .delete().eq("capa_plan_id", capaId).eq("incidencia_id", incidenciaId);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Incidencia desvinculada" });
     await loadData();
@@ -358,6 +409,43 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     setCapaForm({ title: capa.title ?? "", description: capa.description ?? "", responsible_id: capa.responsible_id ?? "" });
     setEditCapaOpen(true);
   };
+
+  // --- Audit form fields ---
+  const renderAuditFields = () => (
+    <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+      <div><Label>Título *</Label><Input value={auditForm.title} onChange={(e) => setAuditForm((p) => ({ ...p, title: e.target.value }))} /></div>
+      <div><Label>Fecha</Label><Input type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} /></div>
+      <div>
+        <Label>Auditor</Label>
+        <Select value={auditForm.auditor_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, auditor_id: v }))}>
+          <SelectTrigger><SelectValue placeholder="Selecciona auditor" /></SelectTrigger>
+          <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Estado</Label>
+        <Select value={auditForm.status} onValueChange={(v) => setAuditForm((p) => ({ ...p, status: v }))}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="open">Abierta</SelectItem>
+            <SelectItem value="in_progress">En curso</SelectItem>
+            <SelectItem value="closed">Cerrada</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div><Label>Descripción</Label><Textarea value={auditForm.description} onChange={(e) => setAuditForm((p) => ({ ...p, description: e.target.value }))} rows={3} /></div>
+      <div><Label>Observaciones</Label><Textarea value={auditForm.observations} onChange={(e) => setAuditForm((p) => ({ ...p, observations: e.target.value }))} rows={3} placeholder="Observaciones generales de la auditoría" /></div>
+      <div><Label>Hallazgos</Label><Textarea value={auditForm.findings} onChange={(e) => setAuditForm((p) => ({ ...p, findings: e.target.value }))} rows={3} placeholder="Hallazgos detectados durante la auditoría" /></div>
+      <div><Label>Conclusiones</Label><Textarea value={auditForm.conclusions} onChange={(e) => setAuditForm((p) => ({ ...p, conclusions: e.target.value }))} rows={3} placeholder="Conclusiones finales de la auditoría" /></div>
+      <div>
+        <Label>Documentos adjuntos</Label>
+        <Input type="file" multiple onChange={(e) => setAuditFiles(e.target.files)} />
+        {auditFiles && Array.from(auditFiles).map((f, i) => (
+          <p key={i} className="mt-1 text-xs text-muted-foreground flex items-center gap-1"><Paperclip className="h-3 w-3" />{f.name}</p>
+        ))}
+      </div>
+    </div>
+  );
 
   // --- NC form fields ---
   const renderNcFields = () => (
@@ -438,6 +526,10 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   );
 
   const actionTypeLabel = (t: string) => actionTypes.find((at) => at.value === t)?.label ?? t;
+  const statusLabel = (s: string) => {
+    const map: Record<string, string> = { open: "Abierta", in_progress: "En curso", closed: "Cerrada" };
+    return map[s] ?? s;
+  };
 
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
@@ -445,7 +537,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Auditorías</CardTitle>
-          <Button size="sm" onClick={() => setNewAuditOpen(true)}><Plus className="mr-1 h-4 w-4" />Nueva</Button>
+          {canEditContent && <Button size="sm" onClick={() => { resetAuditForm(); setNewAuditOpen(true); }}><Plus className="mr-1 h-4 w-4" />Nueva</Button>}
         </CardHeader>
         <CardContent className="space-y-2">
           {isLoading && <p className="text-sm text-muted-foreground">Cargando auditorías...</p>}
@@ -453,7 +545,10 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
           {!isLoading && paginatedAudits.map((audit) => (
             <button key={audit.id} onClick={() => setSelectedAuditId(audit.id)} className={`w-full rounded border p-3 text-left ${selectedAuditId === audit.id ? "border-primary bg-primary/5" : "border-border"}`}>
               <p className="font-medium">{audit.title}</p>
-              <p className="text-xs text-muted-foreground">{audit.audit_date ?? "Sin fecha"}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">{audit.audit_date ?? "Sin fecha"}</p>
+                <span className="text-xs text-muted-foreground">{statusLabel(audit.status)}</span>
+              </div>
             </button>
           ))}
 
@@ -469,24 +564,8 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
             <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground">
               <span>Página {currentPage} de {totalPages}</span>
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                >
-                  Siguiente
-                </Button>
+                <Button type="button" size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}>Anterior</Button>
+                <Button type="button" size="sm" variant="outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}>Siguiente</Button>
               </div>
             </div>
           )}
@@ -496,13 +575,62 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       <div className="space-y-4">
         {/* Audit info */}
         <Card>
-          <CardHeader><CardTitle>Información de auditoría</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Información de auditoría</CardTitle>
+            {selectedAudit && canEditContent && (
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => openEditAudit(selectedAudit)}>
+                  <Pencil className="mr-1 h-4 w-4" />Editar
+                </Button>
+                {canManageCompany && (
+                  <Button size="sm" variant="destructive" onClick={() => { setDeletingAuditId(selectedAudit.id); setDeleteAuditConfirmOpen(true); }}>
+                    <Trash2 className="mr-1 h-4 w-4" />Eliminar
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardHeader>
           <CardContent>
             {selectedAudit ? (
-              <div className="space-y-2 text-sm">
-                <p><span className="font-medium">Título:</span> {selectedAudit.title}</p>
-                <p><span className="font-medium">Fecha:</span> {selectedAudit.audit_date ?? "Sin fecha"}</p>
-                <p><span className="font-medium">Descripción:</span> {selectedAudit.description ?? "Sin descripción"}</p>
+              <div className="space-y-3 text-sm">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div><span className="font-medium text-muted-foreground">Título:</span> <span>{selectedAudit.title}</span></div>
+                  <div><span className="font-medium text-muted-foreground">Fecha:</span> <span>{selectedAudit.audit_date ?? "Sin fecha"}</span></div>
+                  <div><span className="font-medium text-muted-foreground">Auditor:</span> <span>{getUserName(selectedAudit.auditor_id) ?? "Sin asignar"}</span></div>
+                  <div><span className="font-medium text-muted-foreground">Estado:</span> <span>{statusLabel(selectedAudit.status)}</span></div>
+                </div>
+                {selectedAudit.description && (
+                  <div><p className="font-medium text-muted-foreground mb-1">Descripción:</p><p className="whitespace-pre-wrap">{selectedAudit.description}</p></div>
+                )}
+                {selectedAudit.observations && (
+                  <div><p className="font-medium text-muted-foreground mb-1">Observaciones:</p><p className="whitespace-pre-wrap">{selectedAudit.observations}</p></div>
+                )}
+                {selectedAudit.findings && (
+                  <div><p className="font-medium text-muted-foreground mb-1">Hallazgos:</p><p className="whitespace-pre-wrap">{selectedAudit.findings}</p></div>
+                )}
+                {selectedAudit.conclusions && (
+                  <div><p className="font-medium text-muted-foreground mb-1">Conclusiones:</p><p className="whitespace-pre-wrap">{selectedAudit.conclusions}</p></div>
+                )}
+                {/* Attachments */}
+                {selectedAuditAttachments.length > 0 && (
+                  <div>
+                    <p className="font-medium text-muted-foreground mb-1">Documentos adjuntos:</p>
+                    <div className="space-y-1">
+                      {selectedAuditAttachments.map((att) => (
+                        <div key={att.id} className="flex items-center justify-between rounded border p-2">
+                          <button onClick={() => downloadAttachment(att)} className="flex items-center gap-2 text-sm hover:underline text-primary">
+                            <FileText className="h-4 w-4" />{att.file_name ?? att.object_path}
+                          </button>
+                          {canEditContent && (
+                            <button onClick={() => deleteAuditAttachment(att)} className="text-destructive hover:text-destructive/80">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : <p className="text-sm text-muted-foreground">Selecciona una auditoría.</p>}
           </CardContent>
@@ -525,11 +653,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
               const actCount = actions.filter((a) => nonConformities.some((nc) => nc.capa_plan_id === capa.id && nc.id === a.non_conformity_id)).length;
               const linkedIncs = getLinkedIncidencias(capa.id);
               return (
-                <div
-                  key={capa.id}
-                  onClick={() => setSelectedCapaPlanId(capa.id)}
-                  className={`rounded border p-3 cursor-pointer ${selectedCapaPlanId === capa.id ? "border-primary bg-primary/5" : "border-border"}`}
-                >
+                <div key={capa.id} onClick={() => setSelectedCapaPlanId(capa.id)} className={`rounded border p-3 cursor-pointer ${selectedCapaPlanId === capa.id ? "border-primary bg-primary/5" : "border-border"}`}>
                   <div className="flex items-center justify-between">
                     <p className="font-medium">{capa.title || "Plan CAPA"}</p>
                     <div className="flex items-center gap-1">
@@ -619,16 +743,52 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
       {/* New Audit Dialog */}
       <Dialog open={newAuditOpen} onOpenChange={setNewAuditOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Nueva auditoría</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Título</Label><Input value={auditForm.title} onChange={(e) => setAuditForm((p) => ({ ...p, title: e.target.value }))} /></div>
-            <div><Label>Fecha</Label><Input type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} /></div>
-            <div><Label>Descripción</Label><Textarea value={auditForm.description} onChange={(e) => setAuditForm((p) => ({ ...p, description: e.target.value }))} /></div>
-          </div>
-          <DialogFooter><Button onClick={createAudit}>Crear</Button></DialogFooter>
+          {renderAuditFields()}
+          <DialogFooter><Button onClick={createAudit} disabled={!auditForm.title}>Crear</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Audit Dialog */}
+      <Dialog open={editAuditOpen} onOpenChange={(o) => { setEditAuditOpen(o); if (!o) setEditingAudit(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Editar auditoría</DialogTitle></DialogHeader>
+          {renderAuditFields()}
+          {/* Existing attachments */}
+          {editingAudit && (
+            <div>
+              <Label className="text-muted-foreground">Adjuntos existentes</Label>
+              {auditAttachments.filter((a) => a.audit_id === editingAudit.id).length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1">Sin adjuntos.</p>
+              )}
+              {auditAttachments.filter((a) => a.audit_id === editingAudit.id).map((att) => (
+                <div key={att.id} className="flex items-center justify-between rounded border p-2 mt-1">
+                  <span className="text-sm flex items-center gap-1"><FileText className="h-3 w-3" />{att.file_name ?? att.object_path}</span>
+                  <button onClick={() => deleteAuditAttachment(att)} className="text-destructive hover:text-destructive/80"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            {canEditContent ? <Button onClick={updateAudit} disabled={!auditForm.title}>Guardar cambios</Button> : <p className="text-sm text-muted-foreground">Solo lectura</p>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Audit Confirm */}
+      <AlertDialog open={deleteAuditConfirmOpen} onOpenChange={setDeleteAuditConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar auditoría?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción eliminará la auditoría y todos sus datos asociados (planes CAPA, no conformidades, acciones y adjuntos). No se puede deshacer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (deletingAuditId) deleteAudit(deletingAuditId); setDeleteAuditConfirmOpen(false); }}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* New CAPA Plan Dialog */}
       <Dialog open={newCapaOpen} onOpenChange={setNewCapaOpen}>
@@ -710,9 +870,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                   <p className="text-sm font-medium">{inc.title}</p>
                   <p className="text-xs text-muted-foreground">{inc.status}</p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => { if (linkingCapaPlanId) linkIncidencia(linkingCapaPlanId, inc.id); }}>
-                  Vincular
-                </Button>
+                <Button size="sm" variant="outline" onClick={() => { if (linkingCapaPlanId) linkIncidencia(linkingCapaPlanId, inc.id); }}>Vincular</Button>
               </div>
             ))}
           </div>
