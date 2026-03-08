@@ -785,6 +785,8 @@ export type Database = {
           code: string
           company_id: string
           created_at: string
+          effective_date: string | null
+          expiry_date: string | null
           file_type: string
           file_url: string
           id: string
@@ -803,6 +805,8 @@ export type Database = {
           code: string
           company_id: string
           created_at?: string
+          effective_date?: string | null
+          expiry_date?: string | null
           file_type: string
           file_url: string
           id?: string
@@ -821,6 +825,8 @@ export type Database = {
           code?: string
           company_id?: string
           created_at?: string
+          effective_date?: string | null
+          expiry_date?: string | null
           file_type?: string
           file_url?: string
           id?: string

@@ -75,6 +75,8 @@ interface Document {
   lastModifiedBy: string;
   fileUrl: string;
   description?: string;
+  effectiveDate?: string | null;
+  expiryDate?: string | null;
 }
 
 interface SignedDocument {
@@ -327,6 +329,10 @@ export function DocumentsView({
   const [editDocCategory, setEditDocCategory] = useState("calidad");
   const [editDocTypology, setEditDocTypology] = useState<DocumentTypology>("Documento");
   const [editDocStatus, setEditDocStatus] = useState("draft");
+  const [editDocEffectiveImmediate, setEditDocEffectiveImmediate] = useState(true);
+  const [editDocEffectiveDate, setEditDocEffectiveDate] = useState("");
+  const [editDocNoExpiry, setEditDocNoExpiry] = useState(true);
+  const [editDocExpiryDate, setEditDocExpiryDate] = useState("");
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [isEditSaving, setIsEditSaving] = useState(false);
 
@@ -380,6 +386,10 @@ export function DocumentsView({
   const [newDocCategory, setNewDocCategory] = useState("calidad");
   const [newDocTypology, setNewDocTypology] = useState<DocumentTypology | "">("");
   const [newDocDescription, setNewDocDescription] = useState("");
+  const [newDocEffectiveImmediate, setNewDocEffectiveImmediate] = useState(true);
+  const [newDocEffectiveDate, setNewDocEffectiveDate] = useState("");
+  const [newDocNoExpiry, setNewDocNoExpiry] = useState(true);
+  const [newDocExpiryDate, setNewDocExpiryDate] = useState("");
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -530,6 +540,8 @@ export function DocumentsView({
         originalAuthor: ownerUserMap.get(d.owner_id) || d.owner_id,
         lastModifiedBy: ownerUserMap.get(d.owner_id) || d.owner_id,
         fileUrl: d.file_url,
+        effectiveDate: (d as any).effective_date ?? null,
+        expiryDate: (d as any).expiry_date ?? null,
       }));
       setDbDocuments(mapped);
       return;
@@ -570,6 +582,8 @@ export function DocumentsView({
         originalAuthor: ownerUserMap.get(d.owner_id) || d.owner_id,
         lastModifiedBy: ownerUserMap.get(d.owner_id) || d.owner_id,
         fileUrl: d.file_url,
+        effectiveDate: (d as any).effective_date ?? null,
+        expiryDate: (d as any).expiry_date ?? null,
       }));
       setDbDocuments(mapped);
     }
@@ -608,6 +622,10 @@ export function DocumentsView({
     setEditDocCategory(doc.categoryId);
     setEditDocTypology(doc.typology);
     setEditDocStatus(doc.status);
+    setEditDocEffectiveImmediate(!doc.effectiveDate);
+    setEditDocEffectiveDate(doc.effectiveDate || "");
+    setEditDocNoExpiry(!doc.expiryDate);
+    setEditDocExpiryDate(doc.expiryDate || "");
     setIsEditOpen(true);
   };
 
@@ -621,6 +639,8 @@ export function DocumentsView({
         category: editDocCategory.charAt(0).toUpperCase() + editDocCategory.slice(1),
         typology: editDocTypology,
         status: editDocStatus as any,
+        effective_date: editDocEffectiveImmediate ? null : (editDocEffectiveDate || null),
+        expiry_date: editDocNoExpiry ? null : (editDocExpiryDate || null),
       };
 
       console.log("UPDATE payload", updatePayload);
@@ -1320,6 +1340,8 @@ export function DocumentsView({
         file_type: fileType,
         file_url: filePath,
         status: "draft" as const,
+        effective_date: newDocEffectiveImmediate ? null : (newDocEffectiveDate || null),
+        expiry_date: newDocNoExpiry ? null : (newDocExpiryDate || null),
       };
 
       console.log("typology selected", newDocTypology);
@@ -1374,6 +1396,10 @@ export function DocumentsView({
       setNewDocDescription("");
       setNewDocFile(null);
       setNewDocResponsibilities([]);
+      setNewDocEffectiveImmediate(true);
+      setNewDocEffectiveDate("");
+      setNewDocNoExpiry(true);
+      setNewDocExpiryDate("");
       fetchDocuments();
     } catch (err: unknown) {
       const uploadError = err as { message?: string; details?: string; hint?: string; code?: string };
@@ -2385,6 +2411,29 @@ export function DocumentsView({
                   </Select>
                 </div>
               </div>
+              {/* Fecha efectiva y caducidad */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Fecha efectiva</Label>
+                  <div className="flex items-center gap-2">
+                    <Checkbox checked={newDocEffectiveImmediate} onCheckedChange={(v) => { setNewDocEffectiveImmediate(!!v); if (v) setNewDocEffectiveDate(""); }} />
+                    <span className="text-sm text-muted-foreground">Efectivo Inmediatamente</span>
+                  </div>
+                  {!newDocEffectiveImmediate && (
+                    <Input type="date" value={newDocEffectiveDate} onChange={(e) => setNewDocEffectiveDate(e.target.value)} />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Fecha de caducidad</Label>
+                  <div className="flex items-center gap-2">
+                    <Checkbox checked={newDocNoExpiry} onCheckedChange={(v) => { setNewDocNoExpiry(!!v); if (v) setNewDocExpiryDate(""); }} />
+                    <span className="text-sm text-muted-foreground">Sin Caducidad</span>
+                  </div>
+                  {!newDocNoExpiry && (
+                    <Input type="date" value={newDocExpiryDate} onChange={(e) => setNewDocExpiryDate(e.target.value)} />
+                  )}
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label>Descripción / alcance</Label>
                 <Textarea placeholder="Describe el alcance del documento..." rows={3} value={newDocDescription} onChange={(e) => setNewDocDescription(e.target.value)} />
@@ -2538,6 +2587,29 @@ export function DocumentsView({
                     <SelectItem value="approved">Aprobado</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            {/* Fecha efectiva y caducidad */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Fecha efectiva</Label>
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={editDocEffectiveImmediate} onCheckedChange={(v) => { setEditDocEffectiveImmediate(!!v); if (v) setEditDocEffectiveDate(""); }} />
+                  <span className="text-sm text-muted-foreground">Efectivo Inmediatamente</span>
+                </div>
+                {!editDocEffectiveImmediate && (
+                  <Input type="date" value={editDocEffectiveDate} onChange={(e) => setEditDocEffectiveDate(e.target.value)} />
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Fecha de caducidad</Label>
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={editDocNoExpiry} onCheckedChange={(v) => { setEditDocNoExpiry(!!v); if (v) setEditDocExpiryDate(""); }} />
+                  <span className="text-sm text-muted-foreground">Sin Caducidad</span>
+                </div>
+                {!editDocNoExpiry && (
+                  <Input type="date" value={editDocExpiryDate} onChange={(e) => setEditDocExpiryDate(e.target.value)} />
+                )}
               </div>
             </div>
           </div>
