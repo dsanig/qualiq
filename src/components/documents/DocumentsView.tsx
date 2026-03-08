@@ -556,7 +556,8 @@ export function DocumentsView({
     fetchSignatures();
     fetchCompanyUsers();
     fetchFirmaStatus();
-  }, [fetchDocuments, fetchSignatures, fetchCompanyUsers, fetchFirmaStatus]);
+    fetchRejectedDocs();
+  }, [fetchDocuments, fetchSignatures, fetchCompanyUsers, fetchFirmaStatus, fetchRejectedDocs]);
 
   useEffect(() => {
     void refreshPermissions();
