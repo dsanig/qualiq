@@ -7,6 +7,7 @@ import {
   FolderOpen,
   CheckCircle,
   Clock,
+  ClipboardList,
   AlertCircle,
   FileSpreadsheet,
   File,
