@@ -245,6 +245,8 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
           (action.action_type === "firma" && action.documentStatus === "pending_signature") ||
           (action.action_type === "aprobacion" && action.documentStatus === "pending_approval");
         const canComplete = isActionableStatus;
+        const nextTransition = getNextStatusForAction(action.documentStatus, action.action_type);
+        const canChangeStatus = !isActionableStatus && nextTransition && user && action.user_id === user.id;
 
         return (
           <div
