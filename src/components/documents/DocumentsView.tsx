@@ -1769,6 +1769,7 @@ export function DocumentsView({
     }));
     setSignStatus("completed");
     toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado.` });
+    logAction({ action: "sign_autofirma", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { method: "autofirma_dnie" } });
     fetchFirmaStatus();
   };
 
