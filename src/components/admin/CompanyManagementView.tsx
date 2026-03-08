@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuditLog } from "@/hooks/useAuditLog";
+import { FeatureToggles } from "@/components/company/FeatureToggles";
 
 interface CompanyRow {
   id: string;
