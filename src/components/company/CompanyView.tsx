@@ -501,7 +501,7 @@ export function CompanyView() {
         email: companyForm.email.trim() || null,
         website: companyForm.website.trim() || null,
       } as any)
-      .eq("id", profile.company_id);
+      .eq("id", effectiveCompanyId);
 
     setIsCompanySaving(false);
 
