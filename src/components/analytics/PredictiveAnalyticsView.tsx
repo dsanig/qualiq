@@ -437,6 +437,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       if (error) throw error;
 
       setInsights([]);
+      setArchivedInsights([]);
       toast({ title: "Insights eliminados", description: "Se han eliminado todos los resultados del análisis." });
       logAction({ action: "delete_all", entity_type: "predictive_insight" });
     } catch (e: any) {
