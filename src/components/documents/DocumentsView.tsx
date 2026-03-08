@@ -346,6 +346,7 @@ export function DocumentsView({
   const [updateRespAction, setUpdateRespAction] = useState("revision");
   const [updateRespDueDate, setUpdateRespDueDate] = useState("");
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
+  const [updateMinorOnly, setUpdateMinorOnly] = useState(false);
 
   // Version history
   const [versionHistory, setVersionHistory] = useState<VersionRecord[]>([]);
