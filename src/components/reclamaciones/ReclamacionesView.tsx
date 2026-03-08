@@ -429,6 +429,20 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                         <AlertTriangle className="h-3 w-3 mr-1" />Crear incidencia
                       </Button>
                     )}
+                    {user?.id === rec.responsible_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingReclamacion(rec);
+                          setIsStatusChangeOpen(true);
+                        }}
+                      >
+                        <History className="h-3 w-3 mr-1" />Estado
+                      </Button>
+                    )}
                     {canEditContent && <Pencil className="h-3.5 w-3.5 text-muted-foreground" />}
                   </div>
                 </div>
