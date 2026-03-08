@@ -1039,6 +1039,38 @@ export type Database = {
           },
         ]
       }
+      training_participants: {
+        Row: {
+          created_at: string
+          id: string
+          role: string
+          training_record_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: string
+          training_record_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string
+          training_record_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_participants_training_record_id_fkey"
+            columns: ["training_record_id"]
+            isOneToOne: false
+            referencedRelation: "training_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_questions: {
         Row: {
           created_at: string
@@ -1073,6 +1105,127 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "training_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_record_attachments: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          created_by: string | null
+          file_name: string | null
+          file_type: string | null
+          id: string
+          object_path: string
+          training_record_id: string
+        }
+        Insert: {
+          bucket_id?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          object_path: string
+          training_record_id: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          object_path?: string
+          training_record_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_record_attachments_training_record_id_fkey"
+            columns: ["training_record_id"]
+            isOneToOne: false
+            referencedRelation: "training_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_record_documents: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          training_record_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          training_record_id: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          training_record_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_record_documents_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_record_documents_training_record_id_fkey"
+            columns: ["training_record_id"]
+            isOneToOne: false
+            referencedRelation: "training_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_records: {
+        Row: {
+          company_id: string
+          contents: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          contents?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          contents?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1127,6 +1280,44 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_signatures: {
+        Row: {
+          created_at: string
+          id: string
+          role: string
+          signed_at: string
+          signer_name: string
+          training_record_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: string
+          signed_at?: string
+          signer_name: string
+          training_record_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string
+          signed_at?: string
+          signer_name?: string
+          training_record_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_signatures_training_record_id_fkey"
+            columns: ["training_record_id"]
+            isOneToOne: false
+            referencedRelation: "training_records"
             referencedColumns: ["id"]
           },
         ]

@@ -14,6 +14,7 @@ import { PendingActionsView } from "@/components/dashboard/PendingActionsView";
 import { CompanyView } from "@/components/company/CompanyView";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { TrainingExamView } from "@/components/training/TrainingExamView";
+import { TrainingManagementView } from "@/components/training/TrainingManagementView";
 import { AuditSimulatorView } from "@/components/audit/AuditSimulatorView";
 import { PredictiveAnalyticsView } from "@/components/analytics/PredictiveAnalyticsView";
 import { AuditManagementView } from "@/components/audit/AuditManagementView";
@@ -24,7 +25,8 @@ const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   documents: { title: "Gestión Documental", subtitle: "SOPs, PNTs y documentación de calidad" },
   incidents: { title: "Incidencias", subtitle: "No conformidades, desviaciones y CAPAs" },
   audits: { title: "Auditorías", subtitle: "Gestión de auditorías, CAPA y acciones" },
-  training: { title: "Formación Dinámica", subtitle: "Evaluación de comprensión de procedimientos" },
+  training: { title: "Gestión de Formaciones", subtitle: "Registros de formaciones impartidas y recibidas" },
+  "training-exam": { title: "Examen de Formación", subtitle: "Evaluación de comprensión de procedimientos" },
   "audit-simulator": { title: "Simulador de Auditoría", subtitle: "Simulación de inspecciones FDA/EMA" },
   "predictive-analytics": { title: "Análisis Predictivo CAPA", subtitle: "Detección de patrones y acciones preventivas" },
   chatbot: { title: "Asistente IA", subtitle: "Consultas basadas en documentación y normativa" },
@@ -210,6 +212,8 @@ const Index = () => {
       case "chatbot":
         return <ChatbotView />;
       case "training":
+        return <TrainingManagementView />;
+      case "training-exam":
         return <TrainingExamView />;
       case "audit-simulator":
         return <AuditSimulatorView />;
