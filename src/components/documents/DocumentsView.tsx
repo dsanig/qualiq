@@ -2395,6 +2395,7 @@ export function DocumentsView({
           documentCode={selectedDocument.code}
           open={isResponsibilitiesOpen}
           onOpenChange={setIsResponsibilitiesOpen}
+          onWorkflowChange={() => { fetchDocuments(); fetchFirmaStatus(); }}
         />
       )}
     </div>
