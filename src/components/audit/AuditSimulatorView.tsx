@@ -187,6 +187,23 @@ export function AuditSimulatorView() {
     setExpandedFindings(newExpanded);
   };
 
+  const deleteSimulation = async (simId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      // Delete findings first (FK constraint)
+      await supabase.from("audit_findings").delete().eq("simulation_id", simId);
+      const { error } = await supabase.from("audit_simulations").delete().eq("id", simId);
+      if (error) throw error;
+
+      toast({ title: "Simulación eliminada" });
+      if (selectedSimulation?.id === simId) setSelectedSimulation(null);
+      setSimulations((prev) => prev.filter((s) => s.id !== simId));
+    } catch (err) {
+      console.error("Error deleting simulation:", err);
+      toast({ title: "Error", description: "No se pudo eliminar la simulación", variant: "destructive" });
+    }
+  };
+
   const getRiskColor = (score: number) => {
     if (score >= 80) return "text-destructive";
     if (score >= 60) return "text-warning";
