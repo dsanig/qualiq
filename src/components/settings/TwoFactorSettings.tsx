@@ -27,7 +27,7 @@ export function TwoFactorSettings() {
     setLoading(true);
     try {
       const { data } = await supabase.auth.mfa.listFactors();
-      const verifiedTotp = data?.totp?.find((f) => f.status === "verified");
+      const verifiedTotp = data?.totp?.find((f) => (f.status as string) === "verified");
       if (verifiedTotp) {
         setIsEnabled(true);
         setFactorId(verifiedTotp.id);
