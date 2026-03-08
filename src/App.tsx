@@ -8,6 +8,7 @@ import { CompanyContextProvider } from "@/hooks/useCompanyContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import ShareDownload from "./pages/ShareDownload";
 
 const queryClient = new QueryClient();
 
