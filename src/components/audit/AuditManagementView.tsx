@@ -224,6 +224,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     if (auditFiles) await uploadAuditAttachments(editingAudit.id, auditFiles);
     await syncParticipants(editingAudit.id, auditForm.participant_ids);
     toast({ title: "Auditoría actualizada" });
+    logAction({ action: "update", entity_type: "audit", entity_id: editingAudit.id, entity_title: auditForm.title, details: { status: auditForm.status } });
     setEditAuditOpen(false);
     setEditingAudit(null);
     await loadData();
