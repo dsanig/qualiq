@@ -13,7 +13,7 @@ interface PendingAction {
   due_date: string | null;
   status: string;
   isOverdue: boolean;
-  source: "capa" | "document" | "training" | "reclamacion";
+  source: "capa" | "document" | "training" | "reclamacion" | "incidencia";
   documentCode?: string;
   documentId?: string;
   documentStatus?: string;
