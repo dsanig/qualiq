@@ -1315,7 +1315,7 @@ export function DocumentsView({
         title: newDocTitle.trim(),
         category: newDocCategory.charAt(0).toUpperCase() + newDocCategory.slice(1),
         typology: newDocTypology || "Documento",
-        company_id: profile.company_id,
+        company_id: effectiveCompanyId,
         owner_id: uploaderUser.id,
         file_type: fileType,
         file_url: filePath,
