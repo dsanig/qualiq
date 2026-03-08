@@ -486,6 +486,7 @@ export function CompanyView() {
       fullName: (data as any)?.full_name ?? userItem.full_name ?? "",
       jobTitle: (data as any)?.job_title ?? "",
       role: userItem.is_superadmin ? "Superadmin" : (userItem.role ?? "Espectador"),
+      email: userItem.email ?? "",
     });
     setIsEditDialogOpen(true);
   };
