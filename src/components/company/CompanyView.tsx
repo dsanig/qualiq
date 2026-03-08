@@ -50,6 +50,9 @@ export function CompanyView() {
     role: "Espectador",
   });
   const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "" });
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ fullName: "", jobTitle: "", role: "Espectador" });
+  const [editingUserId, setEditingUserId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [devDetectedRole, setDevDetectedRole] = useState<string>("Desconocido");
   const debugUserCreation = import.meta.env.DEV || import.meta.env.VITE_DEBUG_USER_CREATION === "true";
