@@ -38,7 +38,7 @@ export function SettingsView() {
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ full_name: fullName.trim() || null })
+        .update({ full_name: fullName.trim() || null, job_title: jobTitle.trim() || null } as any)
         .eq("user_id", user.id);
 
       if (error) throw error;
