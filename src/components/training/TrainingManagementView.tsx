@@ -7,6 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +33,7 @@ import {
   Trash2,
   CheckCircle,
   Clock,
+  CalendarIcon,
   Paperclip,
   Upload,
   X,
@@ -46,6 +52,7 @@ interface TrainingRecord {
   description: string | null;
   contents: string | null;
   status: string;
+  deadline: string | null;
   created_by: string;
   created_at: string;
 }
@@ -101,6 +108,8 @@ export function TrainingManagementView() {
   const [selectedTrainers, setSelectedTrainers] = useState<string[]>([]);
   const [selectedTrainees, setSelectedTrainees] = useState<string[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [formStatus, setFormStatus] = useState<string>("pendiente");
+  const [formDeadline, setFormDeadline] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   /* Detail dialog */
@@ -125,7 +134,7 @@ export function TrainingManagementView() {
     setIsLoading(true);
     const { data } = await (supabase as any)
       .from("training_records")
-      .select("id, title, description, contents, status, created_by, created_at")
+      .select("id, title, description, contents, status, deadline, created_by, created_at")
       .order("created_at", { ascending: false });
     setRecords((data as TrainingRecord[]) ?? []);
     setIsLoading(false);
@@ -166,6 +175,8 @@ export function TrainingManagementView() {
     setSelectedTrainers([]);
     setSelectedTrainees([]);
     setPendingFiles([]);
+    setFormStatus("pendiente");
+    setFormDeadline(null);
     setFormOpen(true);
   };
 
@@ -174,6 +185,8 @@ export function TrainingManagementView() {
     setTitle(rec.title);
     setDescription(rec.description ?? "");
     setContents(rec.contents ?? "");
+    setFormStatus(rec.status || "pendiente");
+    setFormDeadline(rec.deadline ? new Date(rec.deadline) : null);
 
     // Load linked docs
     const { data: linkedDocs } = await (supabase as any)
@@ -203,12 +216,12 @@ export function TrainingManagementView() {
       if (editingId) {
         await (supabase as any)
           .from("training_records")
-          .update({ title, description, contents, updated_at: new Date().toISOString() })
+          .update({ title, description, contents, status: formStatus, deadline: formDeadline ? formDeadline.toISOString().split("T")[0] : null, updated_at: new Date().toISOString() })
           .eq("id", editingId);
       } else {
         const { data, error } = await (supabase as any)
           .from("training_records")
-          .insert({ title, description, contents, company_id: profile.company_id, created_by: user.id })
+          .insert({ title, description, contents, status: formStatus, deadline: formDeadline ? formDeadline.toISOString().split("T")[0] : null, company_id: profile.company_id, created_by: user.id })
           .select("id")
           .single();
         if (error) throw error;
@@ -373,9 +386,17 @@ export function TrainingManagementView() {
   const isParticipant = (role: "trainer" | "trainee") =>
     detailParticipants.some((p) => p.user_id === user?.id && p.role === role);
 
-  const getSignatureStatus = (rec: TrainingRecord) => {
-    // We don't have counts loaded in list view, so just use status field
-    return rec.status;
+  const statusLabel = (s: string) => {
+    if (s === "completa") return "Completa";
+    if (s === "en_proceso") return "En proceso";
+    return "Pendiente";
+  };
+
+  const statusVariant = (s: string, deadline: string | null): "default" | "secondary" | "destructive" | "outline" => {
+    if (s === "completa") return "default";
+    if (deadline && new Date(deadline) < new Date()) return "destructive";
+    if (s === "en_proceso") return "secondary";
+    return "outline";
   };
 
   /* ---------------------------------------------------------------- */
@@ -409,10 +430,22 @@ export function TrainingManagementView() {
 
           <div className="space-y-5">
             {/* Status */}
-            <div className="flex gap-2">
-              <Badge variant={allSigned ? "default" : "secondary"}>
-                {allSigned ? "Completada" : "Pendiente de firmas"}
+            <div className="flex gap-2 flex-wrap">
+              <Badge variant={statusVariant(detailRecord.status, detailRecord.deadline)}>
+                {statusLabel(detailRecord.status)}
+                {detailRecord.status !== "completa" && detailRecord.deadline && new Date(detailRecord.deadline) < new Date() && " — Vencida"}
               </Badge>
+              {detailRecord.deadline && (
+                <Badge variant="outline" className="text-xs gap-1">
+                  <CalendarIcon className="w-3 h-3" />
+                  Límite: {format(new Date(detailRecord.deadline), "dd/MM/yyyy")}
+                </Badge>
+              )}
+              {allSigned && (
+                <Badge variant="default" className="text-xs gap-1">
+                  <CheckCircle className="w-3 h-3" /> Todas las firmas completadas
+                </Badge>
+              )}
             </div>
 
             {/* Description */}
@@ -586,7 +619,35 @@ export function TrainingManagementView() {
             <Textarea value={contents} onChange={(e) => setContents(e.target.value)} placeholder="Contenidos de la formación..." rows={4} />
           </div>
 
-          {/* Document selection */}
+          {/* Status + Deadline */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Estado</Label>
+              <Select value={formStatus} onValueChange={setFormStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="en_proceso">En proceso</SelectItem>
+                  <SelectItem value="completa">Completa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Fecha límite</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formDeadline && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formDeadline ? format(formDeadline, "dd/MM/yyyy") : "Sin fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={formDeadline ?? undefined} onSelect={(d) => setFormDeadline(d ?? null)} className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
           <div>
             <Label className="mb-2 block">Documentos del sistema</Label>
             <div className="border rounded-lg max-h-40 overflow-y-auto p-2 space-y-1">
@@ -716,17 +777,26 @@ export function TrainingManagementView() {
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <CardTitle className="text-base line-clamp-2">{rec.title}</CardTitle>
-                  <Badge variant={rec.status === "completed" ? "default" : "secondary"} className="ml-2 flex-shrink-0">
-                    {rec.status === "completed" ? "Completada" : "Borrador"}
+                  <Badge variant={statusVariant(rec.status, rec.deadline)} className="ml-2 flex-shrink-0">
+                    {statusLabel(rec.status)}
+                    {rec.status !== "completa" && rec.deadline && new Date(rec.deadline) < new Date() ? " ⚠" : ""}
                   </Badge>
                 </div>
                 <CardDescription className="line-clamp-2">{rec.description || "Sin descripción"}</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(rec.created_at).toLocaleDateString("es-ES")}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(rec.created_at).toLocaleDateString("es-ES")}
+                    </span>
+                    {rec.deadline && (
+                      <span className={cn("text-xs flex items-center gap-1", rec.status !== "completa" && new Date(rec.deadline) < new Date() ? "text-destructive font-medium" : "text-muted-foreground")}>
+                        <CalendarIcon className="w-3 h-3" />
+                        Límite: {new Date(rec.deadline).toLocaleDateString("es-ES")}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEditForm(rec); }}>
                       <PenLine className="w-3.5 h-3.5" />

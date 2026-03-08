@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, FileText, AlertCircle, PenTool, CheckCircle, Search as SearchIcon } from "lucide-react";
+import { CheckCircle2, Clock, FileText, AlertCircle, PenTool, CheckCircle, Search as SearchIcon, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +13,7 @@ interface PendingAction {
   due_date: string | null;
   status: string;
   isOverdue: boolean;
-  source: "capa" | "document";
+  source: "capa" | "document" | "training";
   documentCode?: string;
   documentId?: string;
 }
@@ -25,6 +25,7 @@ const typeIcons: Record<string, typeof CheckCircle2> = {
   firma: PenTool,
   aprobacion: CheckCircle,
   revision: SearchIcon,
+  training: GraduationCap,
 };
 
 const typeLabels: Record<string, string> = {
@@ -34,6 +35,7 @@ const typeLabels: Record<string, string> = {
   firma: "Firma",
   aprobacion: "Aprobación",
   revision: "Revisión",
+  training: "Formación",
 };
 
 interface PendingActionsProps {
@@ -123,12 +125,40 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
         }
       }
 
+      // Fetch training tasks where current user is a participant and training is not complete
+      let trainingActions: PendingAction[] = [];
+      if (user) {
+        const { data: myParticipations } = await (supabase as any)
+          .from("training_participants")
+          .select("training_record_id, role")
+          .eq("user_id", user.id);
+
+        if (myParticipations && myParticipations.length > 0) {
+          const trainingIds = [...new Set(myParticipations.map((p: any) => p.training_record_id))];
+          const { data: trainings } = await (supabase as any)
+            .from("training_records")
+            .select("id, title, status, deadline")
+            .in("id", trainingIds)
+            .in("status", ["pendiente", "en_proceso"]);
+
+          trainingActions = ((trainings as any[]) ?? []).map((t) => ({
+            id: t.id,
+            description: `Formación: ${t.title}`,
+            action_type: "training",
+            due_date: t.deadline,
+            status: t.status,
+            isOverdue: t.deadline ? new Date(t.deadline) < now : false,
+            source: "training" as const,
+          }));
+        }
+      }
+
       // Combine and sort by due_date
-      const combined = [...capaActions, ...docActions].sort((a, b) => {
+      const combined = [...capaActions, ...docActions, ...trainingActions].sort((a, b) => {
         if (!a.due_date) return 1;
         if (!b.due_date) return -1;
         return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-      }).slice(0, 8);
+      }).slice(0, 10);
 
       setActions(combined);
       setIsLoading(false);
@@ -171,6 +201,8 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                     onNavigateToDocument(action.documentCode);
                   } else if (action.source === "capa" && onNavigateToModule) {
                     onNavigateToModule("audits");
+                  } else if (action.source === "training" && onNavigateToModule) {
+                    onNavigateToModule("training");
                   }
                 }}
               >
@@ -182,6 +214,9 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                       <span className="text-xs text-muted-foreground">{typeLabels[action.action_type] || action.action_type}</span>
                       {action.source === "document" && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">Documento</span>
+                      )}
+                      {action.source === "training" && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">Formación</span>
                       )}
                       {action.due_date && (
                         <>

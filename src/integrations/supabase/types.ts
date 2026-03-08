@@ -1192,6 +1192,7 @@ export type Database = {
           contents: string | null
           created_at: string
           created_by: string
+          deadline: string | null
           description: string | null
           id: string
           status: string
@@ -1203,6 +1204,7 @@ export type Database = {
           contents?: string | null
           created_at?: string
           created_by: string
+          deadline?: string | null
           description?: string | null
           id?: string
           status?: string
@@ -1214,6 +1216,7 @@ export type Database = {
           contents?: string | null
           created_at?: string
           created_by?: string
+          deadline?: string | null
           description?: string | null
           id?: string
           status?: string
