@@ -308,6 +308,9 @@ export function IncidentsView({
   };
 
   const createIncident = async () => {
+    if (!form.responsible_id || form.responsible_id === "none") {
+      toast({ title: "Error", description: "Debe asignar un responsable.", variant: "destructive" }); return;
+    }
     const userId = (await supabase.auth.getUser()).data.user?.id;
     const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", userId ?? "").maybeSingle();
     const baseIncidentPayload = {
