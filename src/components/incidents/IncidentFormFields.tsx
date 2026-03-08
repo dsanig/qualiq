@@ -146,18 +146,6 @@ export function IncidentFormFields({
           </PopoverContent>
         </Popover>
       </div>
-      <div>
-        <Label>Estado</Label>
-        <Select value={form.status} onValueChange={(v) => onFormChange((p) => ({ ...p, status: v }))}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="open">Abierto</SelectItem>
-            <SelectItem value="in_progress">En progreso</SelectItem>
-            <SelectItem value="closed">Cerrado</SelectItem>
-            <SelectItem value="overdue">Vencido</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
 
       {showResolutionNotes && (
         <div>

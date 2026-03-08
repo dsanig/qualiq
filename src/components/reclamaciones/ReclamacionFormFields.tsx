@@ -139,18 +139,6 @@ export function ReclamacionFormFields({
         </Popover>
       </div>
 
-      <div>
-        <Label>Estado</Label>
-        <Select value={form.status} onValueChange={(v) => onFormChange((p) => ({ ...p, status: v }))}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="abierta">Abierta</SelectItem>
-            <SelectItem value="en_revision">En Revisión</SelectItem>
-            <SelectItem value="en_resolucion">En Resolución</SelectItem>
-            <SelectItem value="cerrada">Cerrada</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
 
       {showResolutionFields && (
         <>
