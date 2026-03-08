@@ -1250,8 +1250,8 @@ export function DocumentsView({
         const { error: updateError } = await supabase.from("documents").update({ file_type: fileType }).eq("id", selectedDocument.id);
         if (updateError) throw updateError;
 
-        toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0` });
-        logAction({ action: "update_version", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { new_version: newVersion, changes: updateVersionChanges.trim() } });
+        toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersionLabel}` });
+        logAction({ action: "update_version", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { new_version: newVersionLabel, version_type: updateMinorOnly ? "menor" : "mayor", changes: updateVersionChanges.trim() } });
       }
 
       setIsUpdateVersionOpen(false);
