@@ -110,6 +110,21 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       return;
     }
 
+    // Validate document status matches the action type
+    const docStatus = action.documentStatus;
+    if (action.action_type === "revision" && docStatus !== "review") {
+      toast({ title: "No permitido", description: "Solo se puede revisar un documento en estado 'En Revisión'.", variant: "destructive" });
+      return;
+    }
+    if (action.action_type === "firma" && docStatus !== "pending_signature") {
+      toast({ title: "No permitido", description: "Solo se puede firmar un documento en estado 'Pendiente de Firma'.", variant: "destructive" });
+      return;
+    }
+    if (action.action_type === "aprobacion" && docStatus !== "pending_approval") {
+      toast({ title: "No permitido", description: "Solo se puede aprobar un documento en estado 'En Aprobación'.", variant: "destructive" });
+      return;
+    }
+
     setCompletingId(action.id);
     try {
       const { error } = await (supabase as any)
@@ -119,7 +134,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
 
       if (error) throw error;
 
-      const label = action.action_type === "revision" ? "Revisión completada" : action.action_type === "firma" ? "Firma registrada" : "Acción completada";
+      const label = action.action_type === "revision" ? "Revisión completada" : action.action_type === "firma" ? "Firma registrada" : action.action_type === "aprobacion" ? "Aprobación registrada" : "Acción completada";
       toast({ title: label, description: `Acción completada para ${action.documentCode}` });
 
       setActions(prev => prev.filter(a => a.id !== action.id));
