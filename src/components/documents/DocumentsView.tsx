@@ -1340,6 +1340,8 @@ export function DocumentsView({
         file_type: fileType,
         file_url: filePath,
         status: "draft" as const,
+        effective_date: newDocEffectiveImmediate ? null : (newDocEffectiveDate || null),
+        expiry_date: newDocNoExpiry ? null : (newDocExpiryDate || null),
       };
 
       console.log("typology selected", newDocTypology);
