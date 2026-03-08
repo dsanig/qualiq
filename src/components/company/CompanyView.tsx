@@ -161,12 +161,12 @@ export function CompanyView() {
 
   useEffect(() => {
     const fetchCompany = async () => {
-      if (!profile?.company_id) return;
+      if (!effectiveCompanyId) return;
 
       const { data, error } = await supabase
         .from("companies")
         .select("name, legal_name, cif, address, city, postal_code, province, country, phone, email, website")
-        .eq("id", profile.company_id)
+        .eq("id", effectiveCompanyId)
         .maybeSingle();
 
       if (error) {
