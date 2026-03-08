@@ -186,7 +186,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   </span>
                 </div>
               </div>
-              {canComplete && (
+              {canComplete && user && action.user_id === user.id && (
                 <Button
                   variant="outline"
                   size="sm"
