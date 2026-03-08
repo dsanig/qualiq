@@ -212,11 +212,23 @@ export function IncidentsView({
         }
       }
 
+      // Build reclamacion links map: incidencia_id -> reclamacion titles
+      const recTitleMap = new Map((Array.isArray(recData) ? recData : []).map((r: any) => [r.id, r.title]));
+      const recLinksMap: Record<string, string[]> = {};
+      if (Array.isArray(recLinksData)) {
+        for (const link of recLinksData as any[]) {
+          if (!recLinksMap[link.incidencia_id]) recLinksMap[link.incidencia_id] = [];
+          const title = recTitleMap.get(link.reclamacion_id);
+          if (title) recLinksMap[link.incidencia_id].push(title);
+        }
+      }
+
       setIncidents(safeIncidents);
       setAudits(safeAudits);
       setUsers(safeUsers);
       setCapaPlans(safeCapa);
       setIncidentCapaLinks(linksMap);
+      setIncidentReclamacionLinks(recLinksMap);
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudieron cargar las incidencias.";
       const denied = isPermissionError(message);
