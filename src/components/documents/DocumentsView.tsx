@@ -1779,7 +1779,34 @@ export function DocumentsView({
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Última modificación</p><p className="text-sm font-medium text-foreground">{doc.lastUpdated}</p></div>
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Modificado por</p><p className="text-sm font-medium text-foreground">{doc.lastModifiedBy}</p></div>
                                 </div>
-                                <div className="flex flex-wrap gap-2">
+
+                                {/* Responsibilities */}
+                                {expandedResponsibilities[doc.id] && expandedResponsibilities[doc.id].length > 0 && (
+                                  <div className="mt-3 border-t border-border pt-3">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Responsables asignados</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                      {expandedResponsibilities[doc.id].map((r, idx) => {
+                                        const actionLabel = r.action_type === "revision" ? "Revisión" : r.action_type === "firma" ? "Firma" : r.action_type === "aprobacion" ? "Aprobación" : r.action_type;
+                                        const isOverdue = new Date(r.due_date) < new Date() && r.status !== "completed";
+                                        const isCompleted = r.status === "completed";
+                                        return (
+                                          <div key={idx} className="flex items-center gap-2 text-xs bg-card border border-border rounded px-2 py-1.5">
+                                            <span className="font-medium text-foreground">{actionLabel}:</span>
+                                            <span className="text-muted-foreground truncate">{r.userName}</span>
+                                            <span className={cn(
+                                              "ml-auto shrink-0",
+                                              isCompleted ? "text-success" : isOverdue ? "text-destructive font-medium" : "text-muted-foreground"
+                                            )}>
+                                              {isCompleted ? "✓" : new Date(r.due_date).toLocaleDateString("es-ES")}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="flex flex-wrap gap-2 mt-3">
                                   <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
                                   <Button variant="outline" onClick={() => handleOpenUpdateVersion(doc)} disabled={!canEditContent}>Actualizar versión</Button>
                                   <Button variant="outline" onClick={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}>
