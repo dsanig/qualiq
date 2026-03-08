@@ -31,6 +31,15 @@ type UserDirectoryEntry = {
 };
 
 
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="text-sm text-foreground">{value || "—"}</p>
+    </div>
+  );
+}
+
 export function CompanyView() {
   const { canManageCompany, canManagePasswords, isSuperadmin, refreshPermissions } = usePermissions();
   const { profile, user } = useAuth();
