@@ -46,6 +46,7 @@ export function SettingsView() {
 
       if (error) throw error;
       toast.success("Perfil actualizado correctamente.");
+      logAction({ action: "update", entity_type: "settings", entity_title: "Perfil de usuario", details: { full_name: fullName.trim(), job_title: jobTitle.trim() } });
     } catch (e: any) {
       toast.error(e.message ?? "Error al actualizar el perfil.");
     } finally {
