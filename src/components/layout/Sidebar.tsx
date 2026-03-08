@@ -47,6 +47,7 @@ const bottomItems = [
 
 const superadminItems = [
   { id: "company-management", label: "Gestión Empresas", icon: Globe },
+  { id: "audit-trail", label: "Pista de Auditoría", icon: Shield },
 ];
 
 export function Sidebar({ activeModule, onModuleChange, collapsed = false, onToggle, enabledFeatures, isSuperadmin = false }: SidebarProps) {
