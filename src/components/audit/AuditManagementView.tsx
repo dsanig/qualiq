@@ -17,6 +17,7 @@ type Audit = {
   id: string; title: string; description: string | null; audit_date: string | null;
   auditor_id: string | null; responsible_id: string | null; observations: string | null;
   findings: string | null; conclusions: string | null; status: string;
+  audit_type: string; external_entity_id: string | null;
 };
 type AuditAttachment = { id: string; audit_id: string; file_name: string | null; object_path: string; file_type: string | null };
 type AuditParticipant = { id: string; audit_id: string; user_id: string };
