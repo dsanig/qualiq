@@ -1586,7 +1586,7 @@ export function DocumentsView({
                   </SelectContent>
                 </Select>
               </div>
-              <span className="text-xs text-muted-foreground">{selectedIds.length} seleccionados</span>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
