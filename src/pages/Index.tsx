@@ -37,6 +37,7 @@ const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   company: { title: "Empresa", subtitle: "Configuración y datos de la organización" },
   settings: { title: "Configuración", subtitle: "Preferencias y ajustes del sistema" },
   "pending-actions": { title: "Acciones Pendientes", subtitle: "Seguimiento completo de tareas y aprobaciones" },
+  "company-management": { title: "Gestión de Empresas", subtitle: "Administración multi-tenant de la plataforma" },
 };
 
 type IncidentType = "incidencia" | "desviacion" | "no_conformidad" | "otra";
