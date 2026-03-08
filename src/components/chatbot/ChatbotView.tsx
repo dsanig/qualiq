@@ -26,7 +26,7 @@ const initialAssistantMessage: Message = {
   id: "welcome",
   role: "assistant",
   content:
-    "Bienvenido al Asistente IA de QualiQ. Estoy listo para ayudarte con consultas sobre tus procesos, incidencias y documentación de cumplimiento.",
+    "Bienvenido a QualAI. Estoy listo para ayudarte con consultas sobre tus procesos, incidencias y documentación de cumplimiento.",
   timestamp: new Date(),
 };
 
