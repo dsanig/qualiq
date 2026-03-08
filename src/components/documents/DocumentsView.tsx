@@ -1304,7 +1304,7 @@ export function DocumentsView({
       }
 
       const documentId = crypto.randomUUID();
-      const filePath = `${profile.company_id}/${documentId}/${newDocFile.name}`;
+      const filePath = `${effectiveCompanyId}/${documentId}/${newDocFile.name}`;
 
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, newDocFile);
       if (uploadError) throw uploadError;
