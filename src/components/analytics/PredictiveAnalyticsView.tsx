@@ -70,13 +70,13 @@ const ANALYSIS_WINDOW_OPTIONS: Array<{ value: AnalysisWindow; label: string; day
 const DEFAULT_ANALYSIS_WINDOW: AnalysisWindow = "1m";
 const STORAGE_WINDOW_KEY = "predictive-analysis-window";
 const MIN_RECORDS_BY_WINDOW: Record<AnalysisWindow, number> = {
-  current: 3,
-  "1w": 3,
-  "2w": 5,
-  "1m": 10,
-  "3m": 10,
-  "6m": 10,
-  "1y": 10,
+  current: 1,
+  "1w": 1,
+  "2w": 1,
+  "1m": 1,
+  "3m": 1,
+  "6m": 1,
+  "1y": 1,
 };
 
 const OPEN_STATUS_VALUES = ["open", "in_progress", "pending_approval", "abierta", "abierto", "pendiente"];
