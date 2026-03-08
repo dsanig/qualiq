@@ -31,7 +31,7 @@ const navigationItems = [
   { id: "documents", label: "Documentos", icon: FileText },
   { id: "incidents", label: "Incidencias", icon: AlertTriangle },
   { id: "reclamaciones", label: "Reclamaciones", icon: FileWarning },
-  { id: "audits", label: "Auditorías", icon: ClipboardCheck },
+  { id: "audits", label: "Auditorías y CAPA", icon: ClipboardCheck },
   { id: "training", label: "Formaciones", icon: GraduationCap },
   { id: "training-exam", label: "Examen Formación", icon: GraduationCap },
   { id: "audit-simulator", label: "Simulador Auditoría", icon: ClipboardCheck },
