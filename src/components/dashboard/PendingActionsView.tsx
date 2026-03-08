@@ -135,7 +135,10 @@ export function PendingActionsView() {
             className="pl-9"
           />
         </div>
-        <Button variant="accent">Actualizar prioridades</Button>
+        <Button variant="accent" onClick={() => setRefreshKey((k) => k + 1)} disabled={isLoading}>
+          {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+          Actualizar prioridades
+        </Button>
       </div>
 
       <div className="bg-card rounded-lg border border-border p-6 space-y-4">
