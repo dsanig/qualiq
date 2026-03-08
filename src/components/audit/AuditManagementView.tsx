@@ -512,6 +512,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       <div><Label>Descripción</Label><Textarea value={ncForm.description} onChange={(e) => setNcForm((p) => ({ ...p, description: e.target.value }))} /></div>
       <div><Label>Severidad</Label><Input value={ncForm.severity} onChange={(e) => setNcForm((p) => ({ ...p, severity: e.target.value }))} /></div>
       <div><Label>Causa raíz</Label><Textarea value={ncForm.root_cause} onChange={(e) => setNcForm((p) => ({ ...p, root_cause: e.target.value }))} /></div>
+      <div>
+        <Label>Responsable *</Label>
+        <Select value={ncForm.responsible_id} onValueChange={(v) => setNcForm((p) => ({ ...p, responsible_id: v }))}>
+          <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
+          <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
       <div><Label>Fecha límite *</Label><Input type="date" value={ncForm.deadline} onChange={(e) => setNcForm((p) => ({ ...p, deadline: e.target.value }))} /></div>
       <div>
         <Label>Estado</Label>
