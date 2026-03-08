@@ -1033,7 +1033,7 @@ export function DocumentsView({
       const fileType = fileTypeForDb(updateVersionFile);
       const fileExt = getFileExtension(updateVersionFile.name) || "bin";
       debugFileTypeMapping(updateVersionFile);
-      const filePath = `${profile.company_id}/${selectedDocument.id}/${crypto.randomUUID()}.${fileExt}`;
+      const filePath = `${effectiveCompanyId}/${selectedDocument.id}/${crypto.randomUUID()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, updateVersionFile);
       if (uploadError) throw uploadError;
