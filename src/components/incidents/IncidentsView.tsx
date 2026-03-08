@@ -747,12 +747,19 @@ export function IncidentsView({
             </div>
           )}
           <DialogFooter>
-            <div className="w-full flex items-center justify-between gap-2">
-              {canDeleteIncidencia && editingIncident ? (
-                <Button variant="destructive" onClick={() => promptDeleteIncident(editingIncident)}>
-                  <Trash2 className="w-4 h-4 mr-1" />Eliminar
-                </Button>
-              ) : <span />}
+            <div className="w-full flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {canDeleteIncidencia && editingIncident ? (
+                  <Button variant="destructive" onClick={() => promptDeleteIncident(editingIncident)}>
+                    <Trash2 className="w-4 h-4 mr-1" />Eliminar
+                  </Button>
+                ) : <span />}
+                {editingIncident && (user?.id === editingIncident.responsible_id || isSuperadmin) && (
+                  <Button variant="outline" onClick={() => setIsStatusChangeOpen(true)}>
+                    <History className="w-4 h-4 mr-1" />Cambiar Estado
+                  </Button>
+                )}
+              </div>
               {canEditContent ? (
                 <Button onClick={updateIncident}>Guardar cambios</Button>
               ) : (
@@ -762,6 +769,31 @@ export function IncidentsView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Status Change Dialog */}
+      {editingIncident && (
+        <StatusChangeDialog
+          open={isStatusChangeOpen}
+          onOpenChange={setIsStatusChangeOpen}
+          currentStatus={editingIncident.status}
+          statusOptions={[
+            { value: "open", label: "Abierto" },
+            { value: "in_progress", label: "En progreso" },
+            { value: "closed", label: "Cerrado" },
+            { value: "overdue", label: "Vencido" },
+          ]}
+          entityId={editingIncident.id}
+          entityType="incidencias"
+          historyTable="incidencia_status_changes"
+          foreignKey="incidencia_id"
+          onStatusChanged={async () => {
+            setIsEditOpen(false);
+            setEditingIncident(null);
+            await loadData();
+          }}
+          getUserName={getUserName}
+        />
+      )}
 
       <AlertDialog open={Boolean(incidentPendingDelete)} onOpenChange={(open) => {
         if (!open && !isDeleting) {
