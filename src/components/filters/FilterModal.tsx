@@ -17,6 +17,7 @@ interface FilterModalProps {
   onOpenChange: (open: boolean) => void;
   filters: FiltersState;
   onFiltersChange: (filters: FiltersState) => void;
+  activeModule?: string;
 }
 
 export function FilterModal({ open, onOpenChange, filters, onFiltersChange }: FilterModalProps) {
