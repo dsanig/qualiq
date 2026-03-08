@@ -9,6 +9,7 @@ import {
   Clock,
   ClipboardList,
   AlertCircle,
+  AlertTriangle,
   FileSpreadsheet,
   File,
   UploadCloud,
@@ -371,6 +372,20 @@ export function DocumentsView({
   // Signature status per document: { docId: { totalSigners, signedCount } }
   const [firmaStatus, setFirmaStatus] = useState<Record<string, { total: number; signed: number }>>({});
 
+  // Track which documents have been rejected (have rejected responsibilities)
+  const [rejectedDocIds, setRejectedDocIds] = useState<Set<string>>(new Set());
+
+  const fetchRejectedDocs = useCallback(async () => {
+    if (!profile?.company_id) return;
+    const { data } = await (supabase as any)
+      .from("document_responsibilities")
+      .select("document_id")
+      .eq("status", "rejected");
+    if (data) {
+      setRejectedDocIds(new Set((data as any[]).map((r: any) => r.document_id)));
+    }
+  }, [profile?.company_id]);
+
   // Fetch signatures from DB
   const fetchSignatures = useCallback(async () => {
     if (!profile?.company_id || !user) return;
@@ -542,7 +557,8 @@ export function DocumentsView({
     fetchSignatures();
     fetchCompanyUsers();
     fetchFirmaStatus();
-  }, [fetchDocuments, fetchSignatures, fetchCompanyUsers, fetchFirmaStatus]);
+    fetchRejectedDocs();
+  }, [fetchDocuments, fetchSignatures, fetchCompanyUsers, fetchFirmaStatus, fetchRejectedDocs]);
 
   useEffect(() => {
     void refreshPermissions();
@@ -965,6 +981,7 @@ export function DocumentsView({
       setIsUpdateVersionOpen(false);
       fetchDocuments();
       fetchFirmaStatus();
+      fetchRejectedDocs();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -1781,6 +1798,27 @@ export function DocumentsView({
                                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Modificado por</p><p className="font-medium text-foreground">{doc.lastModifiedBy}</p></div>
                                 </div>
 
+                                {/* Rejected document banner */}
+                                {doc.status === "draft" && rejectedDocIds.has(doc.id) && (
+                                  <div className="border border-destructive/30 rounded-lg p-3 bg-destructive/5 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                      <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
+                                      <p className="text-sm text-destructive font-medium">
+                                        Este documento fue <strong>denegado</strong> y devuelto a Borrador. Actualiza el archivo adjunto para reiniciar el flujo de aprobación.
+                                      </p>
+                                    </div>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => handleOpenUpdateVersion(doc)}
+                                      disabled={!canEditContent}
+                                    >
+                                      <UploadCloud className="w-4 h-4 mr-1" />
+                                      Actualizar documento
+                                    </Button>
+                                  </div>
+                                )}
+
                                 {/* Actions */}
                                 <div className="flex flex-wrap gap-2">
                                   <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
@@ -1876,6 +1914,28 @@ export function DocumentsView({
               )}
             </div>
           )}
+
+          {/* Rejected document banner in preview */}
+          {selectedDocument && selectedDocument.status === "draft" && rejectedDocIds.has(selectedDocument.id) && (
+            <div className="border border-destructive/30 rounded-lg p-3 bg-destructive/5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
+                <p className="text-sm text-destructive font-medium">
+                  Documento <strong>denegado</strong>. Actualiza el archivo para reiniciar el flujo.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => { setIsPreviewOpen(false); handleOpenUpdateVersion(selectedDocument); }}
+                disabled={!canEditContent}
+              >
+                <UploadCloud className="w-4 h-4 mr-1" />
+                Actualizar documento
+              </Button>
+            </div>
+          )}
+
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>Cerrar</Button>
             {selectedDocument && (
@@ -2547,7 +2607,8 @@ export function DocumentsView({
           documentCode={selectedDocument.code}
           open={isResponsibilitiesOpen}
           onOpenChange={setIsResponsibilitiesOpen}
-          onWorkflowChange={() => { fetchDocuments(); fetchFirmaStatus(); }}
+          onWorkflowChange={() => { fetchDocuments(); fetchFirmaStatus(); fetchRejectedDocs(); }}
+          onUpdateDocument={() => handleOpenUpdateVersion(selectedDocument)}
         />
       )}
       {/* Pending Actions Dialog */}
@@ -2563,9 +2624,29 @@ export function DocumentsView({
                 Acciones pendientes para {selectedDocument.code}
               </DialogDescription>
             </DialogHeader>
+            {/* Rejected document banner in pending actions */}
+            {selectedDocument.status === "draft" && rejectedDocIds.has(selectedDocument.id) && (
+              <div className="border border-destructive/30 rounded-lg p-3 bg-destructive/5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
+                  <p className="text-sm text-destructive font-medium">
+                    Documento <strong>denegado</strong>. Actualiza el archivo para reiniciar el flujo.
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => { setIsPendingActionsOpen(false); handleOpenUpdateVersion(selectedDocument); }}
+                  disabled={!canEditContent}
+                >
+                  <UploadCloud className="w-4 h-4 mr-1" />
+                  Actualizar documento
+                </Button>
+              </div>
+            )}
             <DocumentPendingActions
               documentId={selectedDocument.id}
-              onActionCompleted={() => { fetchDocuments(); fetchFirmaStatus(); }}
+              onActionCompleted={() => { fetchDocuments(); fetchFirmaStatus(); fetchRejectedDocs(); }}
             />
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsPendingActionsOpen(false)}>Cerrar</Button>
