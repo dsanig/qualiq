@@ -43,6 +43,7 @@ interface IncidentPrefillPayload {
   title: string;
   description: string;
   sourceInsightId?: string;
+  sourceReclamacionId?: string;
 }
 
 const Index = () => {
@@ -218,7 +219,7 @@ const Index = () => {
             onSearchChange={handleSearchChange}
             onOpenNewIncident={(reclamacionId, reclamacionTitle) => {
               setIncidentTypeSeed("incidencia");
-              setIncidentPrefill({ title: `Incidencia desde reclamación: ${reclamacionTitle}`, description: `Incidencia generada a partir de la reclamación "${reclamacionTitle}".` });
+              setIncidentPrefill({ title: `Incidencia desde reclamación: ${reclamacionTitle}`, description: `Incidencia generada a partir de la reclamación "${reclamacionTitle}".`, sourceReclamacionId: reclamacionId });
               setActiveModule("incidents");
               setIsNewIncidentOpen(true);
             }}

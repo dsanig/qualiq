@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -395,7 +396,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
         </CardContent>
       </Card>
 
-      {/* New reclamacion dialog */}
+      {/* New reclamacion dialog - NO incidencia linking */}
       <Dialog open={isNewOpen} onOpenChange={(open) => { setIsNewOpen(open); if (!open) { setNewAttachments([]); setSelectedIncidenciaIds([]); setParticipantIds([]); setForm(defaultForm()); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
@@ -409,9 +410,6 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
             attachments={newAttachments}
             onAddFiles={handleAddFiles}
             onRemoveAttachment={handleRemoveNewAttachment}
-            incidencias={incidencias}
-            selectedIncidenciaIds={selectedIncidenciaIds}
-            onIncidenciaToggle={(id) => setSelectedIncidenciaIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
             participantIds={participantIds}
             onParticipantToggle={(uid) => setParticipantIds(prev => prev.includes(uid) ? prev.filter(x => x !== uid) : [...prev, uid])}
           />
@@ -445,17 +443,32 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                 handleRemoveNewAttachment(idx - existingAttachments.length);
               }
             } : undefined}
-            incidencias={incidencias}
-            selectedIncidenciaIds={selectedIncidenciaIds}
-            onIncidenciaToggle={canEditContent ? (id) => setSelectedIncidenciaIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]) : undefined}
             participantIds={participantIds}
             onParticipantToggle={canEditContent ? (uid) => setParticipantIds(prev => prev.includes(uid) ? prev.filter(x => x !== uid) : [...prev, uid]) : undefined}
           />
+
+          {/* Read-only linked incidencias */}
+          {editingReclamacion && (reclamacionLinks[editingReclamacion.id]?.length > 0) && (
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Incidencias vinculadas</Label>
+              <div className="flex flex-wrap gap-1">
+                {reclamacionLinks[editingReclamacion.id]?.map((incId) => {
+                  const inc = incidencias.find((i) => i.id === incId);
+                  return (
+                    <span key={incId} className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5">
+                      <LinkIcon className="h-3 w-3" />{inc?.title || "Incidencia"}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <div className="w-full flex items-center justify-between gap-2">
               {canEditContent && editingReclamacion && onOpenNewIncident && (
                 <Button variant="outline" onClick={() => handleOpenNewIncident(editingReclamacion)}>
-                  <AlertTriangle className="w-4 h-4 mr-1" />Abrir incidencia
+                  <AlertTriangle className="w-4 h-4 mr-1" />Crear incidencia
                 </Button>
               )}
               {!onOpenNewIncident && <span />}

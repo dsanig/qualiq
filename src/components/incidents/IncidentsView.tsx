@@ -45,6 +45,7 @@ interface IncidentPrefillPayload {
   title: string;
   description: string;
   sourceInsightId?: string;
+  sourceReclamacionId?: string;
 }
 
 interface IncidentsViewProps {
@@ -95,6 +96,7 @@ export function IncidentsView({
   const [users, setUsers] = useState<UserRef[]>([]);
   const [capaPlans, setCapaPlans] = useState<CapaPlanRef[]>([]);
   const [incidentCapaLinks, setIncidentCapaLinks] = useState<Record<string, string[]>>({});
+  const [incidentReclamacionLinks, setIncidentReclamacionLinks] = useState<Record<string, string[]>>({});
   const [selectedCapaPlanIds, setSelectedCapaPlanIds] = useState<string[]>([]);
   const [form, setForm] = useState<IncidentFormData>(defaultForm(initialIncidentType));
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
@@ -105,6 +107,7 @@ export function IncidentsView({
   const [newAttachments, setNewAttachments] = useState<AttachmentInfo[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<AttachmentInfo[]>([]);
   const [sourceInsightId, setSourceInsightId] = useState<string | null>(null);
+  const [sourceReclamacionId, setSourceReclamacionId] = useState<string | null>(null);
   const { toast } = useToast();
   const { canEditContent, isSuperadmin } = usePermissions();
   const [incidentPendingDelete, setIncidentPendingDelete] = useState<Incident | null>(null);
@@ -167,12 +170,14 @@ export function IncidentsView({
         return withInsight;
       })();
 
-      const [{ data: incidenciasData, error: incidenciasError }, { data: auditsData, error: auditsError }, { data: usersData, error: usersError }, { data: capaData }, { data: linksData }] = await Promise.all([
+      const [{ data: incidenciasData, error: incidenciasError }, { data: auditsData, error: auditsError }, { data: usersData, error: usersError }, { data: capaData }, { data: linksData }, { data: recLinksData }, { data: recData }] = await Promise.all([
         incidentsPromise,
         (supabase as any).from("audits").select("id,title").order("created_at", { ascending: false }),
         supabase.from("profiles").select("user_id,full_name,email"),
         (supabase as any).from("capa_plans").select("id,title,audit_id"),
         (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
+        (supabase as any).from("reclamacion_incidencias").select("reclamacion_id,incidencia_id"),
+        (supabase as any).from("reclamaciones").select("id,title"),
       ]);
 
       if (incidenciasError) {
@@ -208,11 +213,23 @@ export function IncidentsView({
         }
       }
 
+      // Build reclamacion links map: incidencia_id -> reclamacion titles
+      const recTitleMap = new Map((Array.isArray(recData) ? recData : []).map((r: any) => [r.id, r.title]));
+      const recLinksMap: Record<string, string[]> = {};
+      if (Array.isArray(recLinksData)) {
+        for (const link of recLinksData as any[]) {
+          if (!recLinksMap[link.incidencia_id]) recLinksMap[link.incidencia_id] = [];
+          const title = recTitleMap.get(link.reclamacion_id);
+          if (title) recLinksMap[link.incidencia_id].push(title);
+        }
+      }
+
       setIncidents(safeIncidents);
       setAudits(safeAudits);
       setUsers(safeUsers);
       setCapaPlans(safeCapa);
       setIncidentCapaLinks(linksMap);
+      setIncidentReclamacionLinks(recLinksMap);
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudieron cargar las incidencias.";
       const denied = isPermissionError(message);
@@ -236,6 +253,7 @@ export function IncidentsView({
       incidencia_type: "incidencia",
     }));
     setSourceInsightId(prefill.sourceInsightId ?? null);
+    setSourceReclamacionId(prefill.sourceReclamacionId ?? null);
     onPrefillConsumed?.();
   }, [prefill, isNewIncidentOpen, onPrefillConsumed]);
 
@@ -326,12 +344,23 @@ export function IncidentsView({
       );
     }
 
+    // Auto-link to source reclamacion
+    if (inserted && sourceReclamacionId) {
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      await (supabase as any).from("reclamacion_incidencias").insert({
+        reclamacion_id: sourceReclamacionId,
+        incidencia_id: inserted.id,
+        created_by: userId,
+      });
+    }
+
     toast({ title: "Incidencia creada" });
     onNewIncidentOpenChange(false);
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
     setSelectedCapaPlanIds([]);
     setSourceInsightId(null);
+    setSourceReclamacionId(null);
     await loadData();
   };
 
@@ -399,6 +428,7 @@ export function IncidentsView({
     setExistingAttachments([]);
     setSelectedCapaPlanIds([]);
     setSourceInsightId(null);
+    setSourceReclamacionId(null);
     await loadData();
   };
 
@@ -625,7 +655,7 @@ export function IncidentsView({
       </Card>
 
       {/* New incident dialog */}
-      <Dialog open={isNewIncidentOpen} onOpenChange={(open) => { onNewIncidentOpenChange(open); if (!open) { setNewAttachments([]); setSelectedCapaPlanIds([]); setForm(defaultForm(initialIncidentType)); setSourceInsightId(null); } }}>
+      <Dialog open={isNewIncidentOpen} onOpenChange={(open) => { onNewIncidentOpenChange(open); if (!open) { setNewAttachments([]); setSelectedCapaPlanIds([]); setForm(defaultForm(initialIncidentType)); setSourceInsightId(null); setSourceReclamacionId(null); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nueva incidencia</DialogTitle>
@@ -677,6 +707,19 @@ export function IncidentsView({
             selectedCapaPlanIds={selectedCapaPlanIds}
             onCapaPlanToggle={canEditContent ? handleCapaPlanToggle : undefined}
           />
+          {/* Read-only linked reclamaciones */}
+          {editingIncident && (incidentReclamacionLinks[editingIncident.id]?.length > 0) && (
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Reclamación de origen</p>
+              <div className="flex flex-wrap gap-1">
+                {incidentReclamacionLinks[editingIncident.id].map((title, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 text-xs bg-warning/10 text-warning rounded-full px-2 py-0.5">
+                    <LinkIcon className="h-3 w-3" />{title}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <DialogFooter>
             <div className="w-full flex items-center justify-between gap-2">
               {canDeleteIncidencia && editingIncident ? (
