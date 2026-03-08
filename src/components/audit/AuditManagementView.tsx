@@ -385,7 +385,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const openEditNc = (nc: NonConformity) => {
     setEditingNc(nc);
-    setNcForm({ title: nc.title, description: nc.description ?? "", severity: nc.severity ?? "", root_cause: nc.root_cause ?? "", status: nc.status, deadline: nc.deadline ?? "" });
+    setNcForm({ title: nc.title, description: nc.description ?? "", severity: nc.severity ?? "", root_cause: nc.root_cause ?? "", status: nc.status, deadline: nc.deadline ?? "", responsible_id: nc.responsible_id ?? "" });
     setEditNcOpen(true);
   };
 
