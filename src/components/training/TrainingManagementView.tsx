@@ -52,6 +52,7 @@ interface TrainingRecord {
   description: string | null;
   contents: string | null;
   status: string;
+  deadline: string | null;
   created_by: string;
   created_at: string;
 }
