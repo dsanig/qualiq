@@ -48,6 +48,9 @@ const bottomItems = [
 
 const superadminItems = [
   { id: "company-management", label: "Gestión Empresas", icon: Globe },
+];
+
+const adminItems = [
   { id: "audit-trail", label: "Pista de Auditoría", icon: Shield },
 ];
 
