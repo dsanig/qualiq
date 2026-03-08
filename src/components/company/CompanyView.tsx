@@ -792,6 +792,63 @@ export function CompanyView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {isSuperadmin && (
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Editar usuario</DialogTitle>
+              <DialogDescription>
+                Modifica los datos del usuario seleccionado.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Nombre completo</Label>
+                <Input
+                  value={editForm.fullName}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, fullName: e.target.value }))}
+                  placeholder="Nombre y apellidos"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cargo</Label>
+                <Input
+                  value={editForm.jobTitle}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, jobTitle: e.target.value }))}
+                  placeholder="Ej: Responsable de Calidad"
+                />
+              </div>
+              {!users.find((u) => u.id === editingUserId)?.is_superadmin && (
+                <div className="space-y-2">
+                  <Label>Rol</Label>
+                  <Select
+                    value={editForm.role}
+                    onValueChange={(value) => setEditForm((prev) => ({ ...prev, role: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un rol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Administrador">Administrador</SelectItem>
+                      <SelectItem value="Editor">Editor</SelectItem>
+                      <SelectItem value="Espectador">Espectador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="accent" onClick={handleSaveEditUser} disabled={isSubmitting}>
+                {isSubmitting ? "Guardando..." : "Guardar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
