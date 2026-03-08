@@ -136,9 +136,11 @@ export function CompanyView() {
   };
 
   const fetchUsers = useCallback(async () => {
+    if (!effectiveCompanyId) return;
     const { data, error } = await (supabase as any)
       .from("user_directory")
-      .select("id, email, full_name, role, is_superadmin, created_at")
+      .select("id, email, full_name, company_id, role, is_superadmin, created_at")
+      .eq("company_id", effectiveCompanyId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -151,7 +153,7 @@ export function CompanyView() {
     }
 
     setUsers((data ?? []) as UserDirectoryEntry[]);
-  }, [toast]);
+  }, [toast, effectiveCompanyId]);
 
   useEffect(() => {
     void fetchUsers();
