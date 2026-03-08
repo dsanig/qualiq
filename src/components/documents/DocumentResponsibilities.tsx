@@ -125,12 +125,18 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
     setCompanyUsers(data || []);
   }, [profile?.company_id]);
 
+  const fetchDocumentStatus = useCallback(async () => {
+    const { data } = await supabase.from("documents").select("status").eq("id", documentId).single();
+    setDocumentStatus((data as any)?.status || null);
+  }, [documentId]);
+
   useEffect(() => {
     if (open) {
       fetchResponsibilities();
       fetchCompanyUsers();
+      fetchDocumentStatus();
     }
-  }, [open, fetchResponsibilities, fetchCompanyUsers]);
+  }, [open, fetchResponsibilities, fetchCompanyUsers, fetchDocumentStatus]);
 
   const handleAdd = async () => {
     if (!selectedUserId || !selectedDueDate || !user) {
