@@ -232,6 +232,24 @@ export function TrainingManagementView() {
       if (participantRows.length > 0) {
         await (supabase as any).from("training_participants").insert(participantRows);
       }
+      // Upload pending files
+      if (pendingFiles.length > 0 && recordId) {
+        for (const file of pendingFiles) {
+          const path = `training/${recordId}/${Date.now()}_${file.name}`;
+          const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
+          if (uploadError) {
+            console.error(uploadError);
+            continue;
+          }
+          await (supabase as any).from("training_record_attachments").insert({
+            training_record_id: recordId,
+            object_path: path,
+            file_name: file.name,
+            file_type: file.type,
+            created_by: user.id,
+          });
+        }
+      }
 
       toast({ title: editingId ? "Formación actualizada" : "Formación creada" });
       setFormOpen(false);
