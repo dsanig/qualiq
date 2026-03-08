@@ -654,8 +654,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
           {!isLoading && paginatedAudits.map((audit) => (
             <button key={audit.id} onClick={() => setSelectedAuditId(audit.id)} className={`w-full rounded border p-3 text-left ${selectedAuditId === audit.id ? "border-primary bg-primary/5" : "border-border"}`}>
-              <p className="font-medium">{audit.title}</p>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <p className="font-medium flex-1">{audit.title}</p>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${audit.audit_type === "externa" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"}`}>
+                  {audit.audit_type === "externa" ? "Externa" : "Interna"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-1">
                 <p className="text-xs text-muted-foreground">{audit.audit_date ?? "Sin fecha"}</p>
                 <span className="text-xs text-muted-foreground">{statusLabel(audit.status)}</span>
               </div>
