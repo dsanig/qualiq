@@ -382,6 +382,10 @@ export function DocumentsView({
   const [newDocCategory, setNewDocCategory] = useState("calidad");
   const [newDocTypology, setNewDocTypology] = useState<DocumentTypology | "">("");
   const [newDocDescription, setNewDocDescription] = useState("");
+  const [newDocEffectiveImmediate, setNewDocEffectiveImmediate] = useState(true);
+  const [newDocEffectiveDate, setNewDocEffectiveDate] = useState("");
+  const [newDocNoExpiry, setNewDocNoExpiry] = useState(true);
+  const [newDocExpiryDate, setNewDocExpiryDate] = useState("");
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
