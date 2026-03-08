@@ -11,7 +11,8 @@ import {
   TrendingUp,
   FileWarning,
   Globe,
-  CalendarDays
+  CalendarDays,
+  Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ interface SidebarProps {
   onToggle?: () => void;
   enabledFeatures?: Set<string>;
   isSuperadmin?: boolean;
+  isAdmin?: boolean;
 }
 
 const navigationItems = [
@@ -48,7 +50,11 @@ const superadminItems = [
   { id: "company-management", label: "Gestión Empresas", icon: Globe },
 ];
 
-export function Sidebar({ activeModule, onModuleChange, collapsed = false, onToggle, enabledFeatures, isSuperadmin = false }: SidebarProps) {
+const adminItems = [
+  { id: "audit-trail", label: "Pista de Auditoría", icon: Shield },
+];
+
+export function Sidebar({ activeModule, onModuleChange, collapsed = false, onToggle, enabledFeatures, isSuperadmin = false, isAdmin = false }: SidebarProps) {
   const visibleNavItems = enabledFeatures
     ? navigationItems.filter((item) => item.id === "dashboard" || item.id === "calendar" || enabledFeatures.has(item.id))
     : navigationItems;
@@ -104,6 +110,26 @@ export function Sidebar({ activeModule, onModuleChange, collapsed = false, onTog
       {isSuperadmin && (
         <div className="px-3 py-2 border-t border-sidebar-border space-y-1">
           {superadminItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onModuleChange(item.id)}
+              className={cn(
+                "nav-item w-full",
+                activeModule === item.id && "nav-item-active"
+              )}
+              data-testid={`sidebar-${item.id}`}
+            >
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span>{item.label}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Admin Section (Superadmin + Administrador) */}
+      {(isSuperadmin || isAdmin) && (
+        <div className={cn("px-3 py-2 space-y-1", !isSuperadmin && "border-t border-sidebar-border")}>
+          {adminItems.map((item) => (
             <button
               key={item.id}
               onClick={() => onModuleChange(item.id)}

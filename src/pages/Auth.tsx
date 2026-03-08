@@ -8,6 +8,7 @@ import { Shield, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { MfaVerifyStep } from "@/components/auth/MfaVerifyStep";
+import { logAuditAction } from "@/hooks/useAuditLog";
 
 const emailSchema = z.string().email("Email inválido");
 const passwordSchema = z.string().min(6, "La contraseña debe tener al menos 6 caracteres");
@@ -77,7 +78,7 @@ export default function Auth() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         toast({
           title: "Error de inicio de sesión",
@@ -86,6 +87,9 @@ export default function Auth() {
             : error.message,
           variant: "destructive",
         });
+      } else if (data.user) {
+        const profile = await supabase.from("profiles").select("full_name, company_id").eq("user_id", data.user.id).single();
+        logAuditAction({ userId: data.user.id, userEmail: data.user.email ?? email, userName: profile.data?.full_name ?? email, companyId: profile.data?.company_id ?? undefined, action: "login", entity_type: "auth", details: { method: "password" } });
       }
     } catch {
       toast({

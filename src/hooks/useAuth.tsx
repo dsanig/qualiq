@@ -116,6 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    // Log logout before clearing session
+    if (user) {
+      try {
+        const { logAuditAction } = await import("@/hooks/useAuditLog");
+        await logAuditAction({ userId: user.id, userEmail: user.email ?? undefined, userName: profile?.full_name ?? user.email ?? undefined, companyId: profile?.company_id ?? undefined, action: "logout", entity_type: "auth" });
+      } catch { /* silent */ }
+    }
     try {
       await supabase.auth.signOut({ scope: 'local' });
     } catch {

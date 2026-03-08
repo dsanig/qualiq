@@ -15,6 +15,7 @@ export interface AppLayoutProps {
   searchPlaceholder?: string;
   enabledFeatures?: Set<string>;
   isSuperadmin?: boolean;
+  isAdmin?: boolean;
 }
 
 export function AppLayout({
@@ -30,6 +31,7 @@ export function AppLayout({
   onSearchClear,
   enabledFeatures,
   isSuperadmin,
+  isAdmin,
 }: AppLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -42,6 +44,7 @@ export function AppLayout({
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         enabledFeatures={enabledFeatures}
         isSuperadmin={isSuperadmin}
+        isAdmin={isAdmin}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header

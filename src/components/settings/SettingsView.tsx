@@ -8,10 +8,12 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TwoFactorSettings } from "./TwoFactorSettings";
+import { useAuditLog } from "@/hooks/useAuditLog";
 
 export function SettingsView() {
   const { user, profile } = useAuth();
   const { isSuperadmin, isAdministrador, isEditor, canManageCompany } = usePermissions();
+  const { logAction } = useAuditLog();
 
   const roleName = isSuperadmin ? "Superadmin" : isAdministrador ? "Administrador" : isEditor ? "Editor" : "Espectador";
 
@@ -44,6 +46,7 @@ export function SettingsView() {
 
       if (error) throw error;
       toast.success("Perfil actualizado correctamente.");
+      logAction({ action: "update", entity_type: "settings", entity_title: "Perfil de usuario", details: { full_name: fullName.trim(), job_title: jobTitle.trim() } });
     } catch (e: any) {
       toast.error(e.message ?? "Error al actualizar el perfil.");
     } finally {
@@ -66,6 +69,7 @@ export function SettingsView() {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       toast.success("Contraseña actualizada correctamente.");
+      logAction({ action: "password_change", entity_type: "auth", entity_title: "Cambio de contraseña" });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");

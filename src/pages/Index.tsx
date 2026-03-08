@@ -22,6 +22,7 @@ import { PredictiveAnalyticsView } from "@/components/analytics/PredictiveAnalyt
 import { AuditManagementView } from "@/components/audit/AuditManagementView";
 import { CompanyManagementView } from "@/components/admin/CompanyManagementView";
 import { CalendarView } from "@/components/calendar/CalendarView";
+import { AuditTrailView } from "@/components/audit-trail/AuditTrailView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
@@ -40,6 +41,7 @@ const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   settings: { title: "Configuración", subtitle: "Preferencias y ajustes del sistema" },
   "pending-actions": { title: "Acciones Pendientes", subtitle: "Seguimiento completo de tareas y aprobaciones" },
   "company-management": { title: "Gestión de Empresas", subtitle: "Administración multi-tenant de la plataforma" },
+  "audit-trail": { title: "Pista de Auditoría", subtitle: "Registro completo de todas las acciones del sistema" },
 };
 
 type IncidentType = "incidencia" | "desviacion" | "no_conformidad" | "otra";
@@ -76,7 +78,7 @@ const Index = () => {
   const [isNewReclamacionOpen, setIsNewReclamacionOpen] = useState(false);
   const { user, isLoading } = useAuth();
   const { enabledFeatures } = useCompanyFeatures();
-  const { isSuperadmin } = usePermissions();
+  const { isSuperadmin, isAdministrador } = usePermissions();
   const navigate = useNavigate();
   
   // Auto-logout after 10 minutes of inactivity
@@ -286,6 +288,8 @@ const Index = () => {
         return <CompanyView />;
       case "company-management":
         return <CompanyManagementView />;
+      case "audit-trail":
+        return <AuditTrailView />;
       case "settings":
         return <SettingsView />;
       case "pending-actions":
@@ -319,6 +323,7 @@ const Index = () => {
       searchPlaceholder={searchPlaceholder}
       enabledFeatures={enabledFeatures}
       isSuperadmin={isSuperadmin}
+      isAdmin={isAdministrador}
     >
       {renderModule()}
       <FilterModal
