@@ -238,6 +238,7 @@ export function IncidentsView({
       incidencia_type: "incidencia",
     }));
     setSourceInsightId(prefill.sourceInsightId ?? null);
+    setSourceReclamacionId(prefill.sourceReclamacionId ?? null);
     onPrefillConsumed?.();
   }, [prefill, isNewIncidentOpen, onPrefillConsumed]);
 
