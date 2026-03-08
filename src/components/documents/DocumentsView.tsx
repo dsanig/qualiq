@@ -1163,7 +1163,7 @@ export function DocumentsView({
 
           const { error: versionInsertError } = await (supabase as any).from("document_versions").insert({
             document_id: selectedDocument.id,
-            version: selectedDocument.versionNum,
+            version: selectedDocument.versionMajor,
             file_url: selectedDocument.fileUrl,
             changes_description: updateVersionChanges.trim() || null,
             created_by: actorId,
