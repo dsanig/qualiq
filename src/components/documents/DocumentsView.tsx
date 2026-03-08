@@ -1160,7 +1160,6 @@ export function DocumentsView({
           if (authError || !authData.user) throw authError ?? new Error("No se pudo obtener el usuario autenticado.");
 
           const actorId = authData.user.id;
-          const nextVersion = selectedDocument.versionNum + 1;
 
           const { error: versionInsertError } = await (supabase as any).from("document_versions").insert({
             document_id: selectedDocument.id,
