@@ -134,7 +134,7 @@ export function TrainingManagementView() {
     setIsLoading(true);
     const { data } = await (supabase as any)
       .from("training_records")
-      .select("id, title, description, contents, status, created_by, created_at")
+      .select("id, title, description, contents, status, deadline, created_by, created_at")
       .order("created_at", { ascending: false });
     setRecords((data as TrainingRecord[]) ?? []);
     setIsLoading(false);
