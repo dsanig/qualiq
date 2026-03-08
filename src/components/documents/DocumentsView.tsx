@@ -27,6 +27,7 @@ import { DocumentActionsMenu } from "./DocumentActionsMenu";
 import { DocumentResponsibilities } from "./DocumentResponsibilities";
 import { DocumentSignatureStatusDialog } from "./DocumentSignatureStatusDialog";
 import { DocumentPendingActions } from "./DocumentPendingActions";
+import { ShareDocumentDialog } from "./ShareDocumentDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
