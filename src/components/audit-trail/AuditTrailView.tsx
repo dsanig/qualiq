@@ -215,6 +215,41 @@ export function AuditTrailView() {
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
+  const exportToExcel = async () => {
+    // Fetch ALL entries (no pagination) for export
+    let query = (supabase as any)
+      .from("audit_trail")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (entityTypeFilter !== "all") query = query.eq("entity_type", entityTypeFilter);
+    if (actionFilter !== "all") query = query.eq("action", actionFilter);
+    if (userFilter !== "all") query = query.eq("user_id", userFilter);
+    if (searchQuery.trim()) {
+      query = query.or(
+        `entity_title.ilike.%${searchQuery}%,user_name.ilike.%${searchQuery}%,user_email.ilike.%${searchQuery}%,action.ilike.%${searchQuery}%`
+      );
+    }
+
+    const { data } = await query;
+    if (!data || data.length === 0) return;
+
+    const rows = (data as AuditEntry[]).map((e) => ({
+      "Fecha y hora": format(new Date(e.created_at), "dd/MM/yyyy HH:mm:ss", { locale: es }),
+      "Usuario": e.user_name ?? e.user_email ?? "Desconocido",
+      "Email": e.user_email ?? "",
+      "Acción": actionLabels[e.action] ?? e.action,
+      "Módulo": entityTypeLabels[e.entity_type] ?? e.entity_type,
+      "Elemento": e.entity_title ?? "",
+      "Detalles": e.details ? Object.entries(e.details).map(([k, v]) => `${k}: ${String(v)}`).join("; ") : "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pista de Auditoría");
+    XLSX.writeFile(wb, `pista_auditoria_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Card>
@@ -225,10 +260,16 @@ export function AuditTrailView() {
               Pista de Auditoría
               <Badge variant="secondary" className="ml-2">{totalCount} registros</Badge>
             </CardTitle>
-            <Button variant="outline" size="sm" onClick={() => { setPage(0); loadEntries(); loadFilterOptions(); }}>
-              <RefreshCw className="w-4 h-4 mr-1" />
-              Actualizar
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={exportToExcel}>
+                <Download className="w-4 h-4 mr-1" />
+                Exportar Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setPage(0); loadEntries(); loadFilterOptions(); }}>
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Actualizar
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
