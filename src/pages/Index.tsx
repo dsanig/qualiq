@@ -231,6 +231,7 @@ const Index = () => {
               setActiveModule("incidents");
             }}
           />
+        );
       case "audits":
         return <AuditManagementView searchQuery={activeSearchQuery} />;
       case "chatbot":
