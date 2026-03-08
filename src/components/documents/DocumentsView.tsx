@@ -1772,24 +1772,24 @@ export function DocumentsView({
                           <tr className="bg-secondary/20">
                             <td colSpan={7} className="px-4 py-4">
                               <div className="space-y-4">
-                                {/* Metadata + Actions */}
-                                <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-muted-foreground">
-                                    <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Formato</p><p className="text-sm font-medium text-foreground">{doc.format.toUpperCase()}</p></div>
-                                    <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Autor original</p><p className="text-sm font-medium text-foreground">{doc.originalAuthor}</p></div>
-                                    <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Versión actual</p><p className="text-sm font-medium text-foreground">v{doc.version}</p></div>
-                                    <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Última modificación</p><p className="text-sm font-medium text-foreground">{doc.lastUpdated}</p></div>
-                                    <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Modificado por</p><p className="text-sm font-medium text-foreground">{doc.lastModifiedBy}</p></div>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2 shrink-0">
-                                    <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
-                                    <Button variant="outline" onClick={() => handleOpenUpdateVersion(doc)} disabled={!canEditContent}>Actualizar versión</Button>
-                                    <Button variant="outline" onClick={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}>
-                                      <ClipboardList className="w-4 h-4 mr-1" />
-                                      Acciones Pendientes
-                                    </Button>
-                                    <Button variant="accent" onClick={() => handleDownload(doc)}>Descargar</Button>
-                                  </div>
+                                {/* Metadata */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-sm">
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Formato</p><p className="font-medium text-foreground">{doc.format.toUpperCase()}</p></div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Autor original</p><p className="font-medium text-foreground">{doc.originalAuthor}</p></div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Versión actual</p><p className="font-medium text-foreground">v{doc.version}</p></div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Última modificación</p><p className="font-medium text-foreground">{doc.lastUpdated}</p></div>
+                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Modificado por</p><p className="font-medium text-foreground">{doc.lastModifiedBy}</p></div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex flex-wrap gap-2">
+                                  <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
+                                  <Button variant="outline" onClick={() => handleOpenUpdateVersion(doc)} disabled={!canEditContent}>Actualizar versión</Button>
+                                  <Button variant="outline" onClick={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}>
+                                    <ClipboardList className="w-4 h-4 mr-1" />
+                                    Acciones Pendientes
+                                  </Button>
+                                  <Button variant="accent" onClick={() => handleDownload(doc)}>Descargar</Button>
                                 </div>
 
                                 {/* Responsibilities */}
