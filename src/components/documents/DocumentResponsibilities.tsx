@@ -163,6 +163,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
       });
       if (error) throw error;
       toast({ title: "Responsable añadido" });
+      logAction({ action: "add_responsibility", entity_type: "document", entity_id: documentId, entity_title: documentCode, details: { user_id: selectedUserId, action_type: selectedActionType, due_date: selectedDueDate } });
       setSelectedUserId("");
       setSelectedDueDate("");
       fetchResponsibilities();
