@@ -260,7 +260,14 @@ const Index = () => {
       case "settings":
         return <SettingsView />;
       case "pending-actions":
-        return <PendingActionsView />;
+        return (
+          <PendingActionsView
+            onNavigateToIncident={(incidentId) => {
+              setOpenIncidentId(incidentId);
+              setActiveModule("incidents");
+            }}
+          />
+        );
       default:
         return (
           <div className="flex items-center justify-center h-64 bg-card rounded-lg border border-border">
