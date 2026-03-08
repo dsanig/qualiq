@@ -356,7 +356,7 @@ export function ChatbotView() {
             <Bot className="w-5 h-5 text-accent" />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground">Asistente LLM de QualiQ</h3>
+            <h3 className="font-semibold text-foreground">QualAI</h3>
             <p className="text-xs text-muted-foreground">
               Sesión activa: {activeChat?.title ?? "Nuevo chat"}
             </p>
