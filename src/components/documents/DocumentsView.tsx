@@ -75,6 +75,8 @@ interface Document {
   lastModifiedBy: string;
   fileUrl: string;
   description?: string;
+  effectiveDate?: string | null;
+  expiryDate?: string | null;
 }
 
 interface SignedDocument {
