@@ -162,6 +162,7 @@ export function CompanyManagementView() {
     }
 
     toast({ title: `Empresa ${newStatus === "active" ? "activada" : "desactivada"}` });
+    logAction({ action: "toggle_status", entity_type: "company", entity_id: company.id, entity_title: company.name, details: { new_status: newStatus } });
     void fetchCompanies();
   };
 
