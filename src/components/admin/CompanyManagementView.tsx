@@ -52,6 +52,7 @@ export function CompanyManagementView() {
   const [editingCompany, setEditingCompany] = useState<CompanyRow | null>(null);
   const [form, setForm] = useState({ name: "", slug: "", status: "active", plan_type: "standard", admin_email: "", admin_password: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modulesCompany, setModulesCompany] = useState<CompanyRow | null>(null);
 
   const fetchCompanies = useCallback(async () => {
     setIsLoading(true);
