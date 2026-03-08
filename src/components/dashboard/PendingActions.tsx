@@ -201,6 +201,8 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                     onNavigateToDocument(action.documentCode);
                   } else if (action.source === "capa" && onNavigateToModule) {
                     onNavigateToModule("audits");
+                  } else if (action.source === "training" && onNavigateToModule) {
+                    onNavigateToModule("training");
                   }
                 }}
               >
