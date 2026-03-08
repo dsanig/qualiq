@@ -192,7 +192,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       .from("predictive_insights")
        .select("*")
       .eq("company_id", profile.company_id)
-      .is("read_at", null)
+      .eq("is_acknowledged", false)
       .order("created_at", { ascending: false })
       .limit(20);
 
