@@ -1848,6 +1848,7 @@ export function DocumentsView({
       [selectedDocument.id]: { signedAt, signerName: manualSignName.trim(), reason: manualSignReason.trim() || undefined },
     }));
     toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado con nombre completo.` });
+    logAction({ action: "sign_manual", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { method: "nombre_completo", signer_name: manualSignName.trim() } });
     setIsManualSignOpen(false);
     fetchFirmaStatus();
   };
