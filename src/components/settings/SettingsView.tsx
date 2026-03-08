@@ -193,6 +193,9 @@ export function SettingsView() {
           </Button>
         </div>
       </div>
+
+      {/* 2FA card */}
+      <TwoFactorSettings />
     </div>
   );
 }
