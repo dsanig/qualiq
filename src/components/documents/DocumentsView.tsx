@@ -64,7 +64,8 @@ interface Document {
   category: string;
   categoryId: string;
   version: string;
-  versionNum: number;
+  versionMajor: number;
+  versionMinor: number;
   status: "approved" | "draft" | "review" | "pending_signature" | "pending_approval" | "obsolete" | "archived";
   lastUpdated: string;
   owner: string;
