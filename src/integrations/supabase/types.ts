@@ -1350,6 +1350,32 @@ export type Database = {
           },
         ]
       }
+      superadmin_context: {
+        Row: {
+          active_company_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          active_company_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          active_company_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "superadmin_context_active_company_id_fkey"
+            columns: ["active_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_answers: {
         Row: {
           answered_at: string

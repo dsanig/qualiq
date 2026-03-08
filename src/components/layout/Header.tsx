@@ -2,6 +2,7 @@ import { Bell, Search, User, HelpCircle, LogOut, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NotificationsDropdown } from "@/components/notifications/NotificationsDropdown";
+import { CompanySwitcher } from "./CompanySwitcher";
 import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
@@ -59,6 +60,9 @@ export function Header({ title, subtitle, searchQuery, onSearchChange, onSearchS
             </Button>
           )}
         </div>
+
+        {/* Company Switcher for superadmins */}
+        <CompanySwitcher />
 
         {/* Actions */}
         <div className="flex items-center gap-1">
