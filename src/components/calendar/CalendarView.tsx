@@ -568,6 +568,7 @@ export function CalendarView({
                   })}
                 </div>
               )}
+              </ScrollArea>
             </CardContent>
           </Card>
         )}
