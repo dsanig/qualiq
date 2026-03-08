@@ -187,8 +187,8 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; cl
   approved: { label: "Aprobado", icon: CheckCircle, class: "text-success" },
   draft: { label: "Borrador", icon: Clock, class: "text-muted-foreground" },
   review: { label: "En Revisión", icon: AlertCircle, class: "text-warning" },
-  pending_signature: { label: "Pendiente de Firma", icon: PenTool, class: "text-primary" },
-  pending_approval: { label: "Pendiente de Aprobación", icon: ClipboardList, class: "text-primary" },
+  pending_signature: { label: "Pendiente de Firma", icon: PenTool, class: "text-warning italic" },
+  pending_approval: { label: "Pendiente de Aprobación", icon: ClipboardList, class: "text-warning italic" },
   obsolete: { label: "Obsoleto", icon: AlertCircle, class: "text-destructive" },
   archived: { label: "Archivado", icon: AlertCircle, class: "text-muted-foreground" },
 };
