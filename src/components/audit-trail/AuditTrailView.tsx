@@ -484,7 +484,7 @@ export function AuditTrailView() {
                         <div className="text-xs text-muted-foreground mt-1">
                           {Object.entries(entry.details).map(([key, value]) => (
                             <span key={key} className="mr-3">
-                              <span className="font-medium">{key}:</span> {String(value)}
+                              <span className="font-medium">{detailKeyLabels[key] || key}:</span> {String(value)}
                             </span>
                           ))}
                         </div>
