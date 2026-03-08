@@ -1034,6 +1034,7 @@ export function DocumentsView({
     setUpdateRespUserId("");
     setUpdateRespAction("revision");
     setUpdateRespDueDate("");
+    setUpdateMinorOnly(false);
     setIsUpdateVersionOpen(true);
 
     try {
