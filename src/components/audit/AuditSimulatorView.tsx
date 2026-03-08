@@ -128,13 +128,12 @@ export function AuditSimulatorView() {
 
       if (createError) throw createError;
 
-      // Fetch company documents
+      // Fetch all company documents for comprehensive analysis
       const { data: documents } = await supabase
         .from("documents")
-        .select("id, code, title, category, version, status")
+        .select("id, code, title, category, version, status, typology")
         .eq("company_id", profile.company_id)
-        .eq("status", "approved")
-        .limit(50);
+        .limit(100);
 
       // Run simulation
       const { error: runError } = await supabase.functions.invoke("run-audit-simulation", {
