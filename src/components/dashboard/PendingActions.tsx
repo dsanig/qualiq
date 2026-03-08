@@ -13,7 +13,7 @@ interface PendingAction {
   due_date: string | null;
   status: string;
   isOverdue: boolean;
-  source: "capa" | "document" | "training" | "reclamacion";
+  source: "capa" | "document" | "training" | "reclamacion" | "incidencia";
   documentCode?: string;
   documentId?: string;
   documentStatus?: string;
@@ -30,6 +30,7 @@ const typeIcons: Record<string, typeof CheckCircle2> = {
   training: GraduationCap,
   waiting: Eye,
   reclamacion: FileWarning,
+  incidencia: AlertCircle,
 };
 
 const typeLabels: Record<string, string> = {
@@ -42,6 +43,7 @@ const typeLabels: Record<string, string> = {
   training: "Formación",
   waiting: "En espera",
   reclamacion: "Reclamación",
+  incidencia: "Incidencia",
 };
 
 interface PendingActionsProps {
@@ -259,8 +261,30 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
         }));
       }
 
+      // Fetch incidencias assigned to current user
+      let incidenciaActions: PendingAction[] = [];
+      if (user) {
+        const { data: incData } = await (supabase as any)
+          .from("incidencias")
+          .select("id, title, status, deadline, incidencia_type")
+          .eq("responsible_id", user.id)
+          .in("status", ["open", "in_progress"])
+          .order("deadline", { ascending: true, nullsFirst: false })
+          .limit(20);
+
+        incidenciaActions = ((incData as any[]) ?? []).map((inc) => ({
+          id: inc.id,
+          description: `Incidencia: ${inc.title}`,
+          action_type: "incidencia",
+          due_date: inc.deadline,
+          status: inc.status,
+          isOverdue: inc.deadline ? new Date(inc.deadline) < now : false,
+          source: "incidencia" as const,
+        }));
+      }
+
       // Combine: active tasks first, waiting tasks last
-      const activeActions = [...capaActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions, ...reclamacionActions];
+      const activeActions = [...capaActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions, ...reclamacionActions, ...incidenciaActions];
       const waitingActions = docActions.filter(a => a.action_type === "waiting");
       
       const combined = [
@@ -325,9 +349,11 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                     onNavigateToModule("audits");
                   } else if (action.source === "training" && onNavigateToModule) {
                     onNavigateToModule("training");
-                  } else if (action.source === "reclamacion" && onNavigateToModule) {
-                    onNavigateToModule("reclamaciones");
-                  }
+                   } else if (action.source === "reclamacion" && onNavigateToModule) {
+                     onNavigateToModule("reclamaciones");
+                   } else if (action.source === "incidencia" && onNavigateToModule) {
+                     onNavigateToModule("incidents");
+                   }
                 }}
               >
                 <div className="flex items-start gap-3">
@@ -354,6 +380,9 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                       )}
                       {action.source === "reclamacion" && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-warning/10 text-warning">Reclamación</span>
+                      )}
+                      {action.source === "incidencia" && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">Incidencia</span>
                       )}
                       {action.due_date && (
                         <>
