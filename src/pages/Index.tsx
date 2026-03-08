@@ -323,6 +323,7 @@ const Index = () => {
       searchPlaceholder={searchPlaceholder}
       enabledFeatures={enabledFeatures}
       isSuperadmin={isSuperadmin}
+      isAdmin={isAdministrador}
     >
       {renderModule()}
       <FilterModal
