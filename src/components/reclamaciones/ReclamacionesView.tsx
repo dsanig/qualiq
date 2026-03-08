@@ -395,7 +395,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
         </CardContent>
       </Card>
 
-      {/* New reclamacion dialog */}
+      {/* New reclamacion dialog - NO incidencia linking */}
       <Dialog open={isNewOpen} onOpenChange={(open) => { setIsNewOpen(open); if (!open) { setNewAttachments([]); setSelectedIncidenciaIds([]); setParticipantIds([]); setForm(defaultForm()); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
@@ -409,9 +409,6 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
             attachments={newAttachments}
             onAddFiles={handleAddFiles}
             onRemoveAttachment={handleRemoveNewAttachment}
-            incidencias={incidencias}
-            selectedIncidenciaIds={selectedIncidenciaIds}
-            onIncidenciaToggle={(id) => setSelectedIncidenciaIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
             participantIds={participantIds}
             onParticipantToggle={(uid) => setParticipantIds(prev => prev.includes(uid) ? prev.filter(x => x !== uid) : [...prev, uid])}
           />
