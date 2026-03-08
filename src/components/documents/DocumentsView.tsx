@@ -461,7 +461,7 @@ export function DocumentsView({
       }
     }
     setFirmaStatus(statusMap);
-  }, [profile?.company_id]);
+  }, [effectiveCompanyId]);
 
   const fetchDocuments = useCallback(async () => {
     if (!profile?.company_id) return;
