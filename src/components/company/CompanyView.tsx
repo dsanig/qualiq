@@ -152,10 +152,8 @@ export function CompanyView() {
   }, [toast]);
 
   useEffect(() => {
-    if (canManageCompany) {
-      void fetchUsers();
-    }
-  }, [canManageCompany, fetchUsers]);
+    void fetchUsers();
+  }, [fetchUsers]);
 
   useEffect(() => {
     const fetchCompany = async () => {
