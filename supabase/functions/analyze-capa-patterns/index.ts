@@ -94,7 +94,13 @@ serve(async (req) => {
 
     console.log("CAPA pattern analysis request authenticated for user:", user.id);
 
-    const { companyId, incidentsData } = await req.json();
+    const { companyId, incidentsData, analysisWindow } = await req.json();
+
+    // Determine minimum records based on the selected analysis window
+    const windowMinRecords: Record<string, number> = {
+      current: 3, "1w": 3, "2w": 5, "1m": 10, "3m": 10, "6m": 10, "1y": 10,
+    };
+    const minRecords = windowMinRecords[analysisWindow] ?? PREDICTION_MIN_RECORDS;
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
