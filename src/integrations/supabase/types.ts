@@ -372,34 +372,64 @@ export type Database = {
       }
       companies: {
         Row: {
+          address: string | null
+          cif: string | null
+          city: string | null
+          country: string | null
           created_at: string
+          email: string | null
           id: string
+          legal_name: string | null
           name: string
+          phone: string | null
           plan_type: string
+          postal_code: string | null
+          province: string | null
           settings: Json
           slug: string
           status: string
           updated_at: string
+          website: string | null
         }
         Insert: {
+          address?: string | null
+          cif?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
+          email?: string | null
           id?: string
+          legal_name?: string | null
           name: string
+          phone?: string | null
           plan_type?: string
+          postal_code?: string | null
+          province?: string | null
           settings?: Json
           slug: string
           status?: string
           updated_at?: string
+          website?: string | null
         }
         Update: {
+          address?: string | null
+          cif?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
+          email?: string | null
           id?: string
+          legal_name?: string | null
           name?: string
+          phone?: string | null
           plan_type?: string
+          postal_code?: string | null
+          province?: string | null
           settings?: Json
           slug?: string
           status?: string
           updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
