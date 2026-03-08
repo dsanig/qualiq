@@ -250,6 +250,16 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     setIsEditOpen(true);
   };
 
+  // Auto-open a specific reclamacion when navigating from another module
+  useEffect(() => {
+    if (!openReclamacionId || reclamaciones.length === 0) return;
+    const rec = reclamaciones.find((r) => r.id === openReclamacionId);
+    if (rec) {
+      openEdit(rec);
+      onOpenReclamacionConsumed?.();
+    }
+  }, [openReclamacionId, reclamaciones]);
+
   const updateReclamacion = async () => {
     if (!editingReclamacion) return;
     const { error } = await (supabase as any).from("reclamaciones").update({
