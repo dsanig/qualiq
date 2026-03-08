@@ -1211,7 +1211,9 @@ export function DocumentsView({
     toast({ title: action, description: `Acción "${action}" ejecutada para ${docCode}` });
   };
 
-  const handleRequestDelete = (doc: Document) => {
+  const [deleteLinkedInfo, setDeleteLinkedInfo] = useState<string[]>([]);
+
+  const handleRequestDelete = async (doc: Document) => {
     if (!canManageCompany && !isSuperadmin) {
       toast({
         title: "Permisos insuficientes",
@@ -1221,6 +1223,32 @@ export function DocumentsView({
       return;
     }
 
+    // Check linked records
+    const links: string[] = [];
+    const [
+      { count: versionsCount },
+      { count: responsibilitiesCount },
+      { count: signaturesCount },
+      { count: trainingCount },
+      { count: findingsCount },
+      { count: statusChangesCount },
+    ] = await Promise.all([
+      supabase.from("document_versions").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+      supabase.from("document_responsibilities").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+      supabase.from("document_signatures").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+      supabase.from("training_record_documents").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+      supabase.from("audit_findings").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+      supabase.from("document_status_changes").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+    ]);
+
+    if (versionsCount && versionsCount > 0) links.push(`${versionsCount} versión(es)`);
+    if (responsibilitiesCount && responsibilitiesCount > 0) links.push(`${responsibilitiesCount} responsabilidad(es) asignada(s)`);
+    if (signaturesCount && signaturesCount > 0) links.push(`${signaturesCount} firma(s)`);
+    if (trainingCount && trainingCount > 0) links.push(`${trainingCount} registro(s) de formación`);
+    if (findingsCount && findingsCount > 0) links.push(`${findingsCount} hallazgo(s) de auditoría`);
+    if (statusChangesCount && statusChangesCount > 0) links.push(`${statusChangesCount} cambio(s) de estado`);
+
+    setDeleteLinkedInfo(links);
     setDocumentToDelete(doc);
     setIsDeleteConfirmOpen(true);
   };
@@ -1829,9 +1857,20 @@ export function DocumentsView({
           <DialogHeader>
             <DialogTitle>Eliminar documento</DialogTitle>
             <DialogDescription>
-              Esta acción eliminará el documento y sus relaciones asociadas (versiones, responsables y firmas).
+              Esta acción eliminará el documento y todos sus registros asociados de forma permanente.
             </DialogDescription>
           </DialogHeader>
+          {deleteLinkedInfo.length > 0 && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-1.5">
+              <p className="text-sm font-medium text-destructive">⚠️ Este documento está vinculado a:</p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-0.5">
+                {deleteLinkedInfo.map((info, i) => (
+                  <li key={i}>{info}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground mt-2">Todos estos registros serán eliminados junto con el documento.</p>
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             ¿Seguro que deseas eliminar <span className="font-semibold text-foreground">{documentToDelete?.code}</span>?
           </p>
