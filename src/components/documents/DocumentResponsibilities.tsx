@@ -73,9 +73,10 @@ interface DocumentResponsibilitiesProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onWorkflowChange?: () => void;
+  onUpdateDocument?: () => void;
 }
 
-export function DocumentResponsibilities({ documentId, documentCode, open, onOpenChange, onWorkflowChange }: DocumentResponsibilitiesProps) {
+export function DocumentResponsibilities({ documentId, documentCode, open, onOpenChange, onWorkflowChange, onUpdateDocument }: DocumentResponsibilitiesProps) {
   const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
