@@ -324,6 +324,7 @@ const Index = () => {
         onOpenChange={setIsFilterOpen}
         filters={filters}
         onFiltersChange={setFilters}
+        activeModule={activeModule}
       />
     </AppLayout>
   );
