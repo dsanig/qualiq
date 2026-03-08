@@ -527,6 +527,7 @@ export function CalendarView({
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
+              <ScrollArea className="max-h-[300px]">
               {selectedEvents.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No hay eventos para este día.</p>
               ) : (
@@ -567,6 +568,7 @@ export function CalendarView({
                   })}
                 </div>
               )}
+              </ScrollArea>
             </CardContent>
           </Card>
         )}
