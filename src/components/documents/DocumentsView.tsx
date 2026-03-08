@@ -2594,6 +2594,20 @@ export function DocumentsView({
                 onChange={(e) => setChangeStatusComment(e.target.value)}
               />
             </div>
+            {changeStatusTarget !== selectedDocument?.status && (
+              <div className="space-y-2">
+                <Label className="text-sm">
+                  Escribe <strong className="font-semibold text-foreground">
+                    {changeStatusTarget === "review" ? "REVISAR" : changeStatusTarget === "approved" ? "APROBAR" : "CONFIRMAR"}
+                  </strong> para confirmar
+                </Label>
+                <Input
+                  placeholder={changeStatusTarget === "review" ? "REVISAR" : changeStatusTarget === "approved" ? "APROBAR" : "CONFIRMAR"}
+                  value={changeStatusConfirmText}
+                  onChange={(e) => setChangeStatusConfirmText(e.target.value)}
+                />
+              </div>
+            )}
             <Button variant="outline" size="sm" className="w-full" onClick={() => { if (selectedDocument) handleOpenStatusHistory(selectedDocument); }}>
               <ArrowRightLeft className="w-3.5 h-3.5 mr-2" />
               Ver historial de estados
@@ -2604,7 +2618,11 @@ export function DocumentsView({
             <Button
               variant="accent"
               onClick={handleChangeStatus}
-              disabled={isChangingStatus || changeStatusTarget === selectedDocument?.status}
+              disabled={
+                isChangingStatus || 
+                changeStatusTarget === selectedDocument?.status ||
+                changeStatusConfirmText.trim().toLowerCase() !== (changeStatusTarget === "review" ? "revisar" : changeStatusTarget === "approved" ? "aprobar" : "confirmar")
+              }
             >
               {isChangingStatus ? "Guardando..." : "Cambiar estado"}
             </Button>
