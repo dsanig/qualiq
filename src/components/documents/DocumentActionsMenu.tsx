@@ -11,7 +11,8 @@ import {
   Trash2,
   PenTool,
   ArrowRightLeft,
-  UserCheck
+  UserCheck,
+  ClipboardList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +39,7 @@ interface DocumentActionsMenuProps {
   onChangeStatus?: () => void;
   onManageResponsibilities?: () => void;
   onViewSignatureStatus?: () => void;
+  onViewPendingActions?: () => void;
 }
 
 export function DocumentActionsMenu({
@@ -56,6 +58,7 @@ export function DocumentActionsMenu({
   onChangeStatus,
   onManageResponsibilities,
   onViewSignatureStatus,
+  onViewPendingActions,
 }: DocumentActionsMenuProps) {
   return (
     <DropdownMenu>
@@ -80,6 +83,10 @@ export function DocumentActionsMenu({
         <DropdownMenuItem onClick={onManageResponsibilities} className="cursor-pointer">
           <UserCheck className="w-4 h-4 mr-2" />
           Responsables
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onViewPendingActions} className="cursor-pointer">
+          <ClipboardList className="w-4 h-4 mr-2" />
+          Acciones Pendientes
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onViewHistory} className="cursor-pointer">

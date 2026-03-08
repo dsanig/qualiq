@@ -7,6 +7,7 @@ import {
   FolderOpen,
   CheckCircle,
   Clock,
+  ClipboardList,
   AlertCircle,
   FileSpreadsheet,
   File,
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { DocumentActionsMenu } from "./DocumentActionsMenu";
 import { DocumentResponsibilities } from "./DocumentResponsibilities";
 import { DocumentSignatureStatusDialog } from "./DocumentSignatureStatusDialog";
+import { DocumentPendingActions } from "./DocumentPendingActions";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -333,6 +335,7 @@ export function DocumentsView({
   // Responsibilities state
   const [isResponsibilitiesOpen, setIsResponsibilitiesOpen] = useState(false);
   const [isSignatureStatusOpen, setIsSignatureStatusOpen] = useState(false);
+  const [isPendingActionsOpen, setIsPendingActionsOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
@@ -1584,6 +1587,18 @@ export function DocumentsView({
               ))}
             </div>
           </div>
+
+          {/* Pending Actions Sidebar */}
+          <div className="bg-card rounded-lg border border-border p-4">
+            <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Acciones Pendientes
+            </h3>
+            <DocumentPendingActions
+              compact
+              onActionCompleted={() => { fetchDocuments(); fetchFirmaStatus(); }}
+            />
+          </div>
         </div>
 
         {/* Documents Table */}
@@ -1694,6 +1709,7 @@ export function DocumentsView({
                               onViewSignatureStatus={() => handleOpenSignatureStatus(doc)}
                                onChangeStatus={() => handleOpenChangeStatus(doc)}
                               onManageResponsibilities={() => { setSelectedDocument(doc); setIsResponsibilitiesOpen(true); }}
+                              onViewPendingActions={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}
                               onShare={() => handleAction("Compartir", doc.code)}
                               onToggleLock={() => handleAction("Bloquear/Desbloquear", doc.code)}
                               onDelete={() => handleRequestDelete(doc)}
@@ -2420,6 +2436,29 @@ export function DocumentsView({
           onOpenChange={setIsResponsibilitiesOpen}
           onWorkflowChange={() => { fetchDocuments(); fetchFirmaStatus(); }}
         />
+      )}
+      {/* Pending Actions Dialog */}
+      {selectedDocument && (
+        <Dialog open={isPendingActionsOpen} onOpenChange={setIsPendingActionsOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5" />
+                Acciones Pendientes
+              </DialogTitle>
+              <DialogDescription>
+                Acciones pendientes para {selectedDocument.code}
+              </DialogDescription>
+            </DialogHeader>
+            <DocumentPendingActions
+              documentId={selectedDocument.id}
+              onActionCompleted={() => { fetchDocuments(); fetchFirmaStatus(); }}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPendingActionsOpen(false)}>Cerrar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
