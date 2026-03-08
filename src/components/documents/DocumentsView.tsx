@@ -1579,6 +1579,7 @@ export function DocumentsView({
       await Promise.all([fetchDocuments(), fetchFirmaStatus()]);
 
       toast({ title: "Documento eliminado", description: `${documentToDelete.code} fue eliminado correctamente.` });
+      logAction({ action: "delete", entity_type: "document", entity_id: documentToDelete.id, entity_title: documentToDelete.title, details: { code: documentToDelete.code } });
       setIsDeleteConfirmOpen(false);
       setDocumentToDelete(null);
     } catch (err: any) {
