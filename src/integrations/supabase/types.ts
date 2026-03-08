@@ -93,6 +93,47 @@ export type Database = {
           },
         ]
       }
+      audit_attachments: {
+        Row: {
+          audit_id: string
+          bucket_id: string
+          created_at: string
+          created_by: string | null
+          file_name: string | null
+          file_type: string | null
+          id: string
+          object_path: string
+        }
+        Insert: {
+          audit_id: string
+          bucket_id?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          object_path: string
+        }
+        Update: {
+          audit_id?: string
+          bucket_id?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          id?: string
+          object_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_attachments_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_findings: {
         Row: {
           affected_area: string | null
@@ -214,10 +255,13 @@ export type Database = {
           audit_date: string | null
           auditor_id: string | null
           company_id: string | null
+          conclusions: string | null
           created_at: string
           created_by: string | null
           description: string | null
+          findings: string | null
           id: string
+          observations: string | null
           status: string
           title: string
         }
@@ -225,10 +269,13 @@ export type Database = {
           audit_date?: string | null
           auditor_id?: string | null
           company_id?: string | null
+          conclusions?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          findings?: string | null
           id?: string
+          observations?: string | null
           status?: string
           title: string
         }
@@ -236,10 +283,13 @@ export type Database = {
           audit_date?: string | null
           auditor_id?: string | null
           company_id?: string | null
+          conclusions?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          findings?: string | null
           id?: string
+          observations?: string | null
           status?: string
           title?: string
         }
