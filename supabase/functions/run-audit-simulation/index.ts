@@ -219,7 +219,7 @@ serve(async (req) => {
 
     const companyId = simulation.company_id;
 
-    // ── Gather comprehensive company data in parallel ──
+    // ── Gather ALL company data in parallel ──
     const [
       incidenciasRes,
       auditsRes,
@@ -227,40 +227,97 @@ serve(async (req) => {
       trainingRes,
       profilesRes,
       companyRes,
+      capaPlansRes,
+      nonConformitiesRes,
+      actionsRes,
+      docSignaturesRes,
+      docResponsibilitiesRes,
+      docStatusChangesRes,
+      incStatusChangesRes,
+      recStatusChangesRes,
+      trainingParticipantsRes,
+      trainingSignaturesRes,
+      trainingSessionsRes,
     ] = await Promise.all([
       supabase
         .from("incidencias")
-        .select("id, title, description, incidencia_type, status, deadline, created_at, resolution_notes")
+        .select("id, title, description, incidencia_type, status, deadline, created_at, resolution_notes, responsible_id")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
-        .limit(50),
+        .limit(200),
       supabase
         .from("audits")
-        .select("id, title, status, audit_date, observations, findings, conclusions")
+        .select("id, title, status, audit_date, observations, findings, conclusions, description, responsible_id, auditor_id")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
-        .limit(20),
+        .limit(100),
       supabase
         .from("reclamaciones")
-        .select("id, title, source, status, description, investigation, resolution, conclusion, opened_at, response_deadline")
+        .select("id, title, source, source_code, status, description, detail, investigation, resolution, conclusion, opened_at, response_deadline, responsible_id")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
-        .limit(30),
+        .limit(200),
       supabase
         .from("training_records")
-        .select("id, title, status, deadline, description")
+        .select("id, title, status, deadline, description, contents")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
-        .limit(30),
+        .limit(200),
       supabase
         .from("profiles")
-        .select("full_name, job_title")
+        .select("user_id, full_name, job_title, email")
         .eq("company_id", companyId),
       supabase
         .from("companies")
         .select("name")
         .eq("id", companyId)
         .single(),
+      // CAPA Plans - get all via audits
+      supabase
+        .from("capa_plans")
+        .select("id, audit_id, title, description, responsible_id")
+        .limit(500),
+      supabase
+        .from("non_conformities")
+        .select("id, capa_plan_id, title, description, severity, root_cause, status, deadline, responsible_id")
+        .limit(500),
+      supabase
+        .from("actions")
+        .select("id, non_conformity_id, description, action_type, status, due_date, responsible_id")
+        .limit(500),
+      supabase
+        .from("document_signatures")
+        .select("id, document_id, signer_name, signed_at, signature_method")
+        .limit(500),
+      supabase
+        .from("document_responsibilities")
+        .select("id, document_id, user_id, action_type, status, due_date, completed_at")
+        .limit(500),
+      supabase
+        .from("document_status_changes")
+        .select("id, document_id, old_status, new_status, changed_at, comment")
+        .limit(500),
+      supabase
+        .from("incidencia_status_changes")
+        .select("id, incidencia_id, old_status, new_status, changed_at, comment")
+        .limit(500),
+      supabase
+        .from("reclamacion_status_changes")
+        .select("id, reclamacion_id, old_status, new_status, changed_at, comment")
+        .limit(500),
+      supabase
+        .from("training_participants")
+        .select("id, training_record_id, user_id, role")
+        .limit(500),
+      supabase
+        .from("training_signatures")
+        .select("id, training_record_id, user_id, signer_name, role, signed_at")
+        .limit(500),
+      supabase
+        .from("training_sessions")
+        .select("id, document_id, user_id, status, score, passed, completed_at")
+        .eq("company_id", companyId)
+        .limit(500),
     ]);
 
     const incidencias = incidenciasRes.data || [];
@@ -270,73 +327,153 @@ serve(async (req) => {
     const profiles = profilesRes.data || [];
     const companyName = companyRes.data?.name || "Empresa";
 
+    // Filter CAPA-related data to company audits
+    const companyAuditIds = new Set(audits.map((a: any) => a.id));
+    const capaPlans = (capaPlansRes.data || []).filter((cp: any) => companyAuditIds.has(cp.audit_id));
+    const capaPlanIds = new Set(capaPlans.map((cp: any) => cp.id));
+    const nonConformities = (nonConformitiesRes.data || []).filter((nc: any) => capaPlanIds.has(nc.capa_plan_id));
+    const ncIds = new Set(nonConformities.map((nc: any) => nc.id));
+    const actions = (actionsRes.data || []).filter((a: any) => ncIds.has(a.non_conformity_id));
+
+    const docSignatures = docSignaturesRes.data || [];
+    const docResponsibilities = docResponsibilitiesRes.data || [];
+    const docStatusChanges = docStatusChangesRes.data || [];
+    const incStatusChanges = incStatusChangesRes.data || [];
+    const recStatusChanges = recStatusChangesRes.data || [];
+    const trainingParticipants = trainingParticipantsRes.data || [];
+    const trainingSignatures = trainingSignaturesRes.data || [];
+    const trainingSessions = trainingSessionsRes.data || [];
+
+    // Build profile name map
+    const profileMap = new Map(profiles.map((p: any) => [p.user_id, p.full_name || p.email]));
+    const resolveName = (id: string | null) => (id ? profileMap.get(id) || "Desconocido" : "Sin asignar");
+
     // ── Build rich context ──
     const systemPrompt = SYSTEM_PROMPTS[simulationType] || SYSTEM_PROMPTS.aemps;
 
     // Documents context
     const docsContext = documents?.length > 0
       ? documents.map((d: any) => {
-          let line = `- [${d.code}] "${d.title}" | Categoría: ${d.category} | Tipología: ${d.typology || "N/A"} | Estado: ${d.status} | Versión: ${d.version}`;
+          const sigs = docSignatures.filter((s: any) => s.document_id === d.id);
+          const resps = docResponsibilities.filter((r: any) => r.document_id === d.id);
+          const pendingResps = resps.filter((r: any) => r.status !== "completed");
+          let line = `- [${d.code}] "${d.title}" | Cat: ${d.category} | Tipo: ${d.typology || "N/A"} | Estado: ${d.status} | V${d.version} | Firmas: ${sigs.length} | Responsabilidades pendientes: ${pendingResps.length}`;
           return line;
         }).join("\n")
-      : "⚠️ NO HAY DOCUMENTOS APROBADOS EN EL SISTEMA. Esto es un hallazgo crítico en sí mismo.";
+      : "⚠️ NO HAY DOCUMENTOS EN EL SISTEMA. Esto es un hallazgo crítico en sí mismo.";
 
-    // Document statistics
     const totalDocs = documents?.length || 0;
     const docCategories = documents ? [...new Set(documents.map((d: any) => d.category))] : [];
     const docTypologies = documents ? [...new Set(documents.map((d: any) => d.typology).filter(Boolean))] : [];
+    const approvedDocs = documents?.filter((d: any) => d.status === "approved") || [];
+    const draftDocs = documents?.filter((d: any) => d.status === "draft") || [];
+    const reviewDocs = documents?.filter((d: any) => d.status === "review") || [];
 
     // Incidencias context
     const openIncidents = incidencias.filter((i: any) => i.status === "open" || i.status === "in_progress");
-    const overdueIncidents = incidencias.filter((i: any) => i.deadline && new Date(i.deadline) < new Date() && i.status !== "closed" && i.status !== "resolved");
+    const closedIncidents = incidencias.filter((i: any) => i.status === "closed");
+    const overdueIncidents = incidencias.filter((i: any) => i.deadline && new Date(i.deadline) < new Date() && i.status !== "closed");
     const incidenciasContext = incidencias.length > 0
-      ? `Total de incidencias registradas: ${incidencias.length}
-Incidencias abiertas/en curso: ${openIncidents.length}
-Incidencias con plazo vencido: ${overdueIncidents.length}
+      ? `Total: ${incidencias.length} | Abiertas: ${openIncidents.length} | Cerradas: ${closedIncidents.length} | Vencidas: ${overdueIncidents.length}
 Tipos: ${[...new Set(incidencias.map((i: any) => i.incidencia_type))].join(", ")}
+Cambios de estado registrados: ${incStatusChanges.length}
 
-Detalle de incidencias recientes:
-${incidencias.slice(0, 20).map((i: any) => `  - "${i.title}" [${i.incidencia_type}] Estado: ${i.status}${i.deadline ? ` | Plazo: ${i.deadline}` : ""}${i.resolution_notes ? ` | Resolución: ${i.resolution_notes.substring(0, 100)}` : ""}`).join("\n")}`
-      : "⚠️ NO HAY INCIDENCIAS REGISTRADAS. Evalúa si esto es realista o indica falta de sistema de gestión de incidencias.";
+Detalle:
+${incidencias.map((i: any) => `  - "${i.title}" [${i.incidencia_type}] Estado: ${i.status} | Responsable: ${resolveName(i.responsible_id)}${i.deadline ? ` | Plazo: ${i.deadline}` : " | SIN PLAZO"}${i.resolution_notes ? ` | Resolución: ${i.resolution_notes.substring(0, 150)}` : ""}`).join("\n")}`
+      : "⚠️ NO HAY INCIDENCIAS REGISTRADAS.";
 
     // Audits context
     const auditsContext = audits.length > 0
-      ? `Auditorías internas registradas: ${audits.length}
-${audits.map((a: any) => `  - "${a.title}" | Estado: ${a.status} | Fecha: ${a.audit_date || "N/A"}${a.observations ? ` | Observaciones: ${a.observations.substring(0, 150)}` : ""}${a.findings ? ` | Hallazgos: ${a.findings.substring(0, 150)}` : ""}${a.conclusions ? ` | Conclusiones: ${a.conclusions.substring(0, 150)}` : ""}`).join("\n")}`
-      : "⚠️ NO HAY AUDITORÍAS INTERNAS REGISTRADAS. La ausencia de programa de autoinspección es un incumplimiento.";
+      ? `Auditorías registradas: ${audits.length}
+${audits.map((a: any) => {
+  const auditCapas = capaPlans.filter((cp: any) => cp.audit_id === a.id);
+  return `  - "${a.title}" | Estado: ${a.status} | Fecha: ${a.audit_date || "N/A"} | Auditor: ${resolveName(a.auditor_id)} | Responsable: ${resolveName(a.responsible_id)} | Planes CAPA: ${auditCapas.length}${a.observations ? ` | Obs: ${a.observations.substring(0, 200)}` : ""}${a.findings ? ` | Hallazgos: ${a.findings.substring(0, 200)}` : ""}${a.conclusions ? ` | Conclusiones: ${a.conclusions.substring(0, 200)}` : ""}`;
+}).join("\n")}`
+      : "⚠️ NO HAY AUDITORÍAS INTERNAS REGISTRADAS.";
+
+    // CAPA Plans, NCs, Actions context
+    const openNCs = nonConformities.filter((nc: any) => nc.status !== "closed");
+    const overdueNCs = nonConformities.filter((nc: any) => nc.deadline && new Date(nc.deadline) < new Date() && nc.status !== "closed");
+    const openActions = actions.filter((a: any) => a.status !== "closed");
+    const overdueActions = actions.filter((a: any) => a.due_date && new Date(a.due_date) < new Date() && a.status !== "closed");
+
+    const capaContext = capaPlans.length > 0
+      ? `Planes CAPA: ${capaPlans.length}
+No Conformidades: ${nonConformities.length} (Abiertas: ${openNCs.length}, Vencidas: ${overdueNCs.length})
+Acciones Correctivas/Preventivas: ${actions.length} (Abiertas: ${openActions.length}, Vencidas: ${overdueActions.length})
+
+Detalle de Planes CAPA:
+${capaPlans.map((cp: any) => {
+  const cpNCs = nonConformities.filter((nc: any) => nc.capa_plan_id === cp.id);
+  return `  Plan CAPA: "${cp.title || cp.description || "Sin título"}" | Responsable: ${resolveName(cp.responsible_id)}
+${cpNCs.map((nc: any) => {
+  const ncActions = actions.filter((a: any) => a.non_conformity_id === nc.id);
+  return `    NC: "${nc.title}" | Severidad: ${nc.severity || "N/A"} | Estado: ${nc.status} | Plazo: ${nc.deadline || "SIN PLAZO"} | Responsable: ${resolveName(nc.responsible_id)} | Causa raíz: ${nc.root_cause || "No documentada"}
+${ncActions.map((a: any) => `      Acción [${a.action_type}]: "${a.description}" | Estado: ${a.status} | Plazo: ${a.due_date || "SIN PLAZO"} | Responsable: ${resolveName(a.responsible_id)}`).join("\n")}`;
+}).join("\n")}`;
+}).join("\n\n")}`
+      : "⚠️ NO HAY PLANES CAPA REGISTRADOS.";
 
     // Reclamaciones context
-    const openReclamaciones = reclamaciones.filter((r: any) => r.status !== "cerrada");
+    const openReclamaciones = reclamaciones.filter((r: any) => r.status !== "cerrada" && r.status !== "closed");
+    const overdueRec = reclamaciones.filter((r: any) => r.response_deadline && new Date(r.response_deadline) < new Date() && r.status !== "cerrada" && r.status !== "closed");
     const reclamacionesContext = reclamaciones.length > 0
-      ? `Reclamaciones registradas: ${reclamaciones.length} (${openReclamaciones.length} abiertas)
+      ? `Total: ${reclamaciones.length} | Abiertas: ${openReclamaciones.length} | Vencidas: ${overdueRec.length}
 Fuentes: ${[...new Set(reclamaciones.map((r: any) => r.source))].join(", ")}
-${reclamaciones.slice(0, 15).map((r: any) => `  - "${r.title}" | Fuente: ${r.source} | Estado: ${r.status}${r.investigation ? ` | Investigación: ${r.investigation.substring(0, 100)}` : ""}${r.resolution ? ` | Resolución: ${r.resolution.substring(0, 100)}` : ""}`).join("\n")}`
+Cambios de estado: ${recStatusChanges.length}
+
+Detalle:
+${reclamaciones.map((r: any) => `  - "${r.title}" | Fuente: ${r.source}${r.source_code ? ` (${r.source_code})` : ""} | Estado: ${r.status} | Responsable: ${resolveName(r.responsible_id)} | Plazo: ${r.response_deadline || "SIN PLAZO"}${r.investigation ? ` | Investigación: ${r.investigation.substring(0, 150)}` : ""}${r.resolution ? ` | Resolución: ${r.resolution.substring(0, 150)}` : ""}${r.conclusion ? ` | Conclusión: ${r.conclusion.substring(0, 150)}` : ""}`).join("\n")}`
       : "No hay reclamaciones registradas.";
 
     // Training context
     const completedTrainings = trainings.filter((t: any) => t.status === "completed" || t.status === "signed");
     const pendingTrainings = trainings.filter((t: any) => t.status === "draft" || t.status === "pending");
+    const overdueTrainings = trainings.filter((t: any) => t.deadline && new Date(t.deadline) < new Date() && t.status !== "completed" && t.status !== "signed");
+    const passedSessions = trainingSessions.filter((s: any) => s.passed === true);
+    const failedSessions = trainingSessions.filter((s: any) => s.passed === false);
+
     const trainingContext = trainings.length > 0
-      ? `Registros de formación: ${trainings.length} (Completadas: ${completedTrainings.length}, Pendientes: ${pendingTrainings.length})
-${trainings.slice(0, 15).map((t: any) => `  - "${t.title}" | Estado: ${t.status}${t.deadline ? ` | Plazo: ${t.deadline}` : ""}`).join("\n")}`
-      : "⚠️ NO HAY REGISTROS DE FORMACIÓN. La ausencia de programa de formación documentado es un incumplimiento significativo.";
+      ? `Registros de formación: ${trainings.length} (Completadas: ${completedTrainings.length}, Pendientes: ${pendingTrainings.length}, Vencidas: ${overdueTrainings.length})
+Exámenes realizados: ${trainingSessions.length} (Aprobados: ${passedSessions.length}, Suspendidos: ${failedSessions.length})
+Firmas de formación registradas: ${trainingSignatures.length}
+
+Detalle:
+${trainings.map((t: any) => {
+  const parts = trainingParticipants.filter((p: any) => p.training_record_id === t.id);
+  const sigs = trainingSignatures.filter((s: any) => s.training_record_id === t.id);
+  return `  - "${t.title}" | Estado: ${t.status} | Plazo: ${t.deadline || "SIN PLAZO"} | Participantes: ${parts.length} | Firmas: ${sigs.length}`;
+}).join("\n")}`
+      : "⚠️ NO HAY REGISTROS DE FORMACIÓN.";
 
     // Personnel context
     const personnelContext = profiles.length > 0
-      ? `Personal registrado en el sistema: ${profiles.length} personas
-Puestos identificados: ${[...new Set(profiles.map((p: any) => p.job_title).filter(Boolean))].join(", ") || "No especificados"}`
+      ? `Personal registrado: ${profiles.length}
+Puestos: ${[...new Set(profiles.map((p: any) => p.job_title).filter(Boolean))].join(", ") || "No especificados"}
+${profiles.map((p: any) => `  - ${p.full_name || p.email} | Puesto: ${p.job_title || "No especificado"}`).join("\n")}`
       : "No hay información de personal disponible.";
+
+    // Document workflow stats
+    const totalPendingResps = docResponsibilities.filter((r: any) => r.status !== "completed");
+    const overdueResps = totalPendingResps.filter((r: any) => r.due_date && new Date(r.due_date) < new Date());
+    const docWorkflowContext = `Responsabilidades documentales:
+  Total asignadas: ${docResponsibilities.length} | Pendientes: ${totalPendingResps.length} | Vencidas: ${overdueResps.length}
+  Firmas digitales registradas: ${docSignatures.length}
+  Cambios de estado documentales: ${docStatusChanges.length}
+  Documentos aprobados: ${approvedDocs.length}/${totalDocs} | En borrador: ${draftDocs.length} | En revisión: ${reviewDocs.length}`;
 
     const userPrompt = `SIMULACIÓN DE INSPECCIÓN OFICIAL para: "${companyName}"
 
 ═══════════════════════════════════════
-DATOS DEL SISTEMA DE GESTIÓN DE CALIDAD
+DATOS COMPLETOS DEL SISTEMA DE GESTIÓN DE CALIDAD
 ═══════════════════════════════════════
 
-1. DOCUMENTACIÓN (${totalDocs} documentos aprobados)
-Categorías presentes: ${docCategories.join(", ") || "Ninguna"}
+1. DOCUMENTACIÓN (${totalDocs} documentos totales)
+Categorías: ${docCategories.join(", ") || "Ninguna"}
 Tipologías: ${docTypologies.join(", ") || "N/A"}
+${docWorkflowContext}
 
+Listado de documentos:
 ${docsContext}
 
 2. INCIDENCIAS Y DESVIACIONES
@@ -345,13 +482,16 @@ ${incidenciasContext}
 3. AUDITORÍAS INTERNAS
 ${auditsContext}
 
-4. RECLAMACIONES
+4. PLANES CAPA, NO CONFORMIDADES Y ACCIONES CORRECTIVAS
+${capaContext}
+
+5. RECLAMACIONES
 ${reclamacionesContext}
 
-5. FORMACIÓN DEL PERSONAL
+6. FORMACIÓN DEL PERSONAL
 ${trainingContext}
 
-6. ORGANIZACIÓN
+7. ORGANIZACIÓN Y PERSONAL
 ${personnelContext}
 
 ═══════════════════════════════════════
@@ -362,37 +502,38 @@ Analiza TODA la información proporcionada como lo haría un inspector real dura
 
 DEBES evaluar:
 1. ¿La empresa tiene todos los documentos/SOPs/PNTs requeridos por la normativa? Identifica documentación faltante.
-2. ¿Los documentos existentes cubren adecuadamente los procesos críticos?
-3. ¿El sistema de gestión de incidencias/desviaciones es efectivo? ¿Se están cerrando a tiempo?
-4. ¿Hay reclamaciones sin resolver o patrones preocupantes?
-5. ¿Las auditorías internas son periódicas y tienen seguimiento?
-6. ¿La formación del personal es adecuada y está documentada?
-7. ¿Hay evidencia de CAPA efectivos?
-8. ¿Se cumple con integridad de datos (si aplica)?
-9. ¿Hay indicios de problemas sistémicos (incidencias recurrentes, mismos tipos de desviaciones)?
+2. ¿Los documentos existentes cubren adecuadamente los procesos críticos? ¿Están aprobados o hay demasiados en borrador?
+3. ¿El sistema de gestión de incidencias/desviaciones es efectivo? ¿Se cierran a tiempo? ¿Hay vencidas?
+4. ¿Los planes CAPA son efectivos? ¿Las no conformidades tienen causa raíz documentada? ¿Las acciones se cierran a tiempo?
+5. ¿Hay reclamaciones sin resolver o patrones preocupantes en las fuentes?
+6. ¿Las auditorías internas son periódicas y tienen seguimiento con planes CAPA?
+7. ¿La formación del personal es adecuada, documentada y firmada? ¿Los exámenes se aprueban?
+8. ¿Se cumple con integridad de datos (firmas, trazabilidad de cambios de estado)?
+9. ¿Hay indicios de problemas sistémicos (incidencias recurrentes, NCs sin causa raíz, acciones vencidas)?
+10. ¿Las responsabilidades documentales están asignadas y se cumplen en plazo?
 
-SÉ ESPECÍFICO: referencia documentos concretos del listado cuando sea posible (por código o título).
+SÉ ESPECÍFICO: referencia documentos, incidencias, NCs o acciones concretas del listado.
 SÉ REALISTA: los hallazgos deben ser los que un inspector real identificaría con estos datos.
 NO INVENTES datos que no están en el contexto, pero SÍ señala la AUSENCIA de información esperada.
 
 Responde EXCLUSIVAMENTE en formato JSON válido con esta estructura:
 {
-  "summary": "Resumen ejecutivo detallado de la inspección simulada (mínimo 200 palabras), incluyendo impresión general, áreas de mayor riesgo y conclusión del inspector",
+  "summary": "Resumen ejecutivo detallado de la inspección simulada (mínimo 300 palabras), incluyendo impresión general, áreas de mayor riesgo y conclusión del inspector",
   "risk_score": <número 0-100 donde 0=sin riesgo y 100=riesgo máximo>,
   "findings": [
     {
       "severity": "critical|major|minor|observation",
       "category": "documentation|training|process_control|quality_assurance|validation|storage|equipment|complaints|capa|data_integrity",
       "finding_title": "Título claro y específico del hallazgo",
-      "finding_description": "Descripción detallada explicando qué se encontró, por qué es un problema y cuál es el impacto potencial. Referencia documentos específicos cuando sea posible. Mínimo 50 palabras.",
-      "regulation_reference": "Referencia normativa EXACTA y ESPECÍFICA (artículo, sección, párrafo). Ejemplo: '21 CFR 211.100(a)' o 'EU GMP Part I, Chapter 4.1' o 'RD 824/2010, Art. 15'",
-      "recommendation": "Acción correctiva concreta y factible que la empresa debe implementar. Sé específico sobre qué hacer y en qué plazo.",
-      "affected_area": "Área funcional afectada (ej: Control de Calidad, Producción, Almacén, Documentación, RRHH)"
+      "finding_description": "Descripción detallada explicando qué se encontró, por qué es un problema y cuál es el impacto potencial. Referencia registros específicos cuando sea posible. Mínimo 50 palabras.",
+      "regulation_reference": "Referencia normativa EXACTA y ESPECÍFICA",
+      "recommendation": "Acción correctiva concreta y factible que la empresa debe implementar.",
+      "affected_area": "Área funcional afectada"
     }
   ]
 }
 
-Genera entre 5 y 12 hallazgos realistas, proporcionales a los problemas identificados en los datos. La distribución de severidades debe ser realista.`;
+Genera entre 5 y 15 hallazgos realistas, proporcionales a los problemas identificados en los datos. La distribución de severidades debe ser realista.`;
 
     console.log("Sending request to AI with comprehensive company data...");
 
