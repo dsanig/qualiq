@@ -226,8 +226,11 @@ const Index = () => {
               setActiveModule("incidents");
               setIsNewIncidentOpen(true);
             }}
+            onNavigateToIncident={(incidenciaId) => {
+              setOpenIncidentId(incidenciaId);
+              setActiveModule("incidents");
+            }}
           />
-        );
       case "audits":
         return <AuditManagementView searchQuery={activeSearchQuery} />;
       case "chatbot":
