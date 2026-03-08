@@ -42,7 +42,7 @@ interface PendingActionsProps {
   onNavigateToModule?: (module: string) => void;
 }
 
-export function PendingActions({ onViewAll, onNavigateToDocument }: PendingActionsProps) {
+export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToModule }: PendingActionsProps) {
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
