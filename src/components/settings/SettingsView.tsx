@@ -16,6 +16,7 @@ export function SettingsView() {
 
   // Profile state
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
+  const [jobTitle, setJobTitle] = useState((profile as any)?.job_title ?? "");
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Password state
