@@ -113,7 +113,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     setIsLoading(true);
     try {
       const [{ data: auditsData }, { data: attachData }, { data: participantsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: incData }, { data: linksData }] = await Promise.all([
-        (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id,responsible_id,observations,findings,conclusions,status").order("created_at", { ascending: false }),
+        (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id,responsible_id,observations,findings,conclusions,status,audit_type,external_entity_id").order("created_at", { ascending: false }),
         (supabase as any).from("audit_attachments").select("id,audit_id,file_name,object_path,file_type"),
         (supabase as any).from("audit_participants").select("id,audit_id,user_id"),
         (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
