@@ -520,14 +520,14 @@ export function CalendarView({
 
         {/* Selected day details */}
         {selectedDay && (
-          <Card>
+          <Card className="min-h-[40vh]">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">
                 Eventos del {new Date(selectedDay + "T00:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <ScrollArea className="max-h-[300px]">
+              <ScrollArea className="h-[calc(40vh-60px)]">
               {selectedEvents.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No hay eventos para este día.</p>
               ) : (
