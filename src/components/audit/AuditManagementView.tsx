@@ -113,7 +113,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         (supabase as any).from("audit_attachments").select("id,audit_id,file_name,object_path,file_type"),
         (supabase as any).from("audit_participants").select("id,audit_id,user_id"),
         (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
-        (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline"),
+        (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline,responsible_id"),
         (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
         (supabase as any).from("profiles").select("id,full_name,email"),
         (supabase as any).from("incidencias").select("id,title,status"),
