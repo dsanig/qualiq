@@ -35,6 +35,7 @@ const typeLabels: Record<string, string> = {
   firma: "Firma",
   aprobacion: "Aprobación",
   revision: "Revisión",
+  training: "Formación",
 };
 
 interface PendingActionsProps {
