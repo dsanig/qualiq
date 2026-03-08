@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 
-interface AppLayoutProps {
+export interface AppLayoutProps {
   children: React.ReactNode;
   activeModule: string;
   onModuleChange: (module: string) => void;
@@ -14,6 +14,7 @@ interface AppLayoutProps {
   onSearchClear?: () => void;
   searchPlaceholder?: string;
   enabledFeatures?: Set<string>;
+  isSuperadmin?: boolean;
 }
 
 export function AppLayout({
@@ -28,6 +29,7 @@ export function AppLayout({
   onSearchSubmit,
   onSearchClear,
   enabledFeatures,
+  isSuperadmin,
 }: AppLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -39,6 +41,7 @@ export function AppLayout({
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         enabledFeatures={enabledFeatures}
+        isSuperadmin={isSuperadmin}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header
