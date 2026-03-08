@@ -899,6 +899,7 @@ export type Database = {
           deadline: string | null
           description: string | null
           id: string
+          responsible_id: string | null
           root_cause: string | null
           severity: string | null
           status: string
@@ -910,6 +911,7 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           id?: string
+          responsible_id?: string | null
           root_cause?: string | null
           severity?: string | null
           status?: string
@@ -921,6 +923,7 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           id?: string
+          responsible_id?: string | null
           root_cause?: string | null
           severity?: string | null
           status?: string

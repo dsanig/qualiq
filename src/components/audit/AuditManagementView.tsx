@@ -20,7 +20,7 @@ type Audit = {
 type AuditAttachment = { id: string; audit_id: string; file_name: string | null; object_path: string; file_type: string | null };
 type AuditParticipant = { id: string; audit_id: string; user_id: string };
 type CapaPlan = { id: string; audit_id: string; title: string | null; description: string | null; responsible_id: string | null };
-type NonConformity = { id: string; capa_plan_id: string; title: string; description: string | null; severity: string | null; root_cause: string | null; status: string; deadline: string | null };
+type NonConformity = { id: string; capa_plan_id: string; title: string; description: string | null; severity: string | null; root_cause: string | null; status: string; deadline: string | null; responsible_id: string | null };
 type ActionItem = { id: string; non_conformity_id: string; action_type: "corrective" | "preventive" | "immediate"; description: string; responsible_id: string | null; due_date: string | null; status: string };
 type Profile = { id: string; full_name: string | null; email: string | null };
 type IncidenciaRef = { id: string; title: string; status: string };
@@ -74,7 +74,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   });
   const [auditFiles, setAuditFiles] = useState<FileList | null>(null);
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "" });
-  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "" });
+  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
   const [actionForm, setActionForm] = useState({
     non_conformity_id: "", action_type: "corrective" as "corrective" | "preventive" | "immediate",
     description: "", responsible_id: "", due_date: "", status: "open", file: null as File | null,
@@ -113,7 +113,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         (supabase as any).from("audit_attachments").select("id,audit_id,file_name,object_path,file_type"),
         (supabase as any).from("audit_participants").select("id,audit_id,user_id"),
         (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
-        (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline"),
+        (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline,responsible_id"),
         (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
         (supabase as any).from("profiles").select("id,full_name,email"),
         (supabase as any).from("incidencias").select("id,title,status"),
@@ -321,12 +321,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   };
 
   const createNonConformity = async () => {
-    if (!selectedCapaPlanId || !ncForm.deadline) {
-      toast({ title: "Error", description: "La fecha límite es obligatoria.", variant: "destructive" }); return;
+    if (!selectedCapaPlanId || !ncForm.deadline || !ncForm.responsible_id) {
+      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
     }
     const { data, error } = await (supabase as any).from("non_conformities").insert({
       capa_plan_id: selectedCapaPlanId, title: ncForm.title, description: ncForm.description || null,
       severity: ncForm.severity || null, root_cause: ncForm.root_cause || null, status: ncForm.status, deadline: ncForm.deadline,
+      responsible_id: ncForm.responsible_id,
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     await (supabase as any).from("actions").insert({
@@ -334,15 +335,19 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     });
     toast({ title: "No conformidad creada" });
     setNewNcOpen(false);
-    setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "" });
+    setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
     await loadData();
   };
 
   const updateNonConformity = async () => {
     if (!editingNc) return;
+    if (!ncForm.deadline || !ncForm.responsible_id) {
+      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
+    }
     const { error } = await (supabase as any).from("non_conformities").update({
       title: ncForm.title, description: ncForm.description || null, severity: ncForm.severity || null,
-      root_cause: ncForm.root_cause || null, status: ncForm.status, deadline: ncForm.deadline || null,
+      root_cause: ncForm.root_cause || null, status: ncForm.status, deadline: ncForm.deadline,
+      responsible_id: ncForm.responsible_id,
     }).eq("id", editingNc.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "No conformidad actualizada" });
@@ -351,10 +356,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   };
 
   const createAction = async () => {
+    if (!actionForm.responsible_id || !actionForm.due_date) {
+      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
+    }
     const { data, error } = await (supabase as any).from("actions").insert({
       non_conformity_id: actionForm.non_conformity_id, action_type: actionForm.action_type,
-      description: actionForm.description, responsible_id: actionForm.responsible_id || null,
-      due_date: actionForm.due_date || null, status: actionForm.status,
+      description: actionForm.description, responsible_id: actionForm.responsible_id,
+      due_date: actionForm.due_date, status: actionForm.status,
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (actionForm.file) {
@@ -373,9 +381,12 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const updateAction = async () => {
     if (!editingAction) return;
+    if (!actionForm.responsible_id || !actionForm.due_date) {
+      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
+    }
     const { error } = await (supabase as any).from("actions").update({
       action_type: actionForm.action_type, description: actionForm.description,
-      responsible_id: actionForm.responsible_id || null, due_date: actionForm.due_date || null, status: actionForm.status,
+      responsible_id: actionForm.responsible_id, due_date: actionForm.due_date, status: actionForm.status,
     }).eq("id", editingAction.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Acción actualizada" });
@@ -385,7 +396,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const openEditNc = (nc: NonConformity) => {
     setEditingNc(nc);
-    setNcForm({ title: nc.title, description: nc.description ?? "", severity: nc.severity ?? "", root_cause: nc.root_cause ?? "", status: nc.status, deadline: nc.deadline ?? "" });
+    setNcForm({ title: nc.title, description: nc.description ?? "", severity: nc.severity ?? "", root_cause: nc.root_cause ?? "", status: nc.status, deadline: nc.deadline ?? "", responsible_id: nc.responsible_id ?? "" });
     setEditNcOpen(true);
   };
 
@@ -501,6 +512,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       <div><Label>Descripción</Label><Textarea value={ncForm.description} onChange={(e) => setNcForm((p) => ({ ...p, description: e.target.value }))} /></div>
       <div><Label>Severidad</Label><Input value={ncForm.severity} onChange={(e) => setNcForm((p) => ({ ...p, severity: e.target.value }))} /></div>
       <div><Label>Causa raíz</Label><Textarea value={ncForm.root_cause} onChange={(e) => setNcForm((p) => ({ ...p, root_cause: e.target.value }))} /></div>
+      <div>
+        <Label>Responsable *</Label>
+        <Select value={ncForm.responsible_id} onValueChange={(v) => setNcForm((p) => ({ ...p, responsible_id: v }))}>
+          <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
+          <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
       <div><Label>Fecha límite *</Label><Input type="date" value={ncForm.deadline} onChange={(e) => setNcForm((p) => ({ ...p, deadline: e.target.value }))} /></div>
       <div>
         <Label>Estado</Label>
@@ -533,13 +551,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       </div>
       <div><Label>Descripción</Label><Textarea value={actionForm.description} onChange={(e) => setActionForm((p) => ({ ...p, description: e.target.value }))} /></div>
       <div>
-        <Label>Responsable</Label>
+        <Label>Responsable *</Label>
         <Select value={actionForm.responsible_id} onValueChange={(v) => setActionForm((p) => ({ ...p, responsible_id: v }))}>
           <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
           <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div><Label>Fecha vencimiento</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
+      <div><Label>Fecha vencimiento *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
       <div>
         <Label>Estado</Label>
         <Select value={actionForm.status} onValueChange={(v) => setActionForm((p) => ({ ...p, status: v }))}>
@@ -778,7 +796,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>No conformidades</CardTitle>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "" }); setNewNcOpen(true); }}>Añadir NC</Button>
+                <Button size="sm" variant="outline" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" }); setNewNcOpen(true); }}>Añadir NC</Button>
                 <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open", file: null }); setNewActionOpen(true); }}>Añadir acción</Button>
               </div>
             </CardHeader>
@@ -791,28 +809,58 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                       {canEditContent && <button onClick={() => openEditNc(nc)} className="text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {nc.deadline && <span>Límite: {nc.deadline}</span>}
-                      <span>{nc.status}</span>
+                      {nc.deadline && (
+                        <span className={nc.status !== "closed" && new Date(nc.deadline) < new Date() ? "text-destructive font-medium" : ""}>
+                          Límite: {nc.deadline}
+                        </span>
+                      )}
+                      <span className="px-1.5 py-0.5 rounded bg-muted">{statusLabel(nc.status)}</span>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{nc.description ?? "Sin descripción"}</p>
                   {nc.severity && <p className="text-xs text-muted-foreground mt-1">Severidad: {nc.severity}</p>}
-                  <div className="mt-2 space-y-1">
-                    {actions.filter((a) => a.non_conformity_id === nc.id).map((action) => (
-                      <div key={action.id} className="rounded bg-muted/40 p-2 text-sm cursor-pointer hover:bg-muted/60 transition-colors" onClick={() => openEditAction(action)}>
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium">{actionTypeLabel(action.action_type)}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            {action.due_date && <span>{action.due_date}</span>}
-                            <span>{action.status}</span>
-                            {canEditContent && <Pencil className="h-3 w-3" />}
-                          </div>
+                  {nc.responsible_id && <p className="text-xs text-muted-foreground mt-1">Responsable NC: {getUserName(nc.responsible_id)}</p>}
+                  
+                  {/* Actions summary */}
+                  {(() => {
+                    const ncActions = actions.filter((a) => a.non_conformity_id === nc.id);
+                    if (ncActions.length === 0) return null;
+                    const today = new Date();
+                    return (
+                      <div className="mt-3 border-t border-border pt-2">
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">Acciones correctivas ({ncActions.length})</p>
+                        <div className="space-y-1.5">
+                          {ncActions.map((action) => {
+                            const isOverdue = action.status !== "closed" && action.due_date && new Date(action.due_date) < today;
+                            return (
+                              <div key={action.id} className="rounded bg-muted/40 p-2 text-sm cursor-pointer hover:bg-muted/60 transition-colors" onClick={() => openEditAction(action)}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium">{actionTypeLabel(action.action_type)}</p>
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted">{statusLabel(action.status)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs">
+                                    {action.due_date && (
+                                      <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
+                                        {action.due_date}
+                                      </span>
+                                    )}
+                                    {canEditContent && <Pencil className="h-3 w-3 text-muted-foreground" />}
+                                  </div>
+                                </div>
+                                <p className="text-muted-foreground">{action.description}</p>
+                                {action.responsible_id && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    Responsable: {getUserName(action.responsible_id) ?? action.responsible_id}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                        <p>{action.description}</p>
-                        {action.responsible_id && <p className="text-xs text-muted-foreground">Responsable: {getUserName(action.responsible_id) ?? action.responsible_id}</p>}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </div>
               ))}
               {filteredNcs.length === 0 && <p className="text-sm text-muted-foreground">No hay no conformidades en este plan CAPA.</p>}

@@ -323,8 +323,30 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
         }));
       }
 
+      // Fetch non-conformities assigned to current user
+      let ncActions: PendingAction[] = [];
+      if (user) {
+        const { data: ncData } = await (supabase as any)
+          .from("non_conformities")
+          .select("id, title, status, deadline, responsible_id")
+          .eq("responsible_id", user.id)
+          .in("status", ["open", "in_progress"])
+          .order("deadline", { ascending: true, nullsFirst: false })
+          .limit(20);
+
+        ncActions = ((ncData as any[]) ?? []).map((nc) => ({
+          id: nc.id,
+          description: `No conformidad: ${nc.title}`,
+          action_type: "capa",
+          due_date: nc.deadline,
+          status: nc.status,
+          isOverdue: nc.deadline ? new Date(nc.deadline) < now : false,
+          source: "capa" as const,
+        }));
+      }
+
       // Combine: active tasks first, waiting tasks last
-      const activeActions = [...capaActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions, ...reclamacionActions, ...incidenciaActions];
+      const activeActions = [...capaActions, ...ncActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions, ...reclamacionActions, ...incidenciaActions];
       const waitingActions = docActions.filter(a => a.action_type === "waiting");
       
       const combined = [
