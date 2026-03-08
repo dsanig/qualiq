@@ -233,7 +233,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                 <span className={cn("text-xs text-muted-foreground italic shrink-0", compact && "text-[10px]")}>
                   {action.action_type === "revision" ? "Esperando estado 'En Revisión'" 
                    : action.action_type === "firma" ? "Esperando estado 'Pendiente de Firma'"
-                   : action.action_type === "aprobacion" ? "Esperando estado 'En Aprobación'"
+                   : action.action_type === "aprobacion" ? "Esperando estado 'Pendiente de Aprobación'"
                    : "No disponible"}
                 </span>
               ) : null}
