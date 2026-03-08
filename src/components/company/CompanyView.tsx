@@ -194,7 +194,7 @@ export function CompanyView() {
     };
 
     void fetchCompany();
-  }, [profile?.company_id, toast]);
+  }, [effectiveCompanyId, toast]);
 
   useEffect(() => {
     void refreshPermissions();
