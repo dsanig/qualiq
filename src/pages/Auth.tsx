@@ -111,7 +111,7 @@ export default function Auth() {
             <Shield className="w-6 h-6 text-accent-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">QualiQ</h1>
+            <h1 className="text-2xl font-bold text-foreground">QualiQ<span className="text-sm font-normal italic text-muted-foreground">, by INMEDSA</span></h1>
             <p className="text-sm text-muted-foreground">Compliance Platform</p>
           </div>
         </div>
