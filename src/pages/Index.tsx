@@ -26,6 +26,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   dashboard: { title: "Panel de Control", subtitle: "Visión general del estado de cumplimiento" },
+  calendar: { title: "Calendario", subtitle: "Fechas límite y plazos de todos los módulos" },
   documents: { title: "Gestión Documental", subtitle: "SOPs, PNTs y documentación de calidad" },
   incidents: { title: "Incidencias", subtitle: "No conformidades, desviaciones y CAPAs" },
   reclamaciones: { title: "Reclamaciones", subtitle: "Gestión de reclamaciones de clientes, proveedores y terceros" },
