@@ -21,10 +21,12 @@ import { AuditSimulatorView } from "@/components/audit/AuditSimulatorView";
 import { PredictiveAnalyticsView } from "@/components/analytics/PredictiveAnalyticsView";
 import { AuditManagementView } from "@/components/audit/AuditManagementView";
 import { CompanyManagementView } from "@/components/admin/CompanyManagementView";
+import { CalendarView } from "@/components/calendar/CalendarView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   dashboard: { title: "Panel de Control", subtitle: "Visión general del estado de cumplimiento" },
+  calendar: { title: "Calendario", subtitle: "Fechas límite y plazos de todos los módulos" },
   documents: { title: "Gestión Documental", subtitle: "SOPs, PNTs y documentación de calidad" },
   incidents: { title: "Incidencias", subtitle: "No conformidades, desviaciones y CAPAs" },
   reclamaciones: { title: "Reclamaciones", subtitle: "Gestión de reclamaciones de clientes, proveedores y terceros" },
@@ -183,6 +185,8 @@ const Index = () => {
             onNavigateToModule={setActiveModule}
           />
         );
+      case "calendar":
+        return <CalendarView />;
       case "documents":
         return (
           <DocumentsView

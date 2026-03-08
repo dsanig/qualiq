@@ -10,7 +10,8 @@ import {
   ClipboardCheck,
   TrendingUp,
   FileWarning,
-  Globe
+  Globe,
+  CalendarDays
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ interface SidebarProps {
 
 const navigationItems = [
   { id: "dashboard", label: "Panel de Control", icon: LayoutDashboard },
+  { id: "calendar", label: "Calendario", icon: CalendarDays },
   { id: "documents", label: "Documentos", icon: FileText },
   { id: "incidents", label: "Incidencias", icon: AlertTriangle },
   { id: "reclamaciones", label: "Reclamaciones", icon: FileWarning },
