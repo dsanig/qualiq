@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCompanyContext } from "@/hooks/useCompanyContext";
 import {
   Dialog,
   DialogContent,
