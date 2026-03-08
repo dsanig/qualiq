@@ -32,7 +32,28 @@ export function FeatureToggles({ companyId }: FeatureTogglesProps) {
       .eq("company_id", companyId);
 
     if (!error && data) {
-      setFeatures(data as FeatureRow[]);
+      const existingKeys = new Set((data as FeatureRow[]).map((f) => f.feature_key));
+      const missingFeatures = ALL_FEATURES.filter((f) => !existingKeys.has(f.key));
+
+      if (missingFeatures.length > 0) {
+        const rows = missingFeatures.map((f) => ({
+          company_id: companyId,
+          feature_key: f.key,
+          enabled: true,
+        }));
+        const { data: inserted } = await (supabase as any)
+          .from("company_features")
+          .insert(rows)
+          .select("id, feature_key, enabled, company_id");
+
+        if (inserted) {
+          setFeatures([...(data as FeatureRow[]), ...(inserted as FeatureRow[])]);
+        } else {
+          setFeatures(data as FeatureRow[]);
+        }
+      } else {
+        setFeatures(data as FeatureRow[]);
+      }
     }
     setIsLoading(false);
   }, [companyId]);
