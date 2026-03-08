@@ -11,7 +11,7 @@ import { TwoFactorSettings } from "./TwoFactorSettings";
 
 export function SettingsView() {
   const { user, profile } = useAuth();
-  const { isSuperadmin, isAdministrador, isEditor } = usePermissions();
+  const { isSuperadmin, isAdministrador, isEditor, canManageCompany } = usePermissions();
 
   const roleName = isSuperadmin ? "Superadmin" : isAdministrador ? "Administrador" : isEditor ? "Editor" : "Espectador";
 
