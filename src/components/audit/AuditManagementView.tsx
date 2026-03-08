@@ -290,7 +290,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     }
   };
   const resetAuditForm = () => {
-    setAuditForm({ title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "", observations: "", findings: "", conclusions: "", status: "open", participant_ids: [] });
+    setAuditForm({ title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "", observations: "", findings: "", conclusions: "", status: "open", participant_ids: [], audit_type: "interna", external_entity_id: "" });
     setAuditFiles(null);
   };
 
