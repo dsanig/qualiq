@@ -333,6 +333,7 @@ export function DocumentsView({
   const [isChangeStatusOpen, setIsChangeStatusOpen] = useState(false);
   const [changeStatusTarget, setChangeStatusTarget] = useState<string>("draft");
   const [changeStatusComment, setChangeStatusComment] = useState("");
+  const [changeStatusConfirmText, setChangeStatusConfirmText] = useState("");
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [statusHistory, setStatusHistory] = useState<StatusChangeRecord[]>([]);
   const [isStatusHistoryOpen, setIsStatusHistoryOpen] = useState(false);
