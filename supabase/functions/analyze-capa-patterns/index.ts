@@ -229,8 +229,6 @@ Genera entre 2 y 5 insights relevantes basados en los patrones detectados.`;
       throw new Error("No se pudieron limpiar los insights anteriores");
     }
 
-    const sourceIncidentIds = incidentsData.map((incident: { id?: string }) => incident.id).filter(Boolean);
-
     // Insert insights and pattern detections
     for (const insight of insights) {
       const { data: insightData, error: insightError } = await supabase
@@ -245,11 +243,6 @@ Genera entre 2 y 5 insights relevantes basados en los patrones detectados.`;
           affected_areas: insight.affected_areas,
           suggested_actions: insight.suggested_actions,
           confidence_score: insight.confidence_score,
-          source: {
-            generated_from: "incidencias",
-            lookback_days: 90,
-            incident_ids: sourceIncidentIds,
-          },
         })
         .select()
         .single();
