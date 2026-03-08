@@ -1173,7 +1173,8 @@ export function DocumentsView({
           const { error: docUpdateError } = await (supabase as any)
             .from("documents")
             .update({
-              version: nextVersion,
+              version: newMajor,
+              version_minor: newMinor,
               file_url: filePath,
               file_type: fileType,
               status: "draft",
