@@ -368,7 +368,13 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
                         <LinkIcon className="h-3 w-3 text-muted-foreground" />
                         {linkedIncidencias.map(inc => (
-                          <span key={inc!.id} className="text-xs bg-warning/10 text-warning rounded-full px-1.5 py-0.5">{inc!.title}</span>
+                          <button
+                            key={inc!.id}
+                            className="text-xs bg-warning/10 text-warning rounded-full px-1.5 py-0.5 hover:bg-warning/20 transition-colors"
+                            onClick={(e) => { e.stopPropagation(); onNavigateToIncident?.(inc!.id); }}
+                          >
+                            {inc!.title} →
+                          </button>
                         ))}
                       </div>
                     )}
