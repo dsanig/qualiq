@@ -34,6 +34,22 @@ interface AuditEntry {
 
 const PAGE_SIZE = 50;
 
+const detailKeyLabels: Record<string, string> = {
+  code: "Código",
+  category: "Categoría",
+  typology: "Tipología",
+  status: "Estado",
+  file_type: "Tipo archivo",
+  effective_date: "Fecha efectiva",
+  expiry_date: "Fecha caducidad",
+  old_status: "Estado anterior",
+  new_status: "Nuevo estado",
+  comment: "Comentario",
+  new_version: "Nueva versión",
+  changes: "Cambios",
+  version: "Versión",
+};
+
 const entityTypeLabels: Record<string, string> = {
   auth: "Autenticación",
   document: "Documento",
@@ -245,7 +261,7 @@ export function AuditTrailView() {
       "Acción": actionLabels[e.action] ?? e.action,
       "Módulo": entityTypeLabels[e.entity_type] ?? e.entity_type,
       "Elemento": e.entity_title ?? "",
-      "Detalles": e.details ? Object.entries(e.details).map(([k, v]) => `${k}: ${String(v)}`).join("; ") : "",
+      "Detalles": e.details ? Object.entries(e.details).map(([k, v]) => `${detailKeyLabels[k] || k}: ${String(v)}`).join("; ") : "",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -468,7 +484,7 @@ export function AuditTrailView() {
                         <div className="text-xs text-muted-foreground mt-1">
                           {Object.entries(entry.details).map(([key, value]) => (
                             <span key={key} className="mr-3">
-                              <span className="font-medium">{key}:</span> {String(value)}
+                              <span className="font-medium">{detailKeyLabels[key] || key}:</span> {String(value)}
                             </span>
                           ))}
                         </div>
