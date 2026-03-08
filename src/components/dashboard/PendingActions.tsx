@@ -29,6 +29,7 @@ const typeIcons: Record<string, typeof CheckCircle2> = {
   revision: SearchIcon,
   training: GraduationCap,
   waiting: Eye,
+  reclamacion: FileWarning,
 };
 
 const typeLabels: Record<string, string> = {
@@ -40,6 +41,7 @@ const typeLabels: Record<string, string> = {
   revision: "Revisión",
   training: "Formación",
   waiting: "En espera",
+  reclamacion: "Reclamación",
 };
 
 interface PendingActionsProps {
