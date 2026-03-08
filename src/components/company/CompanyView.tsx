@@ -51,6 +51,7 @@ export function CompanyView() {
     phone: "",
     email: "",
     website: "",
+  });
   const [isCompanySaving, setIsCompanySaving] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [createForm, setCreateForm] = useState({
