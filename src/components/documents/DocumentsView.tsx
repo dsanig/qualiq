@@ -1106,6 +1106,7 @@ export function DocumentsView({
         });
 
         toast({ title: "Documento actualizado", description: `${selectedDocument.code} ha sido actualizado. El flujo de aprobación se ha reiniciado.` });
+        logAction({ action: "update_version_rejected", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { version: selectedDocument.versionNum } });
       } else {
         // Normal version update flow
         const createVersionArgs = {
