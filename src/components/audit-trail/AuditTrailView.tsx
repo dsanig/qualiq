@@ -145,7 +145,7 @@ export function AuditTrailView() {
   const [uniqueUsers, setUniqueUsers] = useState<Array<{ id: string; name: string }>>([]);
   const [uniqueEntityTypes, setUniqueEntityTypes] = useState<string[]>([]);
   const [uniqueActions, setUniqueActions] = useState<string[]>([]);
-  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0); // 0=closed, 1=warning, 2=confirm text
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2 | 3>(0); // 0=closed, 1=warning, 2=download reminder, 3=confirm text
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const loadEntries = useCallback(async () => {
@@ -299,7 +299,7 @@ export function AuditTrailView() {
                     <Button variant="outline" onClick={() => setDeleteStep(0)}>Cancelar</Button>
                     <Button
                       variant="destructive"
-                      onClick={() => { setDeleteStep(2); setDeleteConfirmText(""); }}
+                      onClick={() => setDeleteStep(2)}
                     >
                       Entiendo, continuar
                     </Button>
@@ -307,8 +307,36 @@ export function AuditTrailView() {
                 </AlertDialogContent>
               </AlertDialog>
 
-              {/* Step 2: Type ELIMINAR */}
-              <AlertDialog open={deleteStep === 2} onOpenChange={(open) => { if (!open) { setDeleteStep(0); setDeleteConfirmText(""); } }}>
+              {/* Step 2: Download reminder */}
+              <AlertDialog open={deleteStep === 2} onOpenChange={(open) => { if (!open) setDeleteStep(0); }}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>📥 ¿Deseas guardar una copia?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Antes de eliminar, puedes descargar una copia completa de la pista de auditoría en formato Excel para conservar un respaldo.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                    <Button variant="outline" onClick={() => setDeleteStep(0)}>Cancelar</Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => { exportToExcel(); }}
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      Descargar Excel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => { setDeleteStep(3); setDeleteConfirmText(""); }}
+                    >
+                      Continuar sin descargar
+                    </Button>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              {/* Step 3: Type ELIMINAR */}
+              <AlertDialog open={deleteStep === 3} onOpenChange={(open) => { if (!open) { setDeleteStep(0); setDeleteConfirmText(""); } }}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
