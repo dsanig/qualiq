@@ -842,7 +842,8 @@ export function DocumentsView({
     }
     setIsUpdatingVersion(true);
     try {
-      const newVersion = selectedDocument.versionNum + 1;
+      const isRejectedDraft = selectedDocument.status === "draft" && rejectedDocIds.has(selectedDocument.id);
+      const newVersion = isRejectedDraft ? selectedDocument.versionNum : selectedDocument.versionNum + 1;
       const fileType = fileTypeForDb(updateVersionFile);
       const fileExt = getFileExtension(updateVersionFile.name) || "bin";
       debugFileTypeMapping(updateVersionFile);
@@ -874,33 +875,16 @@ export function DocumentsView({
         throw new Error(`Debes asignar al menos un responsable de: ${missing}.`);
       }
 
-      const createVersionArgs = {
-        _change_summary: updateVersionChanges.trim() || null,
-        _document_id: selectedDocument.id,
-        _file_path: filePath,
-        _responsibilities: cleanedResponsibilities,
-      };
-
-      const fallbackToClientVersionUpdate = async () => {
+      if (isRejectedDraft) {
+        // Rejected draft: just replace file and reset responsibilities, no version bump
         const { data: authData, error: authError } = await supabase.auth.getUser();
         if (authError || !authData.user) throw authError ?? new Error("No se pudo obtener el usuario autenticado.");
-
         const actorId = authData.user.id;
-        const nextVersion = selectedDocument.versionNum + 1;
 
-        const { error: versionInsertError } = await (supabase as any).from("document_versions").insert({
-          document_id: selectedDocument.id,
-          version: selectedDocument.versionNum,
-          file_url: selectedDocument.fileUrl,
-          changes_description: updateVersionChanges.trim() || null,
-          created_by: actorId,
-        });
-        if (versionInsertError) throw versionInsertError;
-
+        // Update document file without changing version
         const { error: docUpdateError } = await (supabase as any)
           .from("documents")
           .update({
-            version: nextVersion,
             file_url: filePath,
             file_type: fileType,
             status: "draft",
@@ -908,76 +892,143 @@ export function DocumentsView({
           .eq("id", selectedDocument.id);
         if (docUpdateError) throw docUpdateError;
 
+        // Delete old responsibilities and create fresh ones
         const { error: deleteRespError } = await (supabase as any)
           .from("document_responsibilities")
           .delete()
           .eq("document_id", selectedDocument.id);
         if (deleteRespError) throw deleteRespError;
 
-        const fallbackResponsibilities = cleanedResponsibilities.map((responsibility) => ({
+        const newResps = cleanedResponsibilities.map((r) => ({
           document_id: selectedDocument.id,
-          user_id: responsibility.responsible_user_id,
-          action_type: responsibility.action_type,
-          due_date: responsibility.due_date,
+          user_id: r.responsible_user_id,
+          action_type: r.action_type,
+          due_date: r.due_date,
           created_by: actorId,
         }));
 
         const { error: respInsertError } = await (supabase as any)
           .from("document_responsibilities")
-          .insert(fallbackResponsibilities);
+          .insert(newResps);
         if (respInsertError) throw respInsertError;
-      };
 
-      if (import.meta.env.DEV) {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        console.log("SUPABASE_URL_HOST", new URL(supabaseUrl).host);
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        const payloadTypes = Object.fromEntries(
-          Object.entries(createVersionArgs).map(([key, value]) => [
-            key,
-            Array.isArray(value) ? "array" : typeof value,
-          ]),
-        );
-        const projectHostname = (() => {
-          try {
-            return new URL(import.meta.env.VITE_SUPABASE_URL).hostname;
-          } catch {
-            return "invalid-url";
-          }
-        })();
-
-        console.info("[documents:update-version] RPC preflight", {
-          supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-          projectHostname,
-          payloadKeys: Object.keys(createVersionArgs),
-          payloadTypes,
-          payloadJson: JSON.stringify(createVersionArgs),
-          authUserId: authData.user?.id ?? null,
-          authError: authError?.message ?? null,
-        });
-      }
-
-      const { error: rpcError } = await (supabase as any).rpc("create_new_document_version", createVersionArgs);
-
-      if (rpcError) {
-        const isMissingRpc = rpcError.message?.includes("Could not find the function public.create_new_document_version")
-          || rpcError.message?.includes("schema cache");
-
-        if (!isMissingRpc) throw rpcError;
-
-        console.warn("[documents:update-version] RPC missing: check Supabase project/env. Falling back to client flow.", {
-          errorCode: rpcError.code,
-          errorMessage: rpcError.message,
+        // Record status change
+        await (supabase as any).from("document_status_changes").insert({
+          document_id: selectedDocument.id,
+          old_status: "draft",
+          new_status: "draft",
+          changed_by: actorId,
+          comment: "Documento actualizado tras denegación. Flujo de aprobación reiniciado.",
         });
 
-        // TODO: Remove this fallback after confirming RPC is deployed in the same Supabase project used by the app.
-        await fallbackToClientVersionUpdate();
+        toast({ title: "Documento actualizado", description: `${selectedDocument.code} ha sido actualizado. El flujo de aprobación se ha reiniciado.` });
+      } else {
+        // Normal version update flow
+        const createVersionArgs = {
+          _change_summary: updateVersionChanges.trim() || null,
+          _document_id: selectedDocument.id,
+          _file_path: filePath,
+          _responsibilities: cleanedResponsibilities,
+        };
+
+        const fallbackToClientVersionUpdate = async () => {
+          const { data: authData, error: authError } = await supabase.auth.getUser();
+          if (authError || !authData.user) throw authError ?? new Error("No se pudo obtener el usuario autenticado.");
+
+          const actorId = authData.user.id;
+          const nextVersion = selectedDocument.versionNum + 1;
+
+          const { error: versionInsertError } = await (supabase as any).from("document_versions").insert({
+            document_id: selectedDocument.id,
+            version: selectedDocument.versionNum,
+            file_url: selectedDocument.fileUrl,
+            changes_description: updateVersionChanges.trim() || null,
+            created_by: actorId,
+          });
+          if (versionInsertError) throw versionInsertError;
+
+          const { error: docUpdateError } = await (supabase as any)
+            .from("documents")
+            .update({
+              version: nextVersion,
+              file_url: filePath,
+              file_type: fileType,
+              status: "draft",
+            })
+            .eq("id", selectedDocument.id);
+          if (docUpdateError) throw docUpdateError;
+
+          const { error: deleteRespError } = await (supabase as any)
+            .from("document_responsibilities")
+            .delete()
+            .eq("document_id", selectedDocument.id);
+          if (deleteRespError) throw deleteRespError;
+
+          const fallbackResponsibilities = cleanedResponsibilities.map((responsibility) => ({
+            document_id: selectedDocument.id,
+            user_id: responsibility.responsible_user_id,
+            action_type: responsibility.action_type,
+            due_date: responsibility.due_date,
+            created_by: actorId,
+          }));
+
+          const { error: respInsertError } = await (supabase as any)
+            .from("document_responsibilities")
+            .insert(fallbackResponsibilities);
+          if (respInsertError) throw respInsertError;
+        };
+
+        if (import.meta.env.DEV) {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          console.log("SUPABASE_URL_HOST", new URL(supabaseUrl).host);
+          const { data: authData, error: authError } = await supabase.auth.getUser();
+          const payloadTypes = Object.fromEntries(
+            Object.entries(createVersionArgs).map(([key, value]) => [
+              key,
+              Array.isArray(value) ? "array" : typeof value,
+            ]),
+          );
+          const projectHostname = (() => {
+            try {
+              return new URL(import.meta.env.VITE_SUPABASE_URL).hostname;
+            } catch {
+              return "invalid-url";
+            }
+          })();
+
+          console.info("[documents:update-version] RPC preflight", {
+            supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+            projectHostname,
+            payloadKeys: Object.keys(createVersionArgs),
+            payloadTypes,
+            payloadJson: JSON.stringify(createVersionArgs),
+            authUserId: authData.user?.id ?? null,
+            authError: authError?.message ?? null,
+          });
+        }
+
+        const { error: rpcError } = await (supabase as any).rpc("create_new_document_version", createVersionArgs);
+
+        if (rpcError) {
+          const isMissingRpc = rpcError.message?.includes("Could not find the function public.create_new_document_version")
+            || rpcError.message?.includes("schema cache");
+
+          if (!isMissingRpc) throw rpcError;
+
+          console.warn("[documents:update-version] RPC missing: check Supabase project/env. Falling back to client flow.", {
+            errorCode: rpcError.code,
+            errorMessage: rpcError.message,
+          });
+
+          await fallbackToClientVersionUpdate();
+        }
+
+        const { error: updateError } = await supabase.from("documents").update({ file_type: fileType }).eq("id", selectedDocument.id);
+        if (updateError) throw updateError;
+
+        toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0` });
       }
 
-      const { error: updateError } = await supabase.from("documents").update({ file_type: fileType }).eq("id", selectedDocument.id);
-      if (updateError) throw updateError;
-
-      toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersion}.0` });
       setIsUpdateVersionOpen(false);
       fetchDocuments();
       fetchFirmaStatus();
