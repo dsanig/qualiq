@@ -30,7 +30,7 @@ interface AuditManagementViewProps {
   searchQuery?: string;
 }
 
-const actionStatus = ["open", "in_progress", "closed", "overdue"] as const;
+const actionStatus = ["open", "in_progress", "closed"] as const;
 const actionTypes = [
   { value: "immediate", label: "Inmediata" },
   { value: "corrective", label: "Correctiva" },
@@ -475,7 +475,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="open">Abierta</SelectItem>
-            <SelectItem value="in_progress">En curso</SelectItem>
+            <SelectItem value="in_progress">En proceso</SelectItem>
             <SelectItem value="closed">Cerrada</SelectItem>
           </SelectContent>
         </Select>
@@ -506,7 +506,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         <Label>Estado</Label>
         <Select value={ncForm.status} onValueChange={(v) => setNcForm((p) => ({ ...p, status: v }))}>
           <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+          <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
         </Select>
       </div>
     </div>
@@ -544,7 +544,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         <Label>Estado</Label>
         <Select value={actionForm.status} onValueChange={(v) => setActionForm((p) => ({ ...p, status: v }))}>
           <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+          <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       {showNcSelect && (
@@ -574,7 +574,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const actionTypeLabel = (t: string) => actionTypes.find((at) => at.value === t)?.label ?? t;
   const statusLabel = (s: string) => {
-    const map: Record<string, string> = { open: "Abierta", in_progress: "En curso", closed: "Cerrada" };
+    const map: Record<string, string> = { open: "Abierta", in_progress: "En proceso", closed: "Cerrada" };
     return map[s] ?? s;
   };
 
