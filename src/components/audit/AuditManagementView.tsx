@@ -74,7 +74,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   });
   const [auditFiles, setAuditFiles] = useState<FileList | null>(null);
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "" });
-  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "" });
+  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
   const [actionForm, setActionForm] = useState({
     non_conformity_id: "", action_type: "corrective" as "corrective" | "preventive" | "immediate",
     description: "", responsible_id: "", due_date: "", status: "open", file: null as File | null,
