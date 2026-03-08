@@ -84,13 +84,14 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
         supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds),
       ]);
 
-      const docMap = new Map((docsRes.data || []).map(d => [d.id, { code: d.code, title: d.title }]));
+      const docMap = new Map((docsRes.data || []).map(d => [d.id, { code: d.code, title: d.title, status: (d as any).status }]));
       const userMap = new Map((usersRes.data || []).map(u => [u.user_id, u.full_name || u.email || u.user_id]));
 
       for (const action of pendingActions) {
         const doc = docMap.get(action.document_id);
         action.documentCode = doc?.code || "";
         action.documentTitle = doc?.title || "";
+        action.documentStatus = doc?.status || "";
         action.responsibleName = userMap.get(action.user_id) || action.user_id;
       }
     }
