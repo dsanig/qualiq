@@ -438,7 +438,7 @@ export function DocumentsView({
 
   // Fetch firma responsibilities and signatures to compute signature status
   const fetchFirmaStatus = useCallback(async () => {
-    if (!profile?.company_id) return;
+    if (!effectiveCompanyId) return;
     // Get all firma responsibilities
     const { data: firmaResps } = await (supabase as any)
       .from("document_responsibilities")
