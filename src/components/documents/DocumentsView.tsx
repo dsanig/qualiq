@@ -1586,7 +1586,6 @@ export function DocumentsView({
                   </SelectContent>
                 </Select>
               </div>
-              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
