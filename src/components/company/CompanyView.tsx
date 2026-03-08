@@ -353,6 +353,7 @@ export function CompanyView() {
       password: createForm.password,
       full_name: createForm.fullName,
       role: createForm.role,
+      company_id: effectiveCompanyId,
     };
 
     if (debugUserCreation) {

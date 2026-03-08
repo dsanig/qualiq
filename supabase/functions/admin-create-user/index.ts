@@ -356,16 +356,20 @@ serve(async (req) => {
 
     const newUserId = createdUserData.user.id;
 
-    // Get the caller's company_id to assign to the new user
-    const { data: callerFullProfile } = await serviceClient
-      .from("profiles")
-      .select("company_id")
-      .eq("user_id", callerId)
-      .maybeSingle();
-    const callerCompanyId = callerFullProfile?.company_id ?? null;
+    // Use the company_id from the payload if provided (superadmin creating for a specific company),
+    // otherwise fall back to the caller's own company_id
+    let targetCompanyId = payload.company_id?.trim() || null;
+    if (!targetCompanyId) {
+      const { data: callerFullProfile } = await serviceClient
+        .from("profiles")
+        .select("company_id")
+        .eq("user_id", callerId)
+        .maybeSingle();
+      targetCompanyId = callerFullProfile?.company_id ?? null;
+    }
 
     const { error: profileUpsertError } = await serviceClient.from("profiles").upsert(
-      { user_id: newUserId, email, full_name: fullName, is_superadmin: false, company_id: callerCompanyId },
+      { user_id: newUserId, email, full_name: fullName, is_superadmin: false, company_id: targetCompanyId },
       { onConflict: "user_id" },
     );
 
