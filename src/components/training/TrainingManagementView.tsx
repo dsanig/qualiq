@@ -599,7 +599,35 @@ export function TrainingManagementView() {
             <Textarea value={contents} onChange={(e) => setContents(e.target.value)} placeholder="Contenidos de la formación..." rows={4} />
           </div>
 
-          {/* Document selection */}
+          {/* Status + Deadline */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Estado</Label>
+              <Select value={formStatus} onValueChange={setFormStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="en_proceso">En proceso</SelectItem>
+                  <SelectItem value="completa">Completa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Fecha límite</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formDeadline && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formDeadline ? format(formDeadline, "dd/MM/yyyy") : "Sin fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={formDeadline ?? undefined} onSelect={(d) => setFormDeadline(d ?? null)} className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
           <div>
             <Label className="mb-2 block">Documentos del sistema</Label>
             <div className="border rounded-lg max-h-40 overflow-y-auto p-2 space-y-1">
