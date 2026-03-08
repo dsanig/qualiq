@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
-type IncidentType = "incidencia" | "reclamacion" | "desviacion" | "otra";
+type IncidentType = "incidencia" | "desviacion" | "no_conformidad" | "otra";
 
 interface AuditRef { id: string; title: string; }
 interface UserRef { id: string; full_name: string | null; email: string | null; }
@@ -65,8 +65,8 @@ export function IncidentFormFields({
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="incidencia">Incidencia</SelectItem>
-            <SelectItem value="reclamacion">Reclamación</SelectItem>
             <SelectItem value="desviacion">Desviación</SelectItem>
+            <SelectItem value="no_conformidad">No Conformidad</SelectItem>
             <SelectItem value="otra">Otra</SelectItem>
           </SelectContent>
         </Select>
