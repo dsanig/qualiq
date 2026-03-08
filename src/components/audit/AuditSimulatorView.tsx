@@ -71,6 +71,22 @@ const SEVERITY_CONFIG = {
   observation: { icon: Info, color: "text-muted-foreground", bg: "bg-secondary", label: "Observación" },
 };
 
+const CATEGORY_LABELS: Record<string, string> = {
+  documentation: "Documentación",
+  training: "Formación",
+  process_control: "Control de Procesos",
+  quality_assurance: "Aseg. Calidad",
+  validation: "Validación",
+  storage: "Almacenamiento",
+  equipment: "Equipos",
+  complaints: "Reclamaciones",
+  capa: "CAPA",
+  data_integrity: "Integridad de Datos",
+};
+
+const formatCategory = (cat: string) =>
+  CATEGORY_LABELS[cat] || cat.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
 export function AuditSimulatorView() {
   const { user, profile } = useAuth();
   const [simulations, setSimulations] = useState<AuditSimulation[]>([]);
@@ -348,7 +364,7 @@ export function AuditSimulatorView() {
                             <Badge variant="outline" className={config.color}>
                               {config.label}
                             </Badge>
-                            <Badge variant="secondary">{finding.category}</Badge>
+                            <Badge variant="secondary">{formatCategory(finding.category)}</Badge>
                           </div>
                           <CardTitle className="text-base">{finding.finding_title}</CardTitle>
                         </div>
