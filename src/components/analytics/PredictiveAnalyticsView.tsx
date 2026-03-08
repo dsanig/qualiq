@@ -324,6 +324,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         title: "Análisis completado",
         description: "Se han detectado nuevos patrones e insights",
       });
+      logAction({ action: "run_analysis", entity_type: "predictive_analytics", details: { window: analysisWindow, records: incidentsData.length } });
 
       fetchInsights();
     } catch (e: unknown) {
