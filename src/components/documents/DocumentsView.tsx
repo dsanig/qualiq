@@ -329,6 +329,10 @@ export function DocumentsView({
   const [editDocCategory, setEditDocCategory] = useState("calidad");
   const [editDocTypology, setEditDocTypology] = useState<DocumentTypology>("Documento");
   const [editDocStatus, setEditDocStatus] = useState("draft");
+  const [editDocEffectiveImmediate, setEditDocEffectiveImmediate] = useState(true);
+  const [editDocEffectiveDate, setEditDocEffectiveDate] = useState("");
+  const [editDocNoExpiry, setEditDocNoExpiry] = useState(true);
+  const [editDocExpiryDate, setEditDocExpiryDate] = useState("");
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [isEditSaving, setIsEditSaving] = useState(false);
 
