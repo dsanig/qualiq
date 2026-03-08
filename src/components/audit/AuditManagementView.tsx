@@ -344,6 +344,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       non_conformity_id: data.id, action_type: "corrective", description: "Acción correctiva inicial", status: "open",
     });
     toast({ title: "No conformidad creada" });
+    logAction({ action: "create", entity_type: "non_conformity", entity_id: data?.id, entity_title: ncForm.title, details: { severity: ncForm.severity, capa_plan_id: selectedCapaPlanId } });
     setNewNcOpen(false);
     setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
     await loadData();
