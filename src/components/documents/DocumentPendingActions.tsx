@@ -331,6 +331,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   </span>
                 )}
               </div>
+            </div>
           </div>
         );
       })}
