@@ -321,12 +321,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   };
 
   const createNonConformity = async () => {
-    if (!selectedCapaPlanId || !ncForm.deadline) {
-      toast({ title: "Error", description: "La fecha límite es obligatoria.", variant: "destructive" }); return;
+    if (!selectedCapaPlanId || !ncForm.deadline || !ncForm.responsible_id) {
+      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
     }
     const { data, error } = await (supabase as any).from("non_conformities").insert({
       capa_plan_id: selectedCapaPlanId, title: ncForm.title, description: ncForm.description || null,
       severity: ncForm.severity || null, root_cause: ncForm.root_cause || null, status: ncForm.status, deadline: ncForm.deadline,
+      responsible_id: ncForm.responsible_id,
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     await (supabase as any).from("actions").insert({
