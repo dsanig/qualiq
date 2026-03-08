@@ -2379,7 +2379,8 @@ export function DocumentsView({
                       // Only show valid transitions for the current status
                       if (cs === "draft") return opt.value === "draft" || opt.value === "review";
                       if (cs === "review") return opt.value === "review"; // pending_signature is automatic
-                      if (cs === "pending_signature") return opt.value === "pending_signature" || opt.value === "approved";
+                      if (cs === "pending_signature") return opt.value === "pending_signature"; // pending_approval is automatic
+                      if (cs === "pending_approval") return opt.value === "pending_approval" || opt.value === "approved";
                       return opt.value === cs;
                     })
                     .map(opt => (
