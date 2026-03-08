@@ -1351,7 +1351,7 @@ export function DocumentsView({
   };
 
   const canPerformAction = useCallback(async (userId: string, documentId: string, actionType: string) => {
-    if (isSuperadmin) return true;
+    // No superadmin bypass — only assigned responsible users can perform actions
     const { count, error } = await (supabase as any)
       .from("document_responsibilities")
       .select("id", { count: "exact", head: true })
@@ -1364,7 +1364,7 @@ export function DocumentsView({
     }
 
     return (count || 0) > 0;
-  }, [isSuperadmin]);
+  }, []);
 
   const handleStartSigning = async () => {
     if (!selectedDocument) return;
