@@ -386,8 +386,13 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <span className={`text-xs flex items-center gap-1 ${status.color}`}><StatusIcon className="h-3 w-3" />{status.label}</span>
+                    {canEditContent && onOpenNewIncident && (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleOpenNewIncident(rec); }}>
+                        <AlertTriangle className="h-3 w-3 mr-1" />Crear incidencia
+                      </Button>
+                    )}
                     {canEditContent && <Pencil className="h-3.5 w-3.5 text-muted-foreground" />}
                   </div>
                 </div>
