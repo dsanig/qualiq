@@ -386,9 +386,17 @@ export function TrainingManagementView() {
   const isParticipant = (role: "trainer" | "trainee") =>
     detailParticipants.some((p) => p.user_id === user?.id && p.role === role);
 
-  const getSignatureStatus = (rec: TrainingRecord) => {
-    // We don't have counts loaded in list view, so just use status field
-    return rec.status;
+  const statusLabel = (s: string) => {
+    if (s === "completa") return "Completa";
+    if (s === "en_proceso") return "En proceso";
+    return "Pendiente";
+  };
+
+  const statusVariant = (s: string, deadline: string | null): "default" | "secondary" | "destructive" | "outline" => {
+    if (s === "completa") return "default";
+    if (deadline && new Date(deadline) < new Date()) return "destructive";
+    if (s === "en_proceso") return "secondary";
+    return "outline";
   };
 
   /* ---------------------------------------------------------------- */
