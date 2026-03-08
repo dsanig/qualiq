@@ -121,7 +121,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       return;
     }
     if (action.action_type === "aprobacion" && docStatus !== "pending_approval") {
-      toast({ title: "No permitido", description: "Solo se puede aprobar un documento en estado 'En Aprobación'.", variant: "destructive" });
+      toast({ title: "No permitido", description: "Solo se puede aprobar un documento en estado 'Pendiente de Aprobación'.", variant: "destructive" });
       return;
     }
 
