@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { TwoFactorSettings } from "./TwoFactorSettings";
 
 export function SettingsView() {
   const { user, profile } = useAuth();
@@ -192,6 +193,9 @@ export function SettingsView() {
           </Button>
         </div>
       </div>
+
+      {/* 2FA card */}
+      <TwoFactorSettings />
     </div>
   );
 }

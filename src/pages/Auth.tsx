@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Shield, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { MfaVerifyStep } from "@/components/auth/MfaVerifyStep";
 
 const emailSchema = z.string().email("Email inválido");
 const passwordSchema = z.string().min(6, "La contraseña debe tener al menos 6 caracteres");
@@ -17,18 +18,29 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [showMfa, setShowMfa] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
+        const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (data && data.nextLevel === "aal2" && data.currentLevel === "aal1") {
+          setShowMfa(true);
+          return;
+        }
         navigate("/");
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
+        const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (data && data.nextLevel === "aal2" && data.currentLevel === "aal1") {
+          setShowMfa(true);
+          return;
+        }
         navigate("/");
       }
     });
@@ -86,6 +98,11 @@ export default function Auth() {
     }
   };
 
+  const handleMfaCancel = async () => {
+    await supabase.auth.signOut({ scope: "local" });
+    setShowMfa(false);
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
@@ -100,54 +117,60 @@ export default function Auth() {
         </div>
 
         <div className="bg-card rounded-xl border border-border p-8 shadow-lg">
-          <h1 className="text-2xl font-bold text-foreground text-center mb-2">
-            Iniciar Sesión
-          </h1>
-          <p className="text-muted-foreground text-center mb-6">
-            Acceda a su plataforma de cumplimiento
-          </p>
+          {showMfa ? (
+            <MfaVerifyStep onVerified={() => navigate("/")} onCancel={handleMfaCancel} />
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold text-foreground text-center mb-2">
+                Iniciar Sesión
+              </h1>
+              <p className="text-muted-foreground text-center mb-6">
+                Acceda a su plataforma de cumplimiento
+              </p>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                data-testid="auth-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="correo@empresa.com"
-                className="mt-1"
-              />
-              {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
-            </div>
-            <div>
-              <Label htmlFor="password">Contraseña</Label>
-              <div className="relative mt-1">
-                <Input
-                  id="password"
-                  data-testid="auth-password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {errors.password && <p className="text-destructive text-sm mt-1">{errors.password}</p>}
-            </div>
-            <Button type="submit" variant="accent" className="w-full" disabled={isLoading} data-testid="auth-submit">
-              {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Iniciar Sesión
-            </Button>
-          </form>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    data-testid="auth-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="correo@empresa.com"
+                    className="mt-1"
+                  />
+                  {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="password">Contraseña</Label>
+                  <div className="relative mt-1">
+                    <Input
+                      id="password"
+                      data-testid="auth-password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {errors.password && <p className="text-destructive text-sm mt-1">{errors.password}</p>}
+                </div>
+                <Button type="submit" variant="accent" className="w-full" disabled={isLoading} data-testid="auth-submit">
+                  {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Iniciar Sesión
+                </Button>
+              </form>
+            </>
+          )}
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
