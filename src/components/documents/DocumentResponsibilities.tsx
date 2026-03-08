@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Trash2, Clock, Users, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Trash2, Clock, Users, CheckCircle2, XCircle, ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -87,6 +87,8 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
   const [rejectingResp, setRejectingResp] = useState<Responsibility | null>(null);
   const [rejectComment, setRejectComment] = useState("");
   const [isRejecting, setIsRejecting] = useState(false);
+  const [documentStatus, setDocumentStatus] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const { user, profile } = useAuth();
   const { canEditContent } = usePermissions();
   const { toast } = useToast();
@@ -123,12 +125,18 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
     setCompanyUsers(data || []);
   }, [profile?.company_id]);
 
+  const fetchDocumentStatus = useCallback(async () => {
+    const { data } = await supabase.from("documents").select("status").eq("id", documentId).single();
+    setDocumentStatus((data as any)?.status || null);
+  }, [documentId]);
+
   useEffect(() => {
     if (open) {
       fetchResponsibilities();
       fetchCompanyUsers();
+      fetchDocumentStatus();
     }
-  }, [open, fetchResponsibilities, fetchCompanyUsers]);
+  }, [open, fetchResponsibilities, fetchCompanyUsers, fetchDocumentStatus]);
 
   const handleAdd = async () => {
     if (!selectedUserId || !selectedDueDate || !user) {
@@ -250,6 +258,34 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
     }
   };
 
+  const handleTransitionToReview = async () => {
+    if (!user) return;
+    setIsTransitioning(true);
+    try {
+      const { error: updateError } = await supabase.from("documents").update({
+        status: "review" as any,
+      }).eq("id", documentId);
+      if (updateError) throw updateError;
+
+      await (supabase as any).from("document_status_changes").insert({
+        document_id: documentId,
+        old_status: "draft",
+        new_status: "review",
+        changed_by: user.id,
+        comment: `Cambio a En Revisión por ${profile?.full_name || user.email}`,
+      });
+
+      toast({ title: "Estado actualizado", description: `${documentCode}: Borrador → En Revisión` });
+      await fetchDocumentStatus();
+      await fetchResponsibilities();
+      onWorkflowChange?.();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
   const now = new Date();
 
   const reviewResps = responsibilities.filter(r => r.action_type === "revision");
@@ -280,6 +316,25 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
               <p className="text-sm text-destructive font-medium">
                 Este documento ha sido denegado y devuelto a Borrador. Revisa los comentarios y vuelve a enviar.
               </p>
+            </div>
+          )}
+
+          {/* Transition to review button */}
+          {documentStatus === "draft" && user && responsibilities.some(r => r.action_type === "revision" && r.user_id === user.id && r.status === "pending") && (
+            <div className="border border-primary/30 rounded-lg p-3 bg-primary/5 flex items-center justify-between gap-2">
+              <p className="text-sm text-foreground">
+                El documento está en <strong>Borrador</strong>. Como responsable de revisión, puedes pasarlo a <strong>En Revisión</strong>.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-primary border-primary/30 hover:bg-primary/10 shrink-0"
+                onClick={handleTransitionToReview}
+                disabled={isTransitioning}
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
+                {isTransitioning ? "..." : "Pasar a En Revisión"}
+              </Button>
             </div>
           )}
 
