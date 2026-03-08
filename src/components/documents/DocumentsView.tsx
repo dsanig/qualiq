@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCompanyContext } from "@/hooks/useCompanyContext";
 import {
   Dialog,
   DialogContent,
@@ -316,6 +317,7 @@ export function DocumentsView({
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const { canEditContent, canManageCompany, isSuperadmin, refreshPermissions } = usePermissions();
+  const { effectiveCompanyId } = useCompanyContext();
   const { logAction } = useAuditLog();
 
   // Edit document state
@@ -403,7 +405,7 @@ export function DocumentsView({
   const [rejectedDocIds, setRejectedDocIds] = useState<Set<string>>(new Set());
 
   const fetchRejectedDocs = useCallback(async () => {
-    if (!profile?.company_id) return;
+    if (!effectiveCompanyId) return;
     const { data } = await (supabase as any)
       .from("document_responsibilities")
       .select("document_id")
@@ -411,11 +413,11 @@ export function DocumentsView({
     if (data) {
       setRejectedDocIds(new Set((data as any[]).map((r: any) => r.document_id)));
     }
-  }, [profile?.company_id]);
+  }, [effectiveCompanyId]);
 
   // Fetch signatures from DB
   const fetchSignatures = useCallback(async () => {
-    if (!profile?.company_id || !user) return;
+    if (!effectiveCompanyId || !user) return;
     const { data } = await supabase
       .from("document_signatures")
       .select("*")
@@ -432,11 +434,11 @@ export function DocumentsView({
       }
       setSignedDocuments(mapped);
     }
-  }, [profile?.company_id, user]);
+  }, [effectiveCompanyId, user]);
 
   // Fetch firma responsibilities and signatures to compute signature status
   const fetchFirmaStatus = useCallback(async () => {
-    if (!profile?.company_id) return;
+    if (!effectiveCompanyId) return;
     // Get all firma responsibilities
     const { data: firmaResps } = await (supabase as any)
       .from("document_responsibilities")
@@ -459,15 +461,15 @@ export function DocumentsView({
       }
     }
     setFirmaStatus(statusMap);
-  }, [profile?.company_id]);
+  }, [effectiveCompanyId]);
 
   const fetchDocuments = useCallback(async () => {
-    if (!profile?.company_id) return;
+    if (!effectiveCompanyId) return;
 
     let query = supabase
       .from("documents")
       .select("*")
-      .eq("company_id", profile.company_id)
+      .eq("company_id", effectiveCompanyId)
       .order("created_at", { ascending: false });
 
     if (filters.documentTypology !== "all") {
@@ -489,7 +491,7 @@ export function DocumentsView({
       const { data: fallbackData, error: fallbackError } = await supabase
         .from("documents")
         .select("*")
-        .eq("company_id", profile.company_id)
+        .eq("company_id", effectiveCompanyId)
         .order("created_at", { ascending: false });
 
       if (fallbackError || !fallbackData) return;
@@ -571,13 +573,13 @@ export function DocumentsView({
       }));
       setDbDocuments(mapped);
     }
-  }, [filters, onFiltersChange, profile?.company_id, toast]);
+  }, [filters, onFiltersChange, effectiveCompanyId, toast]);
 
   const fetchCompanyUsers = useCallback(async () => {
-    if (!profile?.company_id) return;
-    const { data } = await supabase.from("profiles").select("user_id, full_name, email").eq("company_id", profile.company_id);
+    if (!effectiveCompanyId) return;
+    const { data } = await supabase.from("profiles").select("user_id, full_name, email").eq("company_id", effectiveCompanyId);
     setCompanyUsers(data || []);
-  }, [profile?.company_id]);
+  }, [effectiveCompanyId]);
 
   useEffect(() => {
     fetchDocuments();
@@ -627,7 +629,7 @@ export function DocumentsView({
         .from("documents")
         .update(updatePayload as any)
         .eq("id", editingDocId)
-        .eq("company_id", profile?.company_id ?? "")
+        .eq("company_id", effectiveCompanyId ?? "")
         .select("id, typology");
 
       console.log("UPDATE result", { data, error, status, count, rowCount: data?.length ?? 0 });
@@ -647,7 +649,7 @@ export function DocumentsView({
         console.error("[documents] update without affected rows", {
           documentId: editingDocId,
           userId: user?.id,
-          companyId: profile?.company_id,
+          companyId: effectiveCompanyId,
         });
         toast({
           title: "Sin cambios",
@@ -1019,7 +1021,7 @@ export function DocumentsView({
   };
 
   const handleUpdateVersion = async () => {
-    if (!selectedDocument || !user || !profile?.company_id) return;
+    if (!selectedDocument || !user || !effectiveCompanyId) return;
     if (!updateVersionFile) {
       toast({ title: "Archivo requerido", description: "Selecciona un archivo para actualizar la versión.", variant: "destructive" });
       return;
@@ -1031,7 +1033,7 @@ export function DocumentsView({
       const fileType = fileTypeForDb(updateVersionFile);
       const fileExt = getFileExtension(updateVersionFile.name) || "bin";
       debugFileTypeMapping(updateVersionFile);
-      const filePath = `${profile.company_id}/${selectedDocument.id}/${crypto.randomUUID()}.${fileExt}`;
+      const filePath = `${effectiveCompanyId}/${selectedDocument.id}/${crypto.randomUUID()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, updateVersionFile);
       if (uploadError) throw uploadError;
@@ -1269,7 +1271,7 @@ export function DocumentsView({
       toast({ title: "Responsables obligatorios", description: `Debes asignar al menos un responsable de: ${missing}.`, variant: "destructive" });
       return;
     }
-    if (!user || !profile?.company_id) {
+    if (!user || !effectiveCompanyId) {
       toast({ title: "Error", description: "Debes iniciar sesión.", variant: "destructive" });
       return;
     }
@@ -1302,7 +1304,7 @@ export function DocumentsView({
       }
 
       const documentId = crypto.randomUUID();
-      const filePath = `${profile.company_id}/${documentId}/${newDocFile.name}`;
+      const filePath = `${effectiveCompanyId}/${documentId}/${newDocFile.name}`;
 
       const { error: uploadError } = await supabase.storage.from("documents").upload(filePath, newDocFile);
       if (uploadError) throw uploadError;
@@ -1313,7 +1315,7 @@ export function DocumentsView({
         title: newDocTitle.trim(),
         category: newDocCategory.charAt(0).toUpperCase() + newDocCategory.slice(1),
         typology: newDocTypology || "Documento",
-        company_id: profile.company_id,
+        company_id: effectiveCompanyId,
         owner_id: uploaderUser.id,
         file_type: fileType,
         file_url: filePath,
