@@ -185,6 +185,8 @@ const Index = () => {
             onNavigateToModule={setActiveModule}
           />
         );
+      case "calendar":
+        return <CalendarView />;
       case "documents":
         return (
           <DocumentsView
