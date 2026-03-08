@@ -58,6 +58,7 @@ export function DocumentActionsMenu({
   onChangeStatus,
   onManageResponsibilities,
   onViewSignatureStatus,
+  onViewPendingActions,
 }: DocumentActionsMenuProps) {
   return (
     <DropdownMenu>
