@@ -126,7 +126,7 @@ const Index = () => {
 
   const handleQuickAction = (action: string) => {
     switch (action) {
-      case "Nuevo PNT":
+      case "Nuevo Documento":
         setActiveModule("documents");
         setIsNewDocumentOpen(true);
         break;
@@ -138,8 +138,9 @@ const Index = () => {
       case "Crear CAPA":
         setActiveModule("audits");
         break;
-      case "Ver Informes":
-        setActiveModule("analytics");
+      case "Registrar Reclamación":
+        setActiveModule("reclamaciones");
+        setIsNewReclamacionOpen(true);
         break;
       default:
         break;
