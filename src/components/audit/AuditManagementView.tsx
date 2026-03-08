@@ -74,6 +74,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "",
     observations: "", findings: "", conclusions: "", status: "open",
     participant_ids: [] as string[],
+    audit_type: "interna" as "interna" | "externa", external_entity_id: "",
   });
   const [auditFiles, setAuditFiles] = useState<FileList | null>(null);
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "" });
