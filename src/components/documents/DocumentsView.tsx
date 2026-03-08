@@ -1771,33 +1771,45 @@ export function DocumentsView({
                         {expandedDocumentId === doc.id && (
                           <tr className="bg-secondary/20">
                             <td colSpan={7} className="px-4 py-4">
-                              <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-muted-foreground">
-                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Formato</p><p className="text-sm font-medium text-foreground">{doc.format.toUpperCase()}</p></div>
-                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Autor original</p><p className="text-sm font-medium text-foreground">{doc.originalAuthor}</p></div>
-                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Versión actual</p><p className="text-sm font-medium text-foreground">v{doc.version}</p></div>
-                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Última modificación</p><p className="text-sm font-medium text-foreground">{doc.lastUpdated}</p></div>
-                                  <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Modificado por</p><p className="text-sm font-medium text-foreground">{doc.lastModifiedBy}</p></div>
+                              <div className="space-y-4">
+                                {/* Metadata + Actions */}
+                                <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-muted-foreground">
+                                    <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Formato</p><p className="text-sm font-medium text-foreground">{doc.format.toUpperCase()}</p></div>
+                                    <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Autor original</p><p className="text-sm font-medium text-foreground">{doc.originalAuthor}</p></div>
+                                    <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Versión actual</p><p className="text-sm font-medium text-foreground">v{doc.version}</p></div>
+                                    <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Última modificación</p><p className="text-sm font-medium text-foreground">{doc.lastUpdated}</p></div>
+                                    <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Modificado por</p><p className="text-sm font-medium text-foreground">{doc.lastModifiedBy}</p></div>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 shrink-0">
+                                    <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
+                                    <Button variant="outline" onClick={() => handleOpenUpdateVersion(doc)} disabled={!canEditContent}>Actualizar versión</Button>
+                                    <Button variant="outline" onClick={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}>
+                                      <ClipboardList className="w-4 h-4 mr-1" />
+                                      Acciones Pendientes
+                                    </Button>
+                                    <Button variant="accent" onClick={() => handleDownload(doc)}>Descargar</Button>
+                                  </div>
                                 </div>
 
                                 {/* Responsibilities */}
                                 {expandedResponsibilities[doc.id] && expandedResponsibilities[doc.id].length > 0 && (
-                                  <div className="mt-3 border-t border-border pt-3">
+                                  <div className="border-t border-border pt-3">
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Responsables asignados</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    <div className="space-y-1.5">
                                       {expandedResponsibilities[doc.id].map((r, idx) => {
                                         const actionLabel = r.action_type === "revision" ? "Revisión" : r.action_type === "firma" ? "Firma" : r.action_type === "aprobacion" ? "Aprobación" : r.action_type;
                                         const isOverdue = new Date(r.due_date) < new Date() && r.status !== "completed";
                                         const isCompleted = r.status === "completed";
                                         return (
-                                          <div key={idx} className="flex items-center gap-2 text-xs bg-card border border-border rounded px-2 py-1.5">
-                                            <span className="font-medium text-foreground">{actionLabel}:</span>
-                                            <span className="text-muted-foreground truncate">{r.userName}</span>
+                                          <div key={idx} className="flex items-center gap-3 text-sm">
+                                            <span className="font-medium text-foreground w-24 shrink-0">{actionLabel}</span>
+                                            <span className="text-muted-foreground">{r.userName}</span>
                                             <span className={cn(
-                                              "ml-auto shrink-0",
-                                              isCompleted ? "text-success" : isOverdue ? "text-destructive font-medium" : "text-muted-foreground"
+                                              "ml-auto shrink-0 text-xs",
+                                              isCompleted ? "text-success font-medium" : isOverdue ? "text-destructive font-medium" : "text-muted-foreground"
                                             )}>
-                                              {isCompleted ? "✓" : new Date(r.due_date).toLocaleDateString("es-ES")}
+                                              {isCompleted ? "✓ Completado" : `Límite: ${new Date(r.due_date).toLocaleDateString("es-ES")}`}
                                             </span>
                                           </div>
                                         );
@@ -1805,16 +1817,6 @@ export function DocumentsView({
                                     </div>
                                   </div>
                                 )}
-
-                                <div className="flex flex-wrap gap-2 mt-3">
-                                  <Button variant="outline" onClick={() => handleOpenPreview(doc)}>Ver documento</Button>
-                                  <Button variant="outline" onClick={() => handleOpenUpdateVersion(doc)} disabled={!canEditContent}>Actualizar versión</Button>
-                                  <Button variant="outline" onClick={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}>
-                                    <ClipboardList className="w-4 h-4 mr-1" />
-                                    Acciones Pendientes
-                                  </Button>
-                                  <Button variant="accent" onClick={() => handleDownload(doc)}>Descargar</Button>
-                                </div>
                               </div>
                             </td>
                           </tr>
