@@ -345,6 +345,7 @@ export function DocumentsView({
   const [isSignatureStatusOpen, setIsSignatureStatusOpen] = useState(false);
   const [isPendingActionsOpen, setIsPendingActionsOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
   // New document form state
