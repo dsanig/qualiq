@@ -342,8 +342,6 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
       const { error } = await supabase
         .from("predictive_insights")
         .update({
-          read_at: new Date().toISOString(),
-          read_by: userData.user?.id ?? null,
           is_acknowledged: true,
           acknowledged_at: new Date().toISOString(),
           acknowledged_by: userData.user?.id ?? null,
