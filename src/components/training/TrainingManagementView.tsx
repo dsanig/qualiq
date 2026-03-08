@@ -216,7 +216,7 @@ export function TrainingManagementView() {
       if (editingId) {
         await (supabase as any)
           .from("training_records")
-          .update({ title, description, contents, updated_at: new Date().toISOString() })
+          .update({ title, description, contents, status: formStatus, deadline: formDeadline ? formDeadline.toISOString().split("T")[0] : null, updated_at: new Date().toISOString() })
           .eq("id", editingId);
       } else {
         const { data, error } = await (supabase as any)
