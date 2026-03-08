@@ -265,10 +265,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const openEditAudit = (audit: Audit) => {
     setEditingAudit(audit);
+    const participantUserIds = auditParticipants.filter((p) => p.audit_id === audit.id).map((p) => p.user_id);
     setAuditForm({
       title: audit.title, description: audit.description ?? "", audit_date: audit.audit_date ?? "",
-      auditor_id: audit.auditor_id ?? "", observations: audit.observations ?? "",
-      findings: audit.findings ?? "", conclusions: audit.conclusions ?? "", status: audit.status ?? "open",
+      auditor_id: audit.auditor_id ?? "", responsible_id: audit.responsible_id ?? "",
+      observations: audit.observations ?? "", findings: audit.findings ?? "",
+      conclusions: audit.conclusions ?? "", status: audit.status ?? "open",
+      participant_ids: participantUserIds,
     });
     setAuditFiles(null);
     setEditAuditOpen(true);
