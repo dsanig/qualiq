@@ -390,6 +390,7 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
         .eq("company_id", profile.company_id);
       if (error) throw error;
       setInsights((prev) => prev.filter((i) => i.id !== insightId));
+      setWindowInsights((prev) => prev.filter((i) => i.id !== insightId));
       toast({ title: "Insight eliminado" });
     } catch (e: any) {
       toast({ title: "Error al eliminar", description: e.message ?? "Error desconocido.", variant: "destructive" });
