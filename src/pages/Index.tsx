@@ -25,6 +25,7 @@ const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   dashboard: { title: "Panel de Control", subtitle: "Visión general del estado de cumplimiento" },
   documents: { title: "Gestión Documental", subtitle: "SOPs, PNTs y documentación de calidad" },
   incidents: { title: "Incidencias", subtitle: "No conformidades, desviaciones y CAPAs" },
+  reclamaciones: { title: "Reclamaciones", subtitle: "Gestión de reclamaciones de clientes, proveedores y terceros" },
   audits: { title: "Auditorías", subtitle: "Gestión de auditorías, CAPA y acciones" },
   training: { title: "Gestión de Formaciones", subtitle: "Registros de formaciones impartidas y recibidas" },
   "training-exam": { title: "Examen de Formación", subtitle: "Evaluación de comprensión de procedimientos" },
