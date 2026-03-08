@@ -137,6 +137,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const selectedAudit = audits.find((a) => a.id === selectedAuditId) ?? null;
   const selectedAuditAttachments = useMemo(() => auditAttachments.filter((a) => a.audit_id === selectedAuditId), [auditAttachments, selectedAuditId]);
+  const selectedAuditParticipants = useMemo(() => auditParticipants.filter((p) => p.audit_id === selectedAuditId), [auditParticipants, selectedAuditId]);
 
   const getUserName = (id: string | null) => {
     if (!id) return null;
