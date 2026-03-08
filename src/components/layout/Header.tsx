@@ -2,6 +2,7 @@ import { Bell, Search, User, HelpCircle, LogOut, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NotificationsDropdown } from "@/components/notifications/NotificationsDropdown";
+import { CompanySwitcher } from "./CompanySwitcher";
 import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
