@@ -261,7 +261,7 @@ export function AuditTrailView() {
       "Acción": actionLabels[e.action] ?? e.action,
       "Módulo": entityTypeLabels[e.entity_type] ?? e.entity_type,
       "Elemento": e.entity_title ?? "",
-      "Detalles": e.details ? Object.entries(e.details).map(([k, v]) => `${k}: ${String(v)}`).join("; ") : "",
+      "Detalles": e.details ? Object.entries(e.details).map(([k, v]) => `${detailKeyLabels[k] || k}: ${String(v)}`).join("; ") : "",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
