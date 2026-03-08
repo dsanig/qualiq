@@ -380,6 +380,25 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
     });
   };
 
+  const handleDeleteAllInsights = async () => {
+    if (!profile?.company_id) return;
+    if (!confirm("¿Eliminar todos los insights del análisis predictivo? Esta acción no se puede deshacer.")) return;
+
+    try {
+      const { error } = await supabase
+        .from("predictive_insights")
+        .delete()
+        .eq("company_id", profile.company_id);
+
+      if (error) throw error;
+
+      setInsights([]);
+      toast({ title: "Insights eliminados", description: "Se han eliminado todos los resultados del análisis." });
+    } catch (e: any) {
+      toast({ title: "Error al eliminar", description: e.message ?? "Error desconocido.", variant: "destructive" });
+    }
+  };
+
   const unreadWindowInsights = windowInsights.filter((i) => !i.is_acknowledged);
   const unacknowledgedCount = unreadWindowInsights.length;
   const highSeverityCount = unreadWindowInsights.filter((i) => i.severity === "high").length;
