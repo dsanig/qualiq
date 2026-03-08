@@ -12,7 +12,8 @@ import {
   PenTool,
   ArrowRightLeft,
   UserCheck,
-  ClipboardList
+  ClipboardList,
+  ScrollText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,7 @@ interface DocumentActionsMenuProps {
   isLocked?: boolean;
   onEdit?: () => void;
   onViewHistory?: () => void;
+  onViewFullHistory?: () => void;
   onViewOwners?: () => void;
   onDownload?: () => void;
   onShare?: () => void;
@@ -47,6 +49,7 @@ export function DocumentActionsMenu({
   isLocked = false,
   onEdit,
   onViewHistory,
+  onViewFullHistory,
   onViewOwners,
   onDownload,
   onShare,
@@ -89,6 +92,10 @@ export function DocumentActionsMenu({
           Acciones Pendientes
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onViewFullHistory} className="cursor-pointer">
+          <ScrollText className="w-4 h-4 mr-2" />
+          Ver Historial
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={onViewHistory} className="cursor-pointer">
           <History className="w-4 h-4 mr-2" />
           Historial de Versiones
