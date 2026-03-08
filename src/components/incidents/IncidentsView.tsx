@@ -247,6 +247,16 @@ export function IncidentsView({
 
   useEffect(() => { void loadData(); }, [reloadToken]);
 
+  // Auto-open a specific incident by ID (e.g. from reclamaciones navigation)
+  useEffect(() => {
+    if (!openIncidentId || incidents.length === 0) return;
+    const incident = incidents.find((i) => i.id === openIncidentId);
+    if (incident) {
+      openEdit(incident);
+      onOpenIncidentConsumed?.();
+    }
+  }, [openIncidentId, incidents]);
+
   useEffect(() => {
     if (!prefill || !isNewIncidentOpen) return;
     setForm((prev) => ({
