@@ -2437,6 +2437,29 @@ export function DocumentsView({
           onWorkflowChange={() => { fetchDocuments(); fetchFirmaStatus(); }}
         />
       )}
+      {/* Pending Actions Dialog */}
+      {selectedDocument && (
+        <Dialog open={isPendingActionsOpen} onOpenChange={setIsPendingActionsOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5" />
+                Acciones Pendientes
+              </DialogTitle>
+              <DialogDescription>
+                Acciones pendientes para {selectedDocument.code}
+              </DialogDescription>
+            </DialogHeader>
+            <DocumentPendingActions
+              documentId={selectedDocument.id}
+              onActionCompleted={() => { fetchDocuments(); fetchFirmaStatus(); }}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPendingActionsOpen(false)}>Cerrar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
