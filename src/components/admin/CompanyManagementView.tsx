@@ -129,6 +129,7 @@ export function CompanyManagementView() {
         return;
       }
       toast({ title: "Empresa actualizada" });
+      logAction({ action: "update", entity_type: "company", entity_id: editingCompany.id, entity_title: form.name.trim(), details: { status: form.status, plan_type: form.plan_type } });
     } else {
       const { error } = await (supabase as any)
         .from("companies")
