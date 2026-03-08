@@ -356,10 +356,13 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   };
 
   const createAction = async () => {
+    if (!actionForm.responsible_id || !actionForm.due_date) {
+      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
+    }
     const { data, error } = await (supabase as any).from("actions").insert({
       non_conformity_id: actionForm.non_conformity_id, action_type: actionForm.action_type,
-      description: actionForm.description, responsible_id: actionForm.responsible_id || null,
-      due_date: actionForm.due_date || null, status: actionForm.status,
+      description: actionForm.description, responsible_id: actionForm.responsible_id,
+      due_date: actionForm.due_date, status: actionForm.status,
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     if (actionForm.file) {
