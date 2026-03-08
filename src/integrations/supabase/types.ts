@@ -1847,6 +1847,7 @@ export type Database = {
     Views: {
       user_directory: {
         Row: {
+          company_id: string | null
           created_at: string | null
           email: string | null
           full_name: string | null
@@ -1854,7 +1855,15 @@ export type Database = {
           is_superadmin: boolean | null
           role: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
