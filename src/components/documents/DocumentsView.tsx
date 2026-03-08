@@ -629,7 +629,7 @@ export function DocumentsView({
         .from("documents")
         .update(updatePayload as any)
         .eq("id", editingDocId)
-        .eq("company_id", profile?.company_id ?? "")
+        .eq("company_id", effectiveCompanyId ?? "")
         .select("id, typology");
 
       console.log("UPDATE result", { data, error, status, count, rowCount: data?.length ?? 0 });
