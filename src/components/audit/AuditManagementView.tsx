@@ -544,7 +544,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         <Label>Estado</Label>
         <Select value={actionForm.status} onValueChange={(v) => setActionForm((p) => ({ ...p, status: v }))}>
           <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+          <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       {showNcSelect && (
