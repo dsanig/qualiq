@@ -16,6 +16,7 @@ export function SettingsView() {
 
   // Profile state
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
+  const [jobTitle, setJobTitle] = useState((profile as any)?.job_title ?? "");
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Password state
@@ -28,7 +29,8 @@ export function SettingsView() {
 
   useEffect(() => {
     setFullName(profile?.full_name ?? "");
-  }, [profile?.full_name]);
+    setJobTitle((profile as any)?.job_title ?? "");
+  }, [profile?.full_name, (profile as any)?.job_title]);
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -36,7 +38,7 @@ export function SettingsView() {
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ full_name: fullName.trim() || null })
+        .update({ full_name: fullName.trim() || null, job_title: jobTitle.trim() || null } as any)
         .eq("user_id", user.id);
 
       if (error) throw error;
@@ -116,6 +118,16 @@ export function SettingsView() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Tu nombre completo"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="settings-job-title" className="text-xs text-muted-foreground">Cargo</Label>
+              <Input
+                id="settings-job-title"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="Ej: Responsable de Calidad"
                 className="mt-1"
               />
             </div>
