@@ -33,9 +33,8 @@ export function FilterModal({ open, onOpenChange, filters, onFiltersChange }: Fi
       documentTypology: "all",
       documentStatus: "all",
       signatureStatus: "all",
-      incidentArea: "all",
+      incidentType: "all",
       incidentStatus: "all",
-      incidentPriority: "all",
     });
   };
 
