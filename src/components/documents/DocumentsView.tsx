@@ -27,6 +27,7 @@ import { DocumentActionsMenu } from "./DocumentActionsMenu";
 import { DocumentResponsibilities } from "./DocumentResponsibilities";
 import { DocumentSignatureStatusDialog } from "./DocumentSignatureStatusDialog";
 import { DocumentPendingActions } from "./DocumentPendingActions";
+import { ShareDocumentDialog } from "./ShareDocumentDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -344,6 +345,7 @@ export function DocumentsView({
   const [isSignatureStatusOpen, setIsSignatureStatusOpen] = useState(false);
   const [isPendingActionsOpen, setIsPendingActionsOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
   // New document form state
@@ -1835,7 +1837,7 @@ export function DocumentsView({
                                onChangeStatus={() => handleOpenChangeStatus(doc)}
                               onManageResponsibilities={() => { setSelectedDocument(doc); setIsResponsibilitiesOpen(true); }}
                               onViewPendingActions={() => { setSelectedDocument(doc); setIsPendingActionsOpen(true); }}
-                              onShare={() => handleAction("Compartir", doc.code)}
+                              onShare={() => { setSelectedDocument(doc); setIsShareOpen(true); }}
                               onToggleLock={() => handleAction("Bloquear/Desbloquear", doc.code)}
                               onDelete={() => handleRequestDelete(doc)}
                             />
@@ -2727,6 +2729,16 @@ export function DocumentsView({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+      {/* Share Document Dialog */}
+      {selectedDocument && (
+        <ShareDocumentDialog
+          open={isShareOpen}
+          onOpenChange={setIsShareOpen}
+          documentId={selectedDocument.id}
+          documentCode={selectedDocument.code}
+          documentStatus={selectedDocument.status}
+        />
       )}
     </div>
   );
