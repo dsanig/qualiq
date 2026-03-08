@@ -152,10 +152,8 @@ export function CompanyView() {
   }, [toast]);
 
   useEffect(() => {
-    if (canManageCompany) {
-      void fetchUsers();
-    }
-  }, [canManageCompany, fetchUsers]);
+    void fetchUsers();
+  }, [fetchUsers]);
 
   useEffect(() => {
     const fetchCompany = async () => {
@@ -745,7 +743,7 @@ export function CompanyView() {
                     <span className="text-xs bg-secondary px-2 py-1 rounded-full">
                       {userItem.is_superadmin ? "Superadministrador" : userItem.role}
                     </span>
-                    {isSuperadmin && (
+                    {canManageCompany && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -755,7 +753,8 @@ export function CompanyView() {
                         Editar
                       </Button>
                     )}
-                    {canManagePasswords && (
+                    {/* Admins can change any password; regular users only their own */}
+                    {(canManagePasswords || userItem.id === user?.id) && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -912,7 +911,7 @@ export function CompanyView() {
         </DialogContent>
       </Dialog>
 
-      {isSuperadmin && (
+      {canManageCompany && (
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
