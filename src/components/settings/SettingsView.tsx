@@ -29,7 +29,8 @@ export function SettingsView() {
 
   useEffect(() => {
     setFullName(profile?.full_name ?? "");
-  }, [profile?.full_name]);
+    setJobTitle((profile as any)?.job_title ?? "");
+  }, [profile?.full_name, (profile as any)?.job_title]);
 
   const handleSaveProfile = async () => {
     if (!user) return;
