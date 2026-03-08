@@ -649,7 +649,7 @@ export function DocumentsView({
         console.error("[documents] update without affected rows", {
           documentId: editingDocId,
           userId: user?.id,
-          companyId: profile?.company_id,
+          companyId: effectiveCompanyId,
         });
         toast({
           title: "Sin cambios",
