@@ -7,6 +7,7 @@ import { CheckCircle, XCircle, BookOpen, Award, ArrowRight, Loader2 } from "luci
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { useAuditLog } from "@/hooks/useAuditLog";
 
 interface TrainingSession {
   id: string;
