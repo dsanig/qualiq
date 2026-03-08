@@ -2,23 +2,12 @@ import { useEffect, useState, useCallback } from "react";
 import { ClipboardList, CheckCircle2, Clock, AlertTriangle, ArrowRightLeft, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ActionConfirmDialog } from "./ActionConfirmDialog";
 
 const statusLabels: Record<string, string> = {
   draft: "Borrador",
@@ -51,6 +40,12 @@ const actionTypeColors: Record<string, string> = {
   revision: "bg-warning/10 text-warning",
 };
 
+const confirmWords: Record<string, string> = {
+  firma: "FIRMAR",
+  aprobacion: "APROBAR",
+  revision: "REVISAR",
+};
+
 interface PendingAction {
   id: string;
   document_id: string;
@@ -75,11 +70,15 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [completingId, setCompletingId] = useState<string | null>(null);
-  const [rejectingAction, setRejectingAction] = useState<PendingAction | null>(null);
-  const [rejectComment, setRejectComment] = useState("");
-  const [isRejecting, setIsRejecting] = useState(false);
+  const [changingStatusDocId, setChangingStatusDocId] = useState<string | null>(null);
   const { user, profile } = useAuth();
   const { toast } = useToast();
+
+  // Confirm dialog state
+  const [confirmAction, setConfirmAction] = useState<PendingAction | null>(null);
+  const [confirmType, setConfirmType] = useState<"complete" | "reject" | "changeStatus">("complete");
+  const [confirmNextStatus, setConfirmNextStatus] = useState<string>("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const fetchActions = useCallback(async () => {
     if (!user) return;
@@ -134,12 +133,13 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     fetchActions();
   }, [fetchActions]);
 
-  const handleComplete = async (action: PendingAction) => {
+  // --- Action handlers (called after confirmation) ---
+
+  const executeComplete = async (action: PendingAction) => {
     if (!user || action.user_id !== user.id) {
       toast({ title: "Error", description: "Solo el responsable asignado puede completar esta acción.", variant: "destructive" });
       return;
     }
-
     const docStatus = action.documentStatus;
     if (action.action_type === "revision" && docStatus !== "review") {
       toast({ title: "No permitido", description: "Solo se puede revisar un documento en estado 'En Revisión'.", variant: "destructive" });
@@ -160,12 +160,10 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
         .from("document_responsibilities")
         .update({ status: "completed", completed_at: new Date().toISOString() })
         .eq("id", action.id);
-
       if (error) throw error;
 
       const label = action.action_type === "revision" ? "Revisión completada" : action.action_type === "firma" ? "Firma registrada" : action.action_type === "aprobacion" ? "Aprobación registrada" : "Acción completada";
       toast({ title: label, description: `Acción completada para ${action.documentCode}` });
-
       setActions(prev => prev.filter(a => a.id !== action.id));
       onActionCompleted?.();
     } catch (err: any) {
@@ -175,60 +173,49 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     }
   };
 
-  const handleReject = async () => {
-    if (!user || !rejectingAction) return;
-    setIsRejecting(true);
+  const executeReject = async (action: PendingAction, comment?: string) => {
+    if (!user) return;
     try {
-      // 1. Mark this responsibility as rejected
       const { error: rejectError } = await (supabase as any)
         .from("document_responsibilities")
         .update({ status: "rejected", completed_at: new Date().toISOString() })
-        .eq("id", rejectingAction.id);
+        .eq("id", action.id);
       if (rejectError) throw rejectError;
 
-      // 2. Set document back to draft
       const { error: docError } = await supabase
         .from("documents")
         .update({ status: "draft" as any })
-        .eq("id", rejectingAction.document_id);
+        .eq("id", action.document_id);
       if (docError) throw docError;
 
-      // 3. Record status change
       await (supabase as any).from("document_status_changes").insert({
-        document_id: rejectingAction.document_id,
-        old_status: rejectingAction.documentStatus,
+        document_id: action.document_id,
+        old_status: action.documentStatus,
         new_status: "draft",
         changed_by: user.id,
-        comment: `Denegado por ${profile?.full_name || user.email}: ${rejectComment || "Sin comentario"}`,
+        comment: `Denegado por ${profile?.full_name || user.email}: ${comment || "Sin comentario"}`,
       });
 
-      // 4. Reset other pending responsibilities
       await (supabase as any)
         .from("document_responsibilities")
         .update({ status: "pending", completed_at: null })
-        .eq("document_id", rejectingAction.document_id)
+        .eq("document_id", action.document_id)
         .eq("status", "completed");
 
       toast({
         title: "Documento denegado",
-        description: `${rejectingAction.documentCode} ha sido devuelto a Borrador.`,
+        description: `${action.documentCode} ha sido devuelto a Borrador.`,
         variant: "destructive",
       });
 
-      setRejectingAction(null);
-      setRejectComment("");
       fetchActions();
       onActionCompleted?.();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setIsRejecting(false);
     }
   };
 
-  const [changingStatusDocId, setChangingStatusDocId] = useState<string | null>(null);
-
-  const handleChangeDocumentStatus = async (action: PendingAction, nextStatus: string) => {
+  const executeChangeStatus = async (action: PendingAction, nextStatus: string) => {
     if (!user || action.user_id !== user.id) {
       toast({ title: "Error", description: "Solo el responsable asignado puede cambiar el estado.", variant: "destructive" });
       return;
@@ -272,6 +259,88 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     }
   };
 
+  // --- Confirmation triggers ---
+
+  const requestComplete = (action: PendingAction) => {
+    setConfirmAction(action);
+    setConfirmType("complete");
+  };
+
+  const requestReject = (action: PendingAction) => {
+    setConfirmAction(action);
+    setConfirmType("reject");
+  };
+
+  const requestChangeStatus = (action: PendingAction, nextStatus: string) => {
+    setConfirmAction(action);
+    setConfirmType("changeStatus");
+    setConfirmNextStatus(nextStatus);
+  };
+
+  const handleDialogConfirm = async (comment?: string) => {
+    if (!confirmAction) return;
+    setIsProcessing(true);
+    try {
+      if (confirmType === "complete") {
+        await executeComplete(confirmAction);
+      } else if (confirmType === "reject") {
+        await executeReject(confirmAction, comment);
+      } else if (confirmType === "changeStatus") {
+        await executeChangeStatus(confirmAction, confirmNextStatus);
+      }
+    } finally {
+      setIsProcessing(false);
+      setConfirmAction(null);
+    }
+  };
+
+  // --- Dialog config based on type ---
+  const getDialogConfig = () => {
+    if (!confirmAction) return null;
+    const code = confirmAction.documentCode || "";
+
+    if (confirmType === "complete") {
+      const word = confirmWords[confirmAction.action_type] || "CONFIRMAR";
+      const actionLabel = actionTypeLabels[confirmAction.action_type] || "Acción";
+      return {
+        title: `Confirmar ${actionLabel}`,
+        description: `Estás a punto de marcar como completada la acción de ${actionLabel.toLowerCase()} para el documento ${code}.`,
+        confirmWord: word,
+        confirmText: actionLabel,
+        variant: "default" as const,
+        showComment: false,
+      };
+    }
+
+    if (confirmType === "reject") {
+      return {
+        title: "Denegar documento",
+        description: `Al denegar, el documento ${code} volverá al estado Borrador y todas las revisiones/firmas/aprobaciones se reiniciarán.`,
+        confirmWord: "DENEGAR",
+        confirmText: "Confirmar denegación",
+        variant: "destructive" as const,
+        showComment: true,
+        commentLabel: "Motivo de la denegación (opcional)",
+        commentPlaceholder: "Indica el motivo por el que deniegas este documento...",
+      };
+    }
+
+    if (confirmType === "changeStatus") {
+      const toLabel = statusLabels[confirmNextStatus] || confirmNextStatus;
+      const word = confirmNextStatus === "approved" ? "APROBAR" : confirmNextStatus === "review" ? "REVISAR" : "CONFIRMAR";
+      return {
+        title: "Cambiar estado del documento",
+        description: `Vas a cambiar el estado del documento ${code} a "${toLabel}".`,
+        confirmWord: word,
+        confirmText: `Cambiar a ${toLabel}`,
+        variant: "default" as const,
+        showComment: false,
+      };
+    }
+
+    return null;
+  };
+
   const now = new Date();
 
   if (isLoading) {
@@ -290,6 +359,8 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       </div>
     );
   }
+
+  const dialogConfig = getDialogConfig();
 
   return (
     <>
@@ -349,7 +420,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                         "text-primary border-primary/30 hover:bg-primary/10",
                         compact && "h-7 text-xs px-2"
                       )}
-                      onClick={() => handleChangeDocumentStatus(action, nextTransition.nextStatus)}
+                      onClick={() => requestChangeStatus(action, nextTransition.nextStatus)}
                       disabled={changingStatusDocId === action.document_id}
                     >
                       <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
@@ -364,7 +435,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                         "text-success border-success/30 hover:bg-success/10",
                         compact && "h-7 text-xs px-2"
                       )}
-                      onClick={() => handleComplete(action)}
+                      onClick={() => requestComplete(action)}
                       disabled={completingId === action.id}
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
@@ -387,7 +458,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                         "text-destructive border-destructive/30 hover:bg-destructive/10",
                         compact && "h-7 text-xs px-2"
                       )}
-                      onClick={() => setRejectingAction(action)}
+                      onClick={() => requestReject(action)}
                     >
                       <XCircle className="w-3.5 h-3.5 mr-1" />
                       Denegar
@@ -408,39 +479,25 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
         })}
       </div>
 
-      {/* Reject confirmation dialog */}
-      <AlertDialog open={!!rejectingAction} onOpenChange={(open) => { if (!open) { setRejectingAction(null); setRejectComment(""); } }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <XCircle className="w-5 h-5 text-destructive" />
-              Denegar documento
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Al denegar, el documento <strong>{rejectingAction?.documentCode}</strong> volverá al estado <strong>Borrador</strong> y todas las revisiones/firmas/aprobaciones se reiniciarán.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label className="text-sm">Motivo de la denegación (opcional)</Label>
-            <Textarea
-              placeholder="Indica el motivo por el que deniegas este documento..."
-              value={rejectComment}
-              onChange={(e) => setRejectComment(e.target.value)}
-              rows={3}
-            />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRejecting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleReject(); }}
-              disabled={isRejecting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isRejecting ? "Denegando..." : "Confirmar denegación"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Unified confirmation dialog */}
+      {dialogConfig && (
+        <ActionConfirmDialog
+          open={!!confirmAction}
+          onOpenChange={(open) => { if (!open) setConfirmAction(null); }}
+          title={dialogConfig.title}
+          description={dialogConfig.description}
+          confirmWord={dialogConfig.confirmWord}
+          onConfirm={handleDialogConfirm}
+          isLoading={isProcessing}
+          loadingText="Procesando..."
+          confirmText={dialogConfig.confirmText}
+          variant={dialogConfig.variant}
+          showComment={dialogConfig.showComment}
+          commentLabel={dialogConfig.showComment ? dialogConfig.commentLabel : undefined}
+          commentPlaceholder={dialogConfig.showComment ? dialogConfig.commentPlaceholder : undefined}
+          icon={confirmType === "reject" ? <XCircle className="w-5 h-5 text-destructive" /> : <CheckCircle2 className="w-5 h-5 text-success" />}
+        />
+      )}
     </>
   );
 }
