@@ -334,7 +334,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     });
     toast({ title: "No conformidad creada" });
     setNewNcOpen(false);
-    setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "" });
+    setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
     await loadData();
   };
 
