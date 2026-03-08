@@ -261,8 +261,30 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
         }));
       }
 
+      // Fetch incidencias assigned to current user
+      let incidenciaActions: PendingAction[] = [];
+      if (user) {
+        const { data: incData } = await (supabase as any)
+          .from("incidencias")
+          .select("id, title, status, deadline, incidencia_type")
+          .eq("responsible_id", user.id)
+          .in("status", ["open", "in_progress"])
+          .order("deadline", { ascending: true, nullsFirst: false })
+          .limit(20);
+
+        incidenciaActions = ((incData as any[]) ?? []).map((inc) => ({
+          id: inc.id,
+          description: `Incidencia: ${inc.title}`,
+          action_type: "incidencia",
+          due_date: inc.deadline,
+          status: inc.status,
+          isOverdue: inc.deadline ? new Date(inc.deadline) < now : false,
+          source: "incidencia" as const,
+        }));
+      }
+
       // Combine: active tasks first, waiting tasks last
-      const activeActions = [...capaActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions, ...reclamacionActions];
+      const activeActions = [...capaActions, ...docActions.filter(a => a.action_type !== "waiting"), ...trainingActions, ...reclamacionActions, ...incidenciaActions];
       const waitingActions = docActions.filter(a => a.action_type === "waiting");
       
       const combined = [
