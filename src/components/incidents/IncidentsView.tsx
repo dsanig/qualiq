@@ -431,7 +431,6 @@ export function IncidentsView({
       title: form.title, description: form.description || null, incidencia_type: form.incidencia_type,
       audit_id: form.audit_id === "none" ? null : form.audit_id,
       responsible_id: form.responsible_id === "none" ? null : form.responsible_id,
-      status: form.status,
       deadline: form.deadline ? format(form.deadline, "yyyy-MM-dd") : null,
       resolution_notes: form.resolution_notes || null,
     }).eq("id", editingIncident.id);
