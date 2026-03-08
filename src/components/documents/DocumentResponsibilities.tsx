@@ -110,11 +110,14 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
         ? await supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds)
         : { data: [] };
       const nameMap = new Map((profiles || []).map(p => [p.user_id, { name: p.full_name || p.email, email: p.email }]));
-      setResponsibilities((data as Responsibility[]).map(r => ({
-        ...r,
-        userName: nameMap.get(r.user_id)?.name || r.user_id,
-        userEmail: nameMap.get(r.user_id)?.email || "",
-      })));
+      const sorted = (data as Responsibility[])
+        .map(r => ({
+          ...r,
+          userName: nameMap.get(r.user_id)?.name || r.user_id,
+          userEmail: nameMap.get(r.user_id)?.email || "",
+        }))
+        .sort((a, b) => (actionTypeOrder[a.action_type] ?? 99) - (actionTypeOrder[b.action_type] ?? 99));
+      setResponsibilities(sorted);
     }
     setIsLoading(false);
   }, [documentId]);
