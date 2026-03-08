@@ -434,7 +434,7 @@ export function DocumentsView({
       }
       setSignedDocuments(mapped);
     }
-  }, [profile?.company_id, user]);
+  }, [effectiveCompanyId, user]);
 
   // Fetch firma responsibilities and signatures to compute signature status
   const fetchFirmaStatus = useCallback(async () => {
