@@ -169,7 +169,11 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     <div className={cn("space-y-2", compact && "space-y-1.5")}>
       {actions.map(action => {
         const isOverdue = new Date(action.due_date) < now;
-        const canComplete = action.action_type === "revision" || action.action_type === "firma";
+        const isActionableStatus =
+          (action.action_type === "revision" && action.documentStatus === "review") ||
+          (action.action_type === "firma" && action.documentStatus === "pending_signature") ||
+          (action.action_type === "aprobacion" && action.documentStatus === "pending_approval");
+        const canComplete = isActionableStatus;
 
         return (
           <div
