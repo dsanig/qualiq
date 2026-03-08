@@ -373,15 +373,18 @@ export function PredictiveAnalyticsView({ onCreateIncidentFromInsight }: Predict
 
       if (error) throw error;
 
+      const markedInsight = insights.find((i) => i.id === insightId);
       setInsights((prev) => prev.filter((i) => i.id !== insightId));
+      setWindowInsights((prev) => prev.filter((i) => i.id !== insightId));
+      if (markedInsight) {
+        setArchivedInsights((prev) => [{ ...markedInsight, is_acknowledged: true }, ...prev]);
+      }
 
       toast({
         title: "Insight marcado como leído",
-        description: "El insight se ha eliminado del listado.",
+        description: "El insight se ha movido a la sección de archivados.",
       });
-      logAction({ action: "acknowledge_insight", entity_type: "predictive_insight", entity_id: insightId });
-
-      fetchInsights();
+      logAction({ action: "acknowledge", entity_type: "predictive_analytics", entity_id: insightId });
     } catch (error) {
       console.error("Error marking insight as read:", error);
       toast({
