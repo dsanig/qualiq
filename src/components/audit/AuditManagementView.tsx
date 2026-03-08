@@ -201,6 +201,8 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       responsible_id: auditForm.responsible_id || null,
       observations: auditForm.observations || null, findings: auditForm.findings || null,
       conclusions: auditForm.conclusions || null, status: auditForm.status,
+      audit_type: auditForm.audit_type,
+      external_entity_id: auditForm.audit_type === "externa" ? (auditForm.external_entity_id || null) : null,
       company_id: profileData?.company_id, created_by: user?.id,
     }).select("id").single();
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
