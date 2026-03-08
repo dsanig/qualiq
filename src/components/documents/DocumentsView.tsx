@@ -980,6 +980,7 @@ export function DocumentsView({
       setIsUpdateVersionOpen(false);
       fetchDocuments();
       fetchFirmaStatus();
+      fetchRejectedDocs();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
