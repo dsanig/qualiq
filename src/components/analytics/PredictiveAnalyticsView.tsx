@@ -11,6 +11,7 @@ import {
   BarChart3,
   Loader2,
   RefreshCw,
+  Trash2,
   CheckCircle,
   Target,
   FilePlus2
