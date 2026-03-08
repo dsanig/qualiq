@@ -660,7 +660,7 @@ export function DocumentsView({
         return;
       } else if (changeStatusTarget === "approved") {
         if (currentStatus !== "pending_approval") {
-          toast({ title: "Transición no permitida", description: "Solo se puede aprobar un documento que esté 'En Aprobación'.", variant: "destructive" });
+          toast({ title: "Transición no permitida", description: "Solo se puede aprobar un documento que esté 'Pendiente de Aprobación'.", variant: "destructive" });
           return;
         }
         // Check if user has aprobacion responsibility
