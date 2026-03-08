@@ -14,7 +14,10 @@ import {
   Trash2,
   CheckCircle,
   Target,
-  FilePlus2
+  FilePlus2,
+  Archive,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
