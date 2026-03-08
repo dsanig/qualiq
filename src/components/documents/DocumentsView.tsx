@@ -1818,7 +1818,6 @@ export function DocumentsView({
                                   </div>
                                 )}
                               </div>
-                              </div>
                             </td>
                           </tr>
                         )}
