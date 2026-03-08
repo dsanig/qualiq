@@ -13,7 +13,7 @@ const features = [
   { icon: AlertTriangle, title: "No Conformidades & CAPAs", description: "Registro, análisis de causa raíz, acciones correctivas y seguimiento hasta cierre." },
   { icon: Shield, title: "Control de Cambios", description: "Gestión controlada de cambios con impacto automático en documentación relacionada." },
   { icon: BarChart3, title: "Analítica de Cumplimiento", description: "KPIs en tiempo real, tendencias y scoring de preparación para auditorías." },
-  { icon: MessageSquare, title: "Asistente IA", description: "Respuestas basadas en su documentación y normativa española/europea aplicable." },
+  { icon: MessageSquare, title: "QualAI", description: "Respuestas basadas en su documentación y normativa española/europea aplicable." },
   { icon: Lock, title: "Seguridad & RGPD", description: "Datos encriptados, control de acceso por roles y logs de auditoría completos." },
 ];
 
