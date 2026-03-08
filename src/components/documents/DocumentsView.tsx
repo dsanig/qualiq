@@ -1211,7 +1211,9 @@ export function DocumentsView({
     toast({ title: action, description: `Acción "${action}" ejecutada para ${docCode}` });
   };
 
-  const handleRequestDelete = (doc: Document) => {
+  const [deleteLinkedInfo, setDeleteLinkedInfo] = useState<string[]>([]);
+
+  const handleRequestDelete = async (doc: Document) => {
     if (!canManageCompany && !isSuperadmin) {
       toast({
         title: "Permisos insuficientes",
@@ -1221,6 +1223,32 @@ export function DocumentsView({
       return;
     }
 
+    // Check linked records
+    const links: string[] = [];
+    const [
+      { count: versionsCount },
+      { count: responsibilitiesCount },
+      { count: signaturesCount },
+      { count: trainingCount },
+      { count: findingsCount },
+      { count: statusChangesCount },
+    ] = await Promise.all([
+      supabase.from("document_versions").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+      supabase.from("document_responsibilities").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+      supabase.from("document_signatures").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+      supabase.from("training_record_documents").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+      supabase.from("audit_findings").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+      supabase.from("document_status_changes").select("id", { count: "exact", head: true }).eq("document_id", doc.id),
+    ]);
+
+    if (versionsCount && versionsCount > 0) links.push(`${versionsCount} versión(es)`);
+    if (responsibilitiesCount && responsibilitiesCount > 0) links.push(`${responsibilitiesCount} responsabilidad(es) asignada(s)`);
+    if (signaturesCount && signaturesCount > 0) links.push(`${signaturesCount} firma(s)`);
+    if (trainingCount && trainingCount > 0) links.push(`${trainingCount} registro(s) de formación`);
+    if (findingsCount && findingsCount > 0) links.push(`${findingsCount} hallazgo(s) de auditoría`);
+    if (statusChangesCount && statusChangesCount > 0) links.push(`${statusChangesCount} cambio(s) de estado`);
+
+    setDeleteLinkedInfo(links);
     setDocumentToDelete(doc);
     setIsDeleteConfirmOpen(true);
   };
