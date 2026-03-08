@@ -571,6 +571,44 @@ export type Database = {
           },
         ]
       }
+      document_share_links: {
+        Row: {
+          created_at: string
+          created_by: string
+          document_id: string
+          download_count: number
+          expires_at: string
+          id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          document_id: string
+          download_count?: number
+          expires_at: string
+          id?: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          document_id?: string
+          download_count?: number
+          expires_at?: string
+          id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_share_links_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_signatures: {
         Row: {
           created_at: string
