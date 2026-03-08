@@ -1247,7 +1247,7 @@ export function DocumentsView({
           await fallbackToClientVersionUpdate();
         }
 
-        const { error: updateError } = await supabase.from("documents").update({ file_type: fileType }).eq("id", selectedDocument.id);
+        const { error: updateError } = await (supabase as any).from("documents").update({ file_type: fileType, version: newMajor, version_minor: newMinor }).eq("id", selectedDocument.id);
         if (updateError) throw updateError;
 
         toast({ title: "Versión actualizada", description: `El documento ahora está en v${newVersionLabel}` });
