@@ -312,11 +312,23 @@ export function DocumentResponsibilities({ documentId, documentCode, open, onOpe
 
           {/* Rejection banner */}
           {hasRejection && (
-            <div className="border border-destructive/30 rounded-lg p-3 bg-destructive/5 flex items-center gap-2">
-              <XCircle className="w-4 h-4 text-destructive flex-shrink-0" />
-              <p className="text-sm text-destructive font-medium">
-                Este documento ha sido denegado y devuelto a Borrador. Revisa los comentarios y vuelve a enviar.
-              </p>
+            <div className="border border-destructive/30 rounded-lg p-3 bg-destructive/5 space-y-2">
+              <div className="flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                <p className="text-sm text-destructive font-medium">
+                  Este documento ha sido denegado y devuelto a Borrador. Revisa los comentarios y vuelve a enviar.
+                </p>
+              </div>
+              {documentStatus === "draft" && onUpdateDocument && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => { onOpenChange(false); onUpdateDocument(); }}
+                >
+                  <UploadCloud className="w-3.5 h-3.5 mr-1" />
+                  Actualizar documento
+                </Button>
+              )}
             </div>
           )}
 
