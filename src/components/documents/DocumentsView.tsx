@@ -1396,6 +1396,10 @@ export function DocumentsView({
       setNewDocDescription("");
       setNewDocFile(null);
       setNewDocResponsibilities([]);
+      setNewDocEffectiveImmediate(true);
+      setNewDocEffectiveDate("");
+      setNewDocNoExpiry(true);
+      setNewDocExpiryDate("");
       fetchDocuments();
     } catch (err: unknown) {
       const uploadError = err as { message?: string; details?: string; hint?: string; code?: string };
