@@ -657,6 +657,20 @@ export function IncidentsView({
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
+                    {user?.id === incident.responsible_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingIncident(incident);
+                          setIsStatusChangeOpen(true);
+                        }}
+                      >
+                        <History className="h-3 w-3 mr-1" />Estado
+                      </Button>
+                    )}
                     {canEditContent && <Pencil className="h-3.5 w-3.5 text-muted-foreground" />}
                   </div>
                 </div>
