@@ -381,6 +381,7 @@ export function IncidentsView({
     }
 
     toast({ title: "Incidencia creada" });
+    logAction({ action: "create", entity_type: "incidencia", entity_id: inserted?.id, entity_title: form.title, details: { type: form.incidencia_type, responsible_id: form.responsible_id } });
     onNewIncidentOpenChange(false);
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
