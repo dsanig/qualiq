@@ -36,7 +36,11 @@ const mapIncidentTypeToPendingType = (incidentType: string): PendingAction["type
   return "approval";
 };
 
-export function PendingActionsView() {
+interface PendingActionsViewProps {
+  onNavigateToIncident?: (incidentId: string) => void;
+}
+
+export function PendingActionsView({ onNavigateToIncident }: PendingActionsViewProps) {
   const { profile } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [actions, setActions] = useState<PendingAction[]>([]);
@@ -184,7 +188,7 @@ export function PendingActionsView() {
                         <span className="text-xs text-muted-foreground">Responsable: {action.owner}</span>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => onNavigateToIncident?.(action.id)}>
                       Revisar
                     </Button>
                   </div>
