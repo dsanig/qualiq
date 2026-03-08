@@ -498,9 +498,10 @@ export function CalendarView({
                           return (
                             <div
                               key={ev.id}
-                              className={cn("text-[10px] leading-tight px-1 py-0.5 rounded truncate", color.bg, color.text)}
+                              className={cn("text-[10px] leading-tight px-1 py-0.5 rounded truncate flex items-center gap-1", color.bg, color.text)}
                               title={`${ev.typeLabel}: ${ev.title} (${ev.userName})`}
                             >
+                              <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", EVENT_TYPE_CONFIG[ev.type].color)} />
                               {ev.title}
                             </div>
                           );
