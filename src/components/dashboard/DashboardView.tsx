@@ -123,10 +123,10 @@ export function DashboardView({ onQuickAction, onViewPendingActions, onViewIncid
           <h3 className="font-semibold text-foreground mb-4">Acceso Rápido</h3>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: "Nuevo PNT", icon: FileText },
+              { label: "Nuevo Documento", icon: FileText },
               { label: "Registrar Incidencia", icon: AlertTriangle },
               { label: "Crear CAPA", icon: CheckCircle },
-              { label: "Ver Informes", icon: TrendingUp },
+              { label: "Registrar Reclamación", icon: TrendingUp },
             ].map((action) => (
               <button
                 key={action.label}
