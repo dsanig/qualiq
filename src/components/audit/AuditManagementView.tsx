@@ -475,6 +475,26 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       <div><Label>Título *</Label><Input value={auditForm.title} onChange={(e) => setAuditForm((p) => ({ ...p, title: e.target.value }))} /></div>
       <div><Label>Fecha</Label><Input type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} /></div>
       <div>
+        <Label>Tipo de auditoría</Label>
+        <Select value={auditForm.audit_type} onValueChange={(v: "interna" | "externa") => setAuditForm((p) => ({ ...p, audit_type: v, external_entity_id: v === "interna" ? "" : p.external_entity_id }))}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="interna">Interna</SelectItem>
+            <SelectItem value="externa">Externa</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {auditForm.audit_type === "externa" && (
+        <div>
+          <Label>Identificación del cliente / proveedor *</Label>
+          <Input 
+            value={auditForm.external_entity_id} 
+            onChange={(e) => setAuditForm((p) => ({ ...p, external_entity_id: e.target.value }))} 
+            placeholder="Nombre o código del cliente/proveedor externo"
+          />
+        </div>
+      )}
+      <div>
         <Label>Auditor</Label>
         <Select value={auditForm.auditor_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, auditor_id: v }))}>
           <SelectTrigger><SelectValue placeholder="Selecciona auditor" /></SelectTrigger>
