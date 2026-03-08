@@ -174,6 +174,9 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
                   <Badge variant="outline" className={cn("text-xs", actionTypeColors[action.action_type])}>
                     {actionTypeLabels[action.action_type] || action.action_type}
                   </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    → {action.responsibleName}
+                  </span>
                   <span className={cn(
                     "text-xs flex items-center gap-1",
                     isOverdue ? "text-destructive font-medium" : "text-muted-foreground"
