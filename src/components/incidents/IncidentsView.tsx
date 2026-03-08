@@ -60,6 +60,8 @@ interface IncidentsViewProps {
   reloadToken?: number;
   prefill?: IncidentPrefillPayload | null;
   onPrefillConsumed?: () => void;
+  openIncidentId?: string | null;
+  onOpenIncidentConsumed?: () => void;
 }
 
 const typeLabels: Record<IncidentType, string> = {
