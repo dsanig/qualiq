@@ -911,7 +911,7 @@ export function CompanyView() {
         </DialogContent>
       </Dialog>
 
-      {isSuperadmin && (
+      {canManageCompany && (
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
