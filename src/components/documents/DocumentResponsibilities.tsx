@@ -179,6 +179,7 @@ export function DocumentResponsibilities({ documentId, documentCode, ownerName, 
       const { error } = await (supabase as any).from("document_responsibilities").delete().eq("id", id);
       if (error) throw error;
       toast({ title: "Responsable eliminado" });
+      logAction({ action: "delete_responsibility", entity_type: "document", entity_id: documentId, entity_title: documentCode, details: { responsibility_id: id } });
       fetchResponsibilities();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
