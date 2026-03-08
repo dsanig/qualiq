@@ -11,7 +11,8 @@ import {
   TrendingUp,
   FileWarning,
   Globe,
-  CalendarDays
+  CalendarDays,
+  Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
