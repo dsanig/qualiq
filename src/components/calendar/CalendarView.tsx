@@ -22,7 +22,7 @@ const USER_COLORS = [
   { bg: "bg-teal-100 dark:bg-teal-900/40", text: "text-teal-700 dark:text-teal-300", border: "border-teal-400", dot: "bg-teal-500" },
 ];
 
-type EventType = "doc_responsibility" | "incident" | "reclamacion" | "audit" | "training" | "non_conformity" | "capa_action";
+type EventType = "doc_responsibility" | "incident" | "reclamacion" | "audit" | "training" | "non_conformity" | "capa_action" | "doc_effective" | "doc_expiry";
 
 interface CalendarEvent {
   id: string;
@@ -34,6 +34,7 @@ interface CalendarEvent {
   userName: string;
   typeLabel: string;
   documentCode?: string;
+  companyWide?: boolean;
 }
 
 interface UserInfo {
@@ -61,6 +62,8 @@ const EVENT_TYPE_CONFIG: Record<EventType, { label: string; color: string }> = {
   training: { label: "Formaciones", color: "bg-emerald-500" },
   non_conformity: { label: "No Conformidades", color: "bg-orange-500" },
   capa_action: { label: "Acciones CAPA", color: "bg-purple-500" },
+  doc_effective: { label: "Vigencia documento", color: "bg-green-600" },
+  doc_expiry: { label: "Caducidad documento", color: "bg-red-500" },
 };
 
 const ALL_EVENT_TYPES = Object.keys(EVENT_TYPE_CONFIG) as EventType[];
@@ -254,6 +257,41 @@ export function CalendarView({
         }
       });
 
+      // 8. Document effective dates
+      const { data: docsWithDates } = await supabase
+        .from("documents")
+        .select("id, title, code, effective_date, expiry_date, owner_id" as any);
+      (docsWithDates as any[])?.forEach((doc: any) => {
+        if (doc.effective_date) {
+          allEvents.push({
+            id: `doceff-${doc.id}`,
+            sourceId: doc.id,
+            title: `"${doc.title}" entra en efecto`,
+            date: doc.effective_date,
+            type: "doc_effective",
+            userId: doc.owner_id,
+            userName: "Todos",
+            typeLabel: EVENT_TYPE_CONFIG.doc_effective.label,
+            documentCode: doc.code,
+            companyWide: true,
+          });
+        }
+        if (doc.expiry_date) {
+          allEvents.push({
+            id: `docexp-${doc.id}`,
+            sourceId: doc.id,
+            title: `"${doc.title}" caduca`,
+            date: doc.expiry_date,
+            type: "doc_expiry",
+            userId: doc.owner_id,
+            userName: "Todos",
+            typeLabel: EVENT_TYPE_CONFIG.doc_expiry.label,
+            documentCode: doc.code,
+            companyWide: true,
+          });
+        }
+      });
+
       setEvents(allEvents);
       setLoading(false);
     };
@@ -261,7 +299,7 @@ export function CalendarView({
   }, [user]);
 
   const handleEventClick = useCallback((ev: CalendarEvent) => {
-    if (ev.userId !== user?.id) return;
+    if (!ev.companyWide && ev.userId !== user?.id) return;
 
     switch (ev.type) {
       case "incident":
@@ -279,6 +317,8 @@ export function CalendarView({
         onNavigateToTraining?.("training");
         break;
       case "doc_responsibility":
+      case "doc_effective":
+      case "doc_expiry":
         if (ev.documentCode) {
           onNavigateToDocument?.(ev.documentCode);
         } else {
@@ -322,7 +362,7 @@ export function CalendarView({
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   const filteredEvents = useMemo(
-    () => events.filter((e) => visibleUserIds.has(e.userId) && activeTypeFilters.has(e.type)),
+    () => events.filter((e) => (e.companyWide || visibleUserIds.has(e.userId)) && activeTypeFilters.has(e.type)),
     [events, visibleUserIds, activeTypeFilters]
   );
 
@@ -344,7 +384,7 @@ export function CalendarView({
   const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
   const selectedEvents = selectedDay ? eventsByDate.get(selectedDay) || [] : [];
-  const isOwnEvent = (ev: CalendarEvent) => ev.userId === user?.id;
+  const isOwnEvent = (ev: CalendarEvent) => ev.companyWide || ev.userId === user?.id;
 
   return (
     <div className="flex gap-4 h-full">
