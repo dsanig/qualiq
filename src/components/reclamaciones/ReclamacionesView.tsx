@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Clock, Filter, Plus, Search, Pencil, X, CalendarIcon, Trash2, AlertTriangle, Link as LinkIcon, Eye, FileWarning, Users } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Filter, Plus, Search, Pencil, X, CalendarIcon, Trash2, AlertTriangle, Link as LinkIcon, Eye, FileWarning, Users, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { StatusChangeDialog } from "@/components/shared/StatusChangeDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
