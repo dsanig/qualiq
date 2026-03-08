@@ -141,6 +141,7 @@ export function CompanyManagementView() {
         return;
       }
       toast({ title: "Empresa creada" });
+      logAction({ action: "create", entity_type: "company", entity_title: form.name.trim(), details: { slug: form.slug.trim(), plan_type: form.plan_type } });
     }
 
     setIsSubmitting(false);
