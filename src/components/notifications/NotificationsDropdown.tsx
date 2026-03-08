@@ -65,6 +65,8 @@ export function NotificationsDropdown() {
       .update({ is_read: true })
       .eq("id", id);
     
+    const notif = notifications.find(n => n.id === id);
+    logAction({ action: "mark_read", entity_type: "notification", entity_id: id, entity_title: notif?.title });
     setNotifications(prev => 
       prev.map(n => n.id === id ? { ...n, is_read: true } : n)
     );
