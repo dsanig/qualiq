@@ -32,8 +32,8 @@ const iconVariantStyles = {
 
 export function StatCard({ title, value, subtitle, icon: Icon, trend, variant = "default", onViewDetail }: StatCardProps) {
   return (
-    <div className={cn("stat-card", variantStyles[variant])}>
-      <div className="flex items-start justify-between">
+    <div className={cn("stat-card flex flex-col h-full", variantStyles[variant])}>
+      <div className="flex items-start justify-between flex-1">
         <div>
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
           <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
