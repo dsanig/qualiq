@@ -1585,6 +1585,18 @@ export function DocumentsView({
               ))}
             </div>
           </div>
+
+          {/* Pending Actions Sidebar */}
+          <div className="bg-card rounded-lg border border-border p-4">
+            <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Acciones Pendientes
+            </h3>
+            <DocumentPendingActions
+              compact
+              onActionCompleted={() => { fetchDocuments(); fetchFirmaStatus(); }}
+            />
+          </div>
         </div>
 
         {/* Documents Table */}
