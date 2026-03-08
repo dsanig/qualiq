@@ -348,7 +348,7 @@ export function AuditSimulatorView() {
                             <Badge variant="outline" className={config.color}>
                               {config.label}
                             </Badge>
-                            <Badge variant="secondary">{finding.category}</Badge>
+                            <Badge variant="secondary">{formatCategory(finding.category)}</Badge>
                           </div>
                           <CardTitle className="text-base">{finding.finding_title}</CardTitle>
                         </div>
