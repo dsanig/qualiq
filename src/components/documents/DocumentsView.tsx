@@ -2730,6 +2730,16 @@ export function DocumentsView({
           </DialogContent>
         </Dialog>
       )}
+      {/* Share Document Dialog */}
+      {selectedDocument && (
+        <ShareDocumentDialog
+          open={isShareOpen}
+          onOpenChange={setIsShareOpen}
+          documentId={selectedDocument.id}
+          documentCode={selectedDocument.code}
+          documentStatus={selectedDocument.status}
+        />
+      )}
     </div>
   );
 }
