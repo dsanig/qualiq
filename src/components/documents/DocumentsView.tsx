@@ -2307,38 +2307,55 @@ export function DocumentsView({
           </DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
             {/* Current version */}
-            {selectedDocument && (
-              <div className="border border-primary/30 bg-primary/5 rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-foreground">v{selectedDocument.version} (actual)</p>
-                  <Button variant="outline" size="sm" onClick={() => handleDownload(selectedDocument)}>
-                    <Download className="w-3 h-3 mr-1" />Descargar
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Última actualización: {selectedDocument.lastUpdated}</p>
-              </div>
-            )}
-            {isLoadingHistory && <p className="text-center py-4">Cargando historial...</p>}
-            {!isLoadingHistory && versionHistory.length === 0 && <p className="text-center py-4">No hay versiones anteriores registradas.</p>}
-            {versionHistory.map((v) => (
-              <div key={v.id} className="border border-border rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-foreground">v{v.version}.0</p>
-                  <div className="flex gap-1">
-                    <Button variant="outline" size="sm" onClick={() => handleDownloadVersion(v.file_url, v.version, selectedDocument?.code || "doc")}>
+            {selectedDocument && (() => {
+              // The latest version history entry contains the changes_description for the current version
+              const latestHistoryEntry = versionHistory.length > 0 ? versionHistory[0] : null;
+              const currentChanges = latestHistoryEntry?.changes_description;
+              const prevVersion = latestHistoryEntry?.version;
+              return (
+                <div className="border border-primary/30 bg-primary/5 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-foreground">v{selectedDocument.version} (actual)</p>
+                    <Button variant="outline" size="sm" onClick={() => handleDownload(selectedDocument)}>
                       <Download className="w-3 h-3 mr-1" />Descargar
                     </Button>
-                    {isSuperadmin && (
-                      <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteVersion(v.id)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    )}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">Última actualización: {selectedDocument.lastUpdated}</p>
+                  {currentChanges && prevVersion && (
+                    <p className="text-xs mt-1 text-muted-foreground">Cambios respecto v{prevVersion}.0: {currentChanges}</p>
+                  )}
                 </div>
-                <p className="text-xs mt-1">Por {v.creatorName} el {new Date(v.created_at).toLocaleDateString("es-ES")}</p>
-                {v.changes_description && <p className="text-xs mt-1 text-muted-foreground">Cambios respecto v{v.version - 1}.0: {v.changes_description}</p>}
-              </div>
-            ))}
+              );
+            })()}
+            {isLoadingHistory && <p className="text-center py-4">Cargando historial...</p>}
+            {!isLoadingHistory && versionHistory.length === 0 && <p className="text-center py-4">No hay versiones anteriores registradas.</p>}
+            {versionHistory.map((v, index) => {
+              // Each version shows the changes_description from the next older version (index+1)
+              const olderEntry = index + 1 < versionHistory.length ? versionHistory[index + 1] : null;
+              const changes = olderEntry?.changes_description;
+              const olderVersion = olderEntry?.version;
+              return (
+                <div key={v.id} className="border border-border rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-foreground">v{v.version}.0</p>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadVersion(v.file_url, v.version, selectedDocument?.code || "doc")}>
+                        <Download className="w-3 h-3 mr-1" />Descargar
+                      </Button>
+                      {isSuperadmin && (
+                        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteVersion(v.id)}>
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs mt-1">Por {v.creatorName} el {new Date(v.created_at).toLocaleDateString("es-ES")}</p>
+                  {changes && olderVersion != null && (
+                    <p className="text-xs mt-1 text-muted-foreground">Cambios respecto v{olderVersion}.0: {changes}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsHistoryOpen(false)}>Cerrar</Button>
