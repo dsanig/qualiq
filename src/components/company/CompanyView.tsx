@@ -476,7 +476,7 @@ export function CompanyView() {
   };
 
   const handleSaveCompany = async () => {
-    if (!profile?.company_id || !companyName.trim()) {
+    if (!effectiveCompanyId || !companyName.trim()) {
       toast({
         title: "Datos incompletos",
         description: "El nombre de la empresa es obligatorio.",
