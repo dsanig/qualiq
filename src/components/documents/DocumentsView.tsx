@@ -844,6 +844,17 @@ export function DocumentsView({
         throw new Error("Debes asignar al menos un responsable para crear la nueva versión.");
       }
 
+      // Validate at least one responsible per action type
+      const requiredActions = ["revision", "firma", "aprobacion"];
+      const missingActions = requiredActions.filter(
+        action => !cleanedResponsibilities.some(r => r.action_type === action)
+      );
+      if (missingActions.length > 0) {
+        const labels: Record<string, string> = { revision: "Revisión", firma: "Firma", aprobacion: "Aprobación" };
+        const missing = missingActions.map(a => labels[a]).join(", ");
+        throw new Error(`Debes asignar al menos un responsable de: ${missing}.`);
+      }
+
       const createVersionArgs = {
         _change_summary: updateVersionChanges.trim() || null,
         _document_id: selectedDocument.id,
@@ -988,6 +999,17 @@ export function DocumentsView({
     }
     if (!newDocTypology) {
       toast({ title: "Tipología requerida", description: "Selecciona una tipología para guardar el documento.", variant: "destructive" });
+      return;
+    }
+    // Validate at least one responsible per action type
+    const requiredActions = ["revision", "firma", "aprobacion"];
+    const missingActions = requiredActions.filter(
+      action => !newDocResponsibilities.some(r => r.actionType === action && r.userId)
+    );
+    if (missingActions.length > 0) {
+      const labels: Record<string, string> = { revision: "Revisión", firma: "Firma", aprobacion: "Aprobación" };
+      const missing = missingActions.map(a => labels[a]).join(", ");
+      toast({ title: "Responsables obligatorios", description: `Debes asignar al menos un responsable de: ${missing}.`, variant: "destructive" });
       return;
     }
     if (!user || !profile?.company_id) {
