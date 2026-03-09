@@ -1038,6 +1038,26 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             <div><Label>Severidad</Label><Input value={ncForm.severity} onChange={(e) => setNcForm((p) => ({ ...p, severity: e.target.value }))} /></div>
             <div><Label>Causa raíz</Label><Textarea value={ncForm.root_cause} onChange={(e) => setNcForm((p) => ({ ...p, root_cause: e.target.value }))} /></div>
             <div>
+              <Label>Auditoría de origen (opcional)</Label>
+              <Select value={ncForm.audit_id || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, audit_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin auditoría" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin auditoría</SelectItem>
+                  {audits.map((a) => <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Plan CAPA (opcional)</Label>
+              <Select value={ncForm.capa_plan_id || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, capa_plan_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin plan CAPA" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin plan CAPA</SelectItem>
+                  {capaPlans.map((c) => <SelectItem key={c.id} value={c.id}>{c.title || c.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Responsable *</Label>
               <Select value={ncForm.responsible_id} onValueChange={(v) => setNcForm((p) => ({ ...p, responsible_id: v }))}>
                 <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
