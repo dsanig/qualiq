@@ -99,6 +99,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
   const [isLoading, setIsLoading] = useState(true);
   const [newAttachments, setNewAttachments] = useState<AttachmentInfo[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<AttachmentInfo[]>([]);
+  const [attachmentsPendingDeletion, setAttachmentsPendingDeletion] = useState<AttachmentInfo[]>([]);
   const { toast } = useToast();
   const { canEditContent, canManageCompany, isSuperadmin } = usePermissions();
   const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
@@ -275,6 +276,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
       responsible_id: rec.responsible_id ?? "none",
     });
     setNewAttachments([]);
+    setAttachmentsPendingDeletion([]);
     setSelectedIncidenciaIds(reclamacionLinks[rec.id] ?? []);
     void loadExistingAttachments(rec.id);
     void loadParticipants(rec.id);
@@ -310,6 +312,35 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     }).eq("id", editingReclamacion.id);
 
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+
+    if (attachmentsPendingDeletion.length > 0) {
+      const attachmentIdsToDelete = attachmentsPendingDeletion
+        .map((attachment) => attachment.id)
+        .filter((id): id is string => Boolean(id));
+      const objectPathsToDelete = attachmentsPendingDeletion
+        .map((attachment) => attachment.object_path)
+        .filter((path): path is string => Boolean(path));
+
+      if (objectPathsToDelete.length > 0) {
+        const { error: storageDeleteError } = await supabase.storage.from("documents").remove(objectPathsToDelete);
+        if (storageDeleteError) {
+          toast({ title: "Error", description: "No se pudieron eliminar archivos adjuntos del almacenamiento.", variant: "destructive" });
+          return;
+        }
+      }
+
+      if (attachmentIdsToDelete.length > 0) {
+        const { error: attachmentDeleteError } = await (supabase as any)
+          .from("reclamacion_attachments")
+          .delete()
+          .in("id", attachmentIdsToDelete);
+        if (attachmentDeleteError) {
+          toast({ title: "Error", description: attachmentDeleteError.message, variant: "destructive" });
+          return;
+        }
+      }
+    }
+
     if (newAttachments.length > 0) await uploadAttachments(editingReclamacion.id);
     await syncLinks(editingReclamacion.id);
     await syncParticipants(editingReclamacion.id);
@@ -321,6 +352,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     setForm(defaultForm());
     setNewAttachments([]);
     setExistingAttachments([]);
+    setAttachmentsPendingDeletion([]);
     setSelectedIncidenciaIds([]);
     setParticipantIds([]);
     await loadData();
@@ -546,7 +578,7 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
       </Dialog>
 
       {/* Edit reclamacion dialog */}
-      <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingReclamacion(null); setNewAttachments([]); setExistingAttachments([]); setSelectedIncidenciaIds([]); setParticipantIds([]); } }}>
+      <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingReclamacion(null); setNewAttachments([]); setExistingAttachments([]); setAttachmentsPendingDeletion([]); setSelectedIncidenciaIds([]); setParticipantIds([]); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Editar reclamación</DialogTitle>
@@ -567,7 +599,13 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
             onAddFiles={canEditContent ? handleAddFiles : undefined}
             onRemoveAttachment={canEditContent ? (idx) => {
               if (idx < existingAttachments.length) {
-                setExistingAttachments(prev => prev.filter((_, i) => i !== idx));
+                setExistingAttachments((prev) => {
+                  const attachmentToDelete = prev[idx];
+                  if (attachmentToDelete?.id) {
+                    setAttachmentsPendingDeletion((pending) => [...pending, attachmentToDelete]);
+                  }
+                  return prev.filter((_, i) => i !== idx);
+                });
               } else {
                 handleRemoveNewAttachment(idx - existingAttachments.length);
               }
