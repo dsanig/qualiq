@@ -86,6 +86,9 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [editActionOpen, setEditActionOpen] = useState(false);
   const [linkIncidenciaOpen, setLinkIncidenciaOpen] = useState(false);
   const [linkNcOpen, setLinkNcOpen] = useState(false);
+  const [deleteCapaOpen, setDeleteCapaOpen] = useState(false);
+  const [deletingCapaId, setDeletingCapaId] = useState<string | null>(null);
+  const [deleteCapaImpact, setDeleteCapaImpact] = useState<{ ncs: number; actions: number; links: number } | null>(null);
 
   // Forms
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "", audit_id: "" });
