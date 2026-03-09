@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { AlertCircle, CheckCircle, Clock, Filter, Plus, Search, Pencil, X, CalendarIcon, Trash2, AlertTriangle, Link as LinkIcon, Eye, FileWarning, Users, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { StatusChangeDialog } from "@/components/shared/StatusChangeDialog";
+import { ActionConfirmDialog } from "@/components/documents/ActionConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -97,8 +98,11 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
   const [newAttachments, setNewAttachments] = useState<AttachmentInfo[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<AttachmentInfo[]>([]);
   const { toast } = useToast();
-  const { canEditContent, isSuperadmin } = usePermissions();
+  const { canEditContent, canManageCompany, isSuperadmin } = usePermissions();
   const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [reclamacionToDelete, setReclamacionToDelete] = useState<Reclamacion | null>(null);
+  const [isDeletingReclamacion, setIsDeletingReclamacion] = useState(false);
   const { user } = useAuth();
   const { logAction } = useAuditLog();
 
@@ -351,6 +355,34 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     }
   };
 
+  const canDelete = canManageCompany || isSuperadmin;
+
+  const handleDeleteReclamacion = async () => {
+    if (!reclamacionToDelete) return;
+    setIsDeletingReclamacion(true);
+    try {
+      const recId = reclamacionToDelete.id;
+      await Promise.all([
+        (supabase as any).from("reclamacion_incidencias").delete().eq("reclamacion_id", recId),
+        (supabase as any).from("reclamacion_participants").delete().eq("reclamacion_id", recId),
+        (supabase as any).from("reclamacion_attachments").delete().eq("reclamacion_id", recId),
+        (supabase as any).from("reclamacion_status_changes").delete().eq("reclamacion_id", recId),
+      ]);
+      const { error } = await (supabase as any).from("reclamaciones").delete().eq("id", recId);
+      if (error) throw error;
+
+      toast({ title: "Reclamación eliminada", description: `"${reclamacionToDelete.title}" fue eliminada correctamente.` });
+      logAction({ action: "delete", entity_type: "reclamacion", entity_id: recId, entity_title: reclamacionToDelete.title });
+      setIsDeleteConfirmOpen(false);
+      setReclamacionToDelete(null);
+      await loadData();
+    } catch (err: any) {
+      toast({ title: "Error al eliminar", description: err?.message || "No se pudo eliminar la reclamación.", variant: "destructive" });
+    } finally {
+      setIsDeletingReclamacion(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-4">
@@ -445,6 +477,16 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                         }}
                       >
                         <History className="h-3 w-3 mr-1" />Estado
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-destructive hover:text-destructive"
+                        onClick={(e) => { e.stopPropagation(); setReclamacionToDelete(rec); setIsDeleteConfirmOpen(true); }}
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     )}
                     {canEditContent && <Pencil className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -582,6 +624,24 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
           getUserName={getUserName}
         />
       )}
+
+      <ActionConfirmDialog
+        open={isDeleteConfirmOpen}
+        onOpenChange={(open) => {
+          if (isDeletingReclamacion) return;
+          setIsDeleteConfirmOpen(open);
+          if (!open) setReclamacionToDelete(null);
+        }}
+        title="Eliminar reclamación"
+        description={`Esta acción eliminará la reclamación "${reclamacionToDelete?.title}" y todos sus registros asociados (adjuntos, participantes, incidencias vinculadas e historial de estados) de forma permanente e irreversible.`}
+        confirmWord="ELIMINAR"
+        onConfirm={handleDeleteReclamacion}
+        isLoading={isDeletingReclamacion}
+        loadingText="Eliminando..."
+        confirmText="Eliminar"
+        variant="destructive"
+        icon={<Trash2 className="w-5 h-5 text-destructive" />}
+      />
     </div>
   );
 }
