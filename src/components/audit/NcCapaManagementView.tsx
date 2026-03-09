@@ -662,8 +662,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>No Conformidades</CardTitle>
-            {canEditContent && selectedCapaPlanId && (
-              <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" }); setNewNcOpen(true); }}>
+            {canEditContent && (
+              <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: selectedCapaPlan?.audit_id ?? "", capa_plan_id: selectedCapaPlanId ?? "" }); setNewNcOpen(true); }}>
                 <Plus className="mr-1 h-4 w-4" />Nueva NC
               </Button>
             )}
