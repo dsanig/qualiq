@@ -1837,6 +1837,33 @@ export type Database = {
           },
         ]
       }
+      user_notification_preferences: {
+        Row: {
+          alert_period_1: number
+          alert_period_2: number
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alert_period_1?: number
+          alert_period_2?: number
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alert_period_1?: number
+          alert_period_2?: number
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

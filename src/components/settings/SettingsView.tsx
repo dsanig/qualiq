@@ -8,6 +8,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TwoFactorSettings } from "./TwoFactorSettings";
+import { NotificationSettings } from "./NotificationSettings";
 import { useAuditLog } from "@/hooks/useAuditLog";
 
 export function SettingsView() {
@@ -201,6 +202,9 @@ export function SettingsView() {
           </Button>
         </div>
       </div>
+
+      {/* Notification settings */}
+      <NotificationSettings />
 
       {/* 2FA card */}
       <TwoFactorSettings />
