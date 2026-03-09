@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { NotificationsDropdown } from "@/components/notifications/NotificationsDropdown";
 import { CompanySwitcher } from "./CompanySwitcher";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,7 @@ interface HeaderProps {
 
 export function Header({ title, subtitle, searchQuery, onSearchChange, onSearchSubmit, onSearchClear, searchPlaceholder }: HeaderProps) {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <header className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
@@ -66,7 +68,7 @@ export function Header({ title, subtitle, searchQuery, onSearchChange, onSearchS
 
         {/* Actions */}
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
+          <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => navigate("/tutorial")}>
             <HelpCircle className="w-5 h-5" />
           </Button>
           <NotificationsDropdown />

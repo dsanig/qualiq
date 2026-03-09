@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import ShareDownload from "./pages/ShareDownload";
+import Tutorial from "./pages/Tutorial";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route path="/create-account" element={<Navigate to="/login" replace />} />
             <Route path="/share" element={<ShareDownload />} />
+            <Route path="/tutorial" element={<Tutorial />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
