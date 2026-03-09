@@ -24,6 +24,7 @@ interface HeaderProps {
 
 export function Header({ title, subtitle, searchQuery, onSearchChange, onSearchSubmit, onSearchClear, searchPlaceholder }: HeaderProps) {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <header className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
