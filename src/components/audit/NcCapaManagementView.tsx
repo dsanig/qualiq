@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2, Trash2 } from "lucide-react";
+import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2, Trash2, FileText, AlertTriangle, Users, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuditLog } from "@/hooks/useAuditLog";
@@ -49,6 +50,7 @@ type ActionItem = {
 type Profile = { id: string; user_id?: string; full_name: string | null; email: string | null; company_id?: string | null };
 type Audit = { id: string; title: string };
 type IncidenciaRef = { id: string; title: string; status: string };
+type ReclamacionRef = { id: string; title: string; status: string };
 type CapaIncidenciaLink = { capa_plan_id: string; incidencia_id: string };
 type CapaNcLink = { capa_plan_id: string; non_conformity_id: string };
 
@@ -70,6 +72,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [users, setUsers] = useState<Profile[]>([]);
   const [audits, setAudits] = useState<Audit[]>([]);
   const [incidencias, setIncidencias] = useState<IncidenciaRef[]>([]);
+  const [reclamaciones, setReclamaciones] = useState<ReclamacionRef[]>([]);
   const [capaIncidenciaLinks, setCapaIncidenciaLinks] = useState<CapaIncidenciaLink[]>([]);
   const [capaNcLinks, setCapaNcLinks] = useState<CapaNcLink[]>([]);
   const [selectedCapaPlanId, setSelectedCapaPlanId] = useState<string | null>(null);
@@ -108,7 +111,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [editingAction, setEditingAction] = useState<ActionItem | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentCapaPage, setCurrentCapaPage] = useState(1);
 
   const { toast } = useToast();
 
@@ -128,38 +131,39 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const normalizedQuery = useMemo(() => normalizeText(searchQuery), [searchQuery]);
 
   const selectedCapaPlan = useMemo(() => capaPlans.find((p) => p.id === selectedCapaPlanId) ?? null, [capaPlans, selectedCapaPlanId]);
-  const filteredNcs = useMemo(() => {
-    if (!selectedCapaPlanId) return [];
-    const linkedByJoin = capaNcLinks
-      .filter((link) => link.capa_plan_id === selectedCapaPlanId)
-      .map((link) => link.non_conformity_id);
+  
+  // All NCs (not filtered by CAPA)
+  const allNcsFiltered = useMemo(() => {
+    if (!normalizedQuery) return nonConformities;
+    return nonConformities.filter((nc) => {
+      const searchFields = [nc.title, nc.description, nc.severity, getUserName(nc.responsible_id)];
+      return searchFields.some((field) => normalizeText(field).includes(normalizedQuery));
+    });
+  }, [nonConformities, normalizedQuery]);
 
-    return nonConformities.filter(
-      (nc) => nc.capa_plan_id === selectedCapaPlanId || linkedByJoin.includes(nc.id),
-    );
-  }, [nonConformities, selectedCapaPlanId, capaNcLinks]);
+  // All Actions (not filtered by CAPA)
+  const allActionsFiltered = useMemo(() => {
+    if (!normalizedQuery) return actions;
+    return actions.filter((action) => {
+      const searchFields = [action.description, getUserName(action.responsible_id)];
+      return searchFields.some((field) => normalizeText(field).includes(normalizedQuery));
+    });
+  }, [actions, normalizedQuery]);
+
   const selectedNc = useMemo(() => nonConformities.find((nc) => nc.id === selectedNcId) ?? null, [nonConformities, selectedNcId]);
   const ncActions = useMemo(() => actions.filter((a) => a.non_conformity_id === selectedNcId), [actions, selectedNcId]);
-  const capaActions = useMemo(() => {
-    if (!selectedCapaPlanId) return actions.filter((a) => !a.capa_plan_id);
-    const ncIds = filteredNcs.map((nc) => nc.id);
-    return actions.filter((a) => a.capa_plan_id === selectedCapaPlanId || (a.non_conformity_id ? ncIds.includes(a.non_conformity_id) : false));
-  }, [actions, selectedCapaPlanId, filteredNcs]);
-  const directPlanActions = useMemo(
-    () => actions.filter((a) => a.capa_plan_id === selectedCapaPlanId && !a.non_conformity_id),
-    [actions, selectedCapaPlanId],
-  );
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [{ data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: auditsData }, { data: incData }, { data: linksData }, { data: capaNcData }] = await Promise.all([
+      const [{ data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: auditsData }, { data: incData }, { data: recData }, { data: linksData }, { data: capaNcData }] = await Promise.all([
         (supabase as any).from("capa_plans").select("id,audit_id,company_id,title,description,responsible_id").order("created_at", { ascending: false }),
         (supabase as any).from("non_conformities").select("id,capa_plan_id,audit_id,company_id,title,description,severity,root_cause,status,deadline,responsible_id"),
         (supabase as any).from("actions").select("id,capa_plan_id,company_id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
         (supabase as any).from("profiles").select("id,user_id,company_id,full_name,email"),
         (supabase as any).from("audits").select("id,title"),
         (supabase as any).from("incidencias").select("id,title,status"),
+        (supabase as any).from("reclamaciones").select("id,title,status"),
         (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
         (supabase as any).from("capa_plan_non_conformities").select("non_conformity_id,capa_plan_id"),
       ]);
@@ -169,24 +173,15 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       setUsers((usersData ?? []) as Profile[]);
       setAudits((auditsData ?? []) as Audit[]);
       setIncidencias((incData ?? []) as IncidenciaRef[]);
+      setReclamaciones((recData ?? []) as ReclamacionRef[]);
       setCapaIncidenciaLinks((linksData ?? []) as CapaIncidenciaLink[]);
       setCapaNcLinks((capaNcData ?? []) as CapaNcLink[]);
-      if (!selectedCapaPlanId && capaData?.[0]?.id) setSelectedCapaPlanId(capaData[0].id);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => { void loadData(); }, []);
-
-  // Auto-select first NC when CAPA changes
-  useEffect(() => {
-    if (filteredNcs.length > 0 && !filteredNcs.some(nc => nc.id === selectedNcId)) {
-      setSelectedNcId(filteredNcs[0].id);
-    } else if (filteredNcs.length === 0) {
-      setSelectedNcId(null);
-    }
-  }, [filteredNcs, selectedNcId]);
 
   const getUserName = (id: string | null) => {
     if (!id) return null;
@@ -197,6 +192,16 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const getAuditTitle = (id: string | null) => {
     if (!id) return null;
     return audits.find((a) => a.id === id)?.title ?? null;
+  };
+
+  const getCapaPlanTitle = (id: string | null) => {
+    if (!id) return null;
+    return capaPlans.find((c) => c.id === id)?.title ?? null;
+  };
+
+  const getNcTitle = (id: string | null) => {
+    if (!id) return null;
+    return nonConformities.find((nc) => nc.id === id)?.title ?? null;
   };
 
   const capaPlansFiltered = useMemo(() => {
@@ -217,14 +222,14 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   }, [capaPlans, nonConformities, capaNcLinks, normalizedQuery, users, audits]);
 
   const PAGE_SIZE = 10;
-  const totalPages = Math.max(1, Math.ceil(capaPlansFiltered.length / PAGE_SIZE));
+  const totalCapaPages = Math.max(1, Math.ceil(capaPlansFiltered.length / PAGE_SIZE));
   const paginatedCapaPlans = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
+    const start = (currentCapaPage - 1) * PAGE_SIZE;
     return capaPlansFiltered.slice(start, start + PAGE_SIZE);
-  }, [capaPlansFiltered, currentPage]);
+  }, [capaPlansFiltered, currentCapaPage]);
 
-  useEffect(() => { setCurrentPage(1); }, [normalizedQuery]);
-  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
+  useEffect(() => { setCurrentCapaPage(1); }, [normalizedQuery]);
+  useEffect(() => { if (currentCapaPage > totalCapaPages) setCurrentCapaPage(totalCapaPages); }, [currentCapaPage, totalCapaPages]);
 
   // --- CRUD ---
   const createCapaPlan = async () => {
@@ -307,19 +312,14 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const deleteCapaPlan = async () => {
     if (!deletingCapaId) return;
 
-    // Delete join table links first
     await Promise.all([
       (supabase as any).from("capa_plan_non_conformities").delete().eq("capa_plan_id", deletingCapaId),
       (supabase as any).from("incidencia_capa_plans").delete().eq("capa_plan_id", deletingCapaId),
     ]);
 
-    // Unlink NCs (set capa_plan_id to null)
     await (supabase as any).from("non_conformities").update({ capa_plan_id: null }).eq("capa_plan_id", deletingCapaId);
-
-    // Unlink actions (set capa_plan_id to null)
     await (supabase as any).from("actions").update({ capa_plan_id: null }).eq("capa_plan_id", deletingCapaId);
 
-    // Delete the plan
     const { error } = await (supabase as any).from("capa_plans").delete().eq("id", deletingCapaId);
 
     if (error) {
@@ -333,6 +333,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     setDeleteCapaOpen(false);
     setDeletingCapaId(null);
     setDeleteCapaImpact(null);
+    setDeleteConfirmText("");
     await loadData();
   };
 
@@ -360,8 +361,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     const { data, error } = await (supabase as any)
       .from("non_conformities")
       .insert({
-        capa_plan_id: ncForm.capa_plan_id || selectedCapaPlanId || null,
-        audit_id: ncForm.audit_id || selectedCapaPlan?.audit_id || null,
+        capa_plan_id: ncForm.capa_plan_id || null,
+        audit_id: ncForm.audit_id || null,
         company_id: companyId,
         title: ncForm.title,
         description: ncForm.description || null,
@@ -431,8 +432,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     const { data, error } = await (supabase as any)
       .from("actions")
       .insert({
-        non_conformity_id: actionForm.non_conformity_id || selectedNcId || null,
-        capa_plan_id: actionForm.capa_plan_id || selectedCapaPlanId || null,
+        non_conformity_id: actionForm.non_conformity_id || null,
+        capa_plan_id: actionForm.capa_plan_id || null,
         company_id: companyId,
         action_type: actionForm.action_type,
         description: actionForm.description,
@@ -458,7 +459,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const updateAction = async () => {
     if (!editingAction) return;
 
-    // Check if user is the responsible
     if (editingAction.responsible_id !== currentUserId) {
       toast({ title: "Sin permisos", description: "Solo el responsable puede modificar esta acción.", variant: "destructive" });
       return;
@@ -638,7 +638,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     setEditActionOpen(true);
   };
 
-  // Count stats for a CAPA plan
   const getCapaStats = (capaId: string) => {
     const linkedByJoin = capaNcLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.non_conformity_id);
     const ncs = nonConformities.filter((nc) => nc.capa_plan_id === capaId || linkedByJoin.includes(nc.id));
@@ -650,392 +649,446 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     return { ncs: ncs.length, openNcs, actions: allActions.length, openActions };
   };
 
+  // Get NCs for a specific CAPA plan
+  const getNcsForCapaPlan = (capaId: string) => {
+    const linkedByJoin = capaNcLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.non_conformity_id);
+    return nonConformities.filter((nc) => nc.capa_plan_id === capaId || linkedByJoin.includes(nc.id));
+  };
+
+  // Get Actions for a specific CAPA plan
+  const getActionsForCapaPlan = (capaId: string) => {
+    const relatedNcs = getNcsForCapaPlan(capaId);
+    const ncIds = relatedNcs.map((nc) => nc.id);
+    return actions.filter((a) => a.capa_plan_id === capaId || (a.non_conformity_id && ncIds.includes(a.non_conformity_id)));
+  };
+
   return (
-    <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-      {/* CAPA Plans list */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Planes CAPA</CardTitle>
-          {canEditContent && (
-            <Button size="sm" onClick={() => { setCapaForm({ title: "", description: "", responsible_id: "", audit_id: "" }); setNewCapaOpen(true); }}>
-              <Plus className="mr-1 h-4 w-4" />Nuevo
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {isLoading && <p className="text-sm text-muted-foreground">Cargando...</p>}
+    <div className="space-y-6">
+      {/* TOP SECTION: NCs and Actions Tabs */}
+      <Tabs defaultValue="ncs" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="ncs" className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
+            No Conformidades
+            <Badge variant="secondary" className="ml-1">{allNcsFiltered.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="actions" className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            Acciones Correctivas
+            <Badge variant="secondary" className="ml-1">{allActionsFiltered.length}</Badge>
+          </TabsTrigger>
+        </TabsList>
 
-          {!isLoading && paginatedCapaPlans.map((capa) => {
-            const stats = getCapaStats(capa.id);
-            return (
-              <button
-                key={capa.id}
-                onClick={() => setSelectedCapaPlanId(capa.id)}
-                className={`w-full rounded border p-3 text-left ${selectedCapaPlanId === capa.id ? "border-primary bg-primary/5" : "border-border"}`}
-              >
-                <p className="font-medium">{capa.title || "Sin título"}</p>
-                <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                  <span>{stats.ncs} NC{stats.ncs !== 1 ? "s" : ""}</span>
-                  {stats.openNcs > 0 && <Badge variant="outline" className="text-xs">{stats.openNcs} abierta{stats.openNcs !== 1 ? "s" : ""}</Badge>}
-                </div>
-                {capa.audit_id && (
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    🔗 {getAuditTitle(capa.audit_id)}
-                  </p>
-                )}
-              </button>
-            );
-          })}
-
-          {!isLoading && capaPlansFiltered.length === 0 && (
-            <p className="text-sm text-muted-foreground">No hay planes CAPA.</p>
-          )}
-
-          {!isLoading && capaPlansFiltered.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground">
-              <span>Página {currentPage} de {totalPages}</span>
-              <div className="flex gap-2">
-                <Button type="button" size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>Anterior</Button>
-                <Button type="button" size="sm" variant="outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>Siguiente</Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="space-y-4">
-        {/* CAPA Plan details */}
-        {selectedCapaPlan && (
+        {/* Tab: No Conformidades */}
+        <TabsContent value="ncs" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{selectedCapaPlan.title || "Plan CAPA"}</CardTitle>
-              <div className="flex gap-2">
-                {canEditContent && (
-                  <>
-                    <Button size="sm" variant="outline" onClick={() => openEditCapa(selectedCapaPlan)}>
-                      <Pencil className="mr-1 h-4 w-4" />Editar
-                    </Button>
-                    {canManageCompany && (
-                      <Button size="sm" variant="destructive" onClick={() => openDeleteCapa(selectedCapaPlan.id)}>
-                        <Trash2 className="mr-1 h-4 w-4" />Eliminar
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Todas las No Conformidades
+              </CardTitle>
+              {canEditContent && (
+                <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" }); setNewNcOpen(true); }}>
+                  <Plus className="mr-1 h-4 w-4" />Nueva NC
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Descripción</p>
-                  <p>{selectedCapaPlan.description || "—"}</p>
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando...</p>
+              ) : allNcsFiltered.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay no conformidades registradas.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Severidad</TableHead>
+                        <TableHead>Responsable</TableHead>
+                        <TableHead>Fecha límite</TableHead>
+                        <TableHead>Origen</TableHead>
+                        <TableHead>Plan CAPA</TableHead>
+                        <TableHead className="w-[80px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allNcsFiltered.map((nc) => {
+                        const ncActs = actions.filter((a) => a.non_conformity_id === nc.id);
+                        return (
+                          <TableRow key={nc.id}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{nc.title}</p>
+                                <p className="text-xs text-muted-foreground">{ncActs.length} acción{ncActs.length !== 1 ? "es" : ""}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={nc.status === "closed" ? "secondary" : nc.status === "in_progress" ? "default" : "outline"}>
+                                {statusLabel(nc.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {nc.severity ? <Badge variant="outline">{nc.severity}</Badge> : "—"}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-sm">{getUserName(nc.responsible_id) || "Sin asignar"}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {nc.deadline ? (
+                                <span className={`flex items-center gap-1 text-sm ${isOverdue(nc.deadline) && nc.status !== "closed" ? "text-destructive" : ""}`}>
+                                  <Calendar className="h-3 w-3" />
+                                  {nc.deadline}
+                                  {isOverdue(nc.deadline) && nc.status !== "closed" && <AlertCircle className="h-3 w-3" />}
+                                </span>
+                              ) : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {nc.audit_id ? (
+                                <Badge variant="outline" className="text-xs">
+                                  <FileText className="h-3 w-3 mr-1" />
+                                  {getAuditTitle(nc.audit_id)?.slice(0, 20) || "Auditoría"}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Sin origen</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {nc.capa_plan_id ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  {getCapaPlanTitle(nc.capa_plan_id)?.slice(0, 15) || "Plan CAPA"}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {canEditContent && (
+                                <Button size="sm" variant="ghost" onClick={() => openEditNc(nc)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Responsable</p>
-                  <p>{getUserName(selectedCapaPlan.responsible_id) || "—"}</p>
-                </div>
-                {selectedCapaPlan.audit_id && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Auditoría vinculada</p>
-                    <p className="text-blue-600 dark:text-blue-400">{getAuditTitle(selectedCapaPlan.audit_id)}</p>
-                  </div>
-                )}
-              </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              {/* Linked incidencias */}
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium">Incidencias vinculadas</p>
-                  {canEditContent && (
-                    <Button size="sm" variant="outline" onClick={() => setLinkIncidenciaOpen(true)}>
-                      <Link2 className="mr-1 h-4 w-4" />Vincular
-                    </Button>
-                  )}
-                </div>
-                {linkedIncidencias.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay incidencias vinculadas.</p>
-                ) : (
-                  <div className="space-y-1">
-                    {linkedIncidencias.map((inc) => (
-                      <div key={inc.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
-                        <span>{inc.title}</span>
-                        {canEditContent && (
-                          <Button size="sm" variant="ghost" onClick={() => unlinkIncidencia(inc.id)}>
-                            <Unlink className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Linked NCs (opcional) */}
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium">No conformidades vinculadas</p>
-                  {canEditContent && (
-                    <Button size="sm" variant="outline" onClick={() => setLinkNcOpen(true)}>
-                      <Link2 className="mr-1 h-4 w-4" />Vincular
-                    </Button>
-                  )}
-                </div>
-
-                {linkedNcs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay no conformidades vinculadas.</p>
-                ) : (
-                  <div className="space-y-1">
-                    {linkedNcs.map((nc) => {
-                      const canUnlink = canEditContent && linkedNcIds.includes(nc.id);
-                      return (
-                        <div key={nc.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
-                          <span className="truncate">{nc.title}</span>
-                          {canUnlink && (
-                            <Button size="sm" variant="ghost" onClick={() => unlinkNc(nc.id)}>
-                              <Unlink className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Acciones correctivas directas del plan (sin NC) */}
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium">Acciones correctivas del plan</p>
-                  {canEditContent && (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setActionForm({ non_conformity_id: "", capa_plan_id: selectedCapaPlanId ?? "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" });
-                        setNewActionOpen(true);
-                      }}
-                    >
-                      <Plus className="mr-1 h-4 w-4" />Nueva
-                    </Button>
-                  )}
-                </div>
-
-                {directPlanActions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay acciones directas en este plan.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {directPlanActions.map((action) => (
-                      <div key={action.id} className="border rounded p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+        {/* Tab: Acciones Correctivas */}
+        <TabsContent value="actions" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" />
+                Todas las Acciones Correctivas
+              </CardTitle>
+              {canEditContent && (
+                <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
+                  <Plus className="mr-1 h-4 w-4" />Nueva Acción
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando...</p>
+              ) : allActionsFiltered.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay acciones correctivas registradas.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Descripción</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Responsable</TableHead>
+                        <TableHead>Vencimiento</TableHead>
+                        <TableHead>NC Origen</TableHead>
+                        <TableHead>Plan CAPA</TableHead>
+                        <TableHead className="w-[80px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allActionsFiltered.map((action) => (
+                        <TableRow key={action.id}>
+                          <TableCell>
+                            <p className="font-medium max-w-xs truncate">{action.description}</p>
+                          </TableCell>
+                          <TableCell>
                             <Badge variant="outline">{actionTypeLabel(action.action_type)}</Badge>
+                          </TableCell>
+                          <TableCell>
                             <Badge variant={action.status === "closed" ? "secondary" : action.status === "in_progress" ? "default" : "outline"}>
                               {statusLabel(action.status)}
                             </Badge>
-                          </div>
-                          {action.responsible_id === currentUserId && (
-                            <Button size="sm" variant="ghost" onClick={() => openEditAction(action)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                        <p className="mt-2 text-sm">{action.description}</p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span>Responsable: {getUserName(action.responsible_id) || "—"}</span>
-                          {action.due_date && (
-                            <span className={isOverdue(action.due_date) && action.status !== "closed" ? "text-destructive flex items-center gap-1" : ""}>
-                              {isOverdue(action.due_date) && action.status !== "closed" && <AlertCircle className="h-3 w-3" />}
-                              Vence: {action.due_date}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Tabs for NC and Actions separation */}
-        <Tabs defaultValue="ncs" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="ncs" className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4" />
-              No Conformidades
-              {filteredNcs.length > 0 && (
-                <Badge variant="secondary" className="ml-1">{filteredNcs.length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="actions" className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              Acciones Correctivas
-              {capaActions.length > 0 && (
-                <Badge variant="secondary" className="ml-1">{capaActions.length}</Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Tab: No Conformidades */}
-          <TabsContent value="ncs" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <ClipboardList className="h-5 w-5" />
-                  No Conformidades
-                </CardTitle>
-                {canEditContent && (
-                  <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: selectedCapaPlan?.audit_id ?? "", capa_plan_id: selectedCapaPlanId ?? "" }); setNewNcOpen(true); }}>
-                    <Plus className="mr-1 h-4 w-4" />Nueva NC
-                  </Button>
-                )}
-              </CardHeader>
-              <CardContent>
-                {filteredNcs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay no conformidades en este plan.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredNcs.map((nc) => {
-                      const ncActs = actions.filter((a) => a.non_conformity_id === nc.id);
-                      const openActions = ncActs.filter((a) => a.status !== "closed").length;
-                      const overdueActions = ncActs.filter((a) => a.status !== "closed" && isOverdue(a.due_date)).length;
-                      
-                      return (
-                        <button
-                          key={nc.id}
-                          onClick={() => setSelectedNcId(nc.id)}
-                          className={`w-full rounded border p-3 text-left transition-colors ${selectedNcId === nc.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium">{nc.title}</p>
-                            <Badge variant={nc.status === "closed" ? "secondary" : nc.status === "in_progress" ? "default" : "outline"}>
-                              {statusLabel(nc.status)}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                            <span>{ncActs.length} acción{ncActs.length !== 1 ? "es" : ""}</span>
-                            {openActions > 0 && <Badge variant="outline">{openActions} pendiente{openActions !== 1 ? "s" : ""}</Badge>}
-                            {overdueActions > 0 && <Badge variant="destructive">{overdueActions} vencida{overdueActions !== 1 ? "s" : ""}</Badge>}
-                            {nc.deadline && (
-                              <span className={isOverdue(nc.deadline) && nc.status !== "closed" ? "text-destructive" : ""}>
-                                Límite: {nc.deadline}
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* NC Detail Card */}
-            {selectedNc && (
-              <Card className="border-l-4 border-l-primary">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{selectedNc.title}</CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedNc.severity && <Badge variant="outline" className="mr-2">{selectedNc.severity}</Badge>}
-                      Responsable: {getUserName(selectedNc.responsible_id) || "Sin asignar"}
-                    </p>
-                  </div>
-                  {canEditContent && (
-                    <Button size="sm" variant="outline" onClick={() => openEditNc(selectedNc)}>
-                      <Pencil className="mr-1 h-4 w-4" />Editar
-                    </Button>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {selectedNc.description && (
-                    <div>
-                      <p className="text-sm font-medium">Descripción</p>
-                      <p className="text-sm text-muted-foreground">{selectedNc.description}</p>
-                    </div>
-                  )}
-                  {selectedNc.root_cause && (
-                    <div>
-                      <p className="text-sm font-medium">Causa raíz</p>
-                      <p className="text-sm text-muted-foreground">{selectedNc.root_cause}</p>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-4 text-sm">
-                    <span>Estado: <Badge variant={selectedNc.status === "closed" ? "secondary" : "default"}>{statusLabel(selectedNc.status)}</Badge></span>
-                    {selectedNc.deadline && (
-                      <span className={isOverdue(selectedNc.deadline) && selectedNc.status !== "closed" ? "text-destructive" : ""}>
-                        Fecha límite: {selectedNc.deadline}
-                      </span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* Tab: Acciones Correctivas */}
-          <TabsContent value="actions" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5" />
-                  Acciones Correctivas
-                </CardTitle>
-                {canEditContent && (
-                  <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", capa_plan_id: selectedCapaPlanId ?? "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
-                    <Plus className="mr-1 h-4 w-4" />Nueva Acción
-                  </Button>
-                )}
-              </CardHeader>
-              <CardContent>
-                {capaActions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay acciones correctivas en este plan.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {capaActions.map((action) => {
-                      const relatedNc = nonConformities.find((nc) => nc.id === action.non_conformity_id);
-                      return (
-                        <div key={action.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline">{actionTypeLabel(action.action_type)}</Badge>
-                              <Badge variant={action.status === "closed" ? "secondary" : action.status === "in_progress" ? "default" : "outline"}>
-                                {statusLabel(action.status)}
-                              </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Users className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-sm">{getUserName(action.responsible_id) || "Sin asignar"}</span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {action.due_date ? (
+                              <span className={`flex items-center gap-1 text-sm ${isOverdue(action.due_date) && action.status !== "closed" ? "text-destructive" : ""}`}>
+                                <Calendar className="h-3 w-3" />
+                                {action.due_date}
+                                {isOverdue(action.due_date) && action.status !== "closed" && <AlertCircle className="h-3 w-3" />}
+                              </span>
+                            ) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {action.non_conformity_id ? (
+                              <Badge variant="outline" className="text-xs">
+                                <ClipboardList className="h-3 w-3 mr-1" />
+                                {getNcTitle(action.non_conformity_id)?.slice(0, 15) || "NC"}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {action.capa_plan_id ? (
+                              <Badge variant="secondary" className="text-xs">
+                                {getCapaPlanTitle(action.capa_plan_id)?.slice(0, 15) || "Plan CAPA"}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
                             {action.responsible_id === currentUserId && (
                               <Button size="sm" variant="ghost" onClick={() => openEditAction(action)}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             )}
-                          </div>
-                          <p className="mt-2 text-sm font-medium">{action.description}</p>
-                          <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
-                            <span>Responsable: {getUserName(action.responsible_id) || "—"}</span>
-                            {action.due_date && (
-                              <span className={isOverdue(action.due_date) && action.status !== "closed" ? "text-destructive flex items-center gap-1" : ""}>
-                                {isOverdue(action.due_date) && action.status !== "closed" && <AlertCircle className="h-3 w-3" />}
-                                Vence: {action.due_date}
-                              </span>
-                            )}
-                            {relatedNc && (
-                              <span className="flex items-center gap-1">
-                                <ClipboardList className="h-3 w-3" />
-                                NC: {relatedNc.title}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
+      {/* BOTTOM SECTION: CAPA Plans */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Planes CAPA
+            <Badge variant="secondary">{capaPlansFiltered.length}</Badge>
+          </CardTitle>
+          {canEditContent && (
+            <Button size="sm" onClick={() => { setCapaForm({ title: "", description: "", responsible_id: "", audit_id: "" }); setNewCapaOpen(true); }}>
+              <Plus className="mr-1 h-4 w-4" />Nuevo Plan CAPA
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+            {/* CAPA Plans list */}
+            <div className="space-y-2">
+              {isLoading && <p className="text-sm text-muted-foreground">Cargando...</p>}
+
+              {!isLoading && paginatedCapaPlans.map((capa) => {
+                const stats = getCapaStats(capa.id);
+                return (
+                  <button
+                    key={capa.id}
+                    onClick={() => setSelectedCapaPlanId(capa.id)}
+                    className={`w-full rounded border p-3 text-left transition-colors ${selectedCapaPlanId === capa.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
+                  >
+                    <p className="font-medium">{capa.title || "Sin título"}</p>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                      <span>{stats.ncs} NC{stats.ncs !== 1 ? "s" : ""}</span>
+                      <span>{stats.actions} acción{stats.actions !== 1 ? "es" : ""}</span>
+                      {stats.openNcs > 0 && <Badge variant="outline" className="text-xs">{stats.openNcs} abierta{stats.openNcs !== 1 ? "s" : ""}</Badge>}
+                    </div>
+                    {capa.audit_id && (
+                      <p className="text-xs text-primary mt-1">
+                        🔗 {getAuditTitle(capa.audit_id)}
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
+
+              {!isLoading && capaPlansFiltered.length === 0 && (
+                <p className="text-sm text-muted-foreground">No hay planes CAPA.</p>
+              )}
+
+              {!isLoading && capaPlansFiltered.length > PAGE_SIZE && (
+                <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground">
+                  <span>Página {currentCapaPage} de {totalCapaPages}</span>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant="outline" disabled={currentCapaPage === 1} onClick={() => setCurrentCapaPage((p) => Math.max(1, p - 1))}>Anterior</Button>
+                    <Button type="button" size="sm" variant="outline" disabled={currentCapaPage === totalCapaPages} onClick={() => setCurrentCapaPage((p) => Math.min(totalCapaPages, p + 1))}>Siguiente</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* CAPA Plan details */}
+            <div className="space-y-4">
+              {selectedCapaPlan ? (
+                <>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>{selectedCapaPlan.title || "Plan CAPA"}</CardTitle>
+                      <div className="flex gap-2">
+                        {canEditContent && (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => openEditCapa(selectedCapaPlan)}>
+                              <Pencil className="mr-1 h-4 w-4" />Editar
+                            </Button>
+                            {canManageCompany && (
+                              <Button size="sm" variant="destructive" onClick={() => openDeleteCapa(selectedCapaPlan.id)}>
+                                <Trash2 className="mr-1 h-4 w-4" />Eliminar
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Descripción</p>
+                          <p>{selectedCapaPlan.description || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Responsable</p>
+                          <p>{getUserName(selectedCapaPlan.responsible_id) || "—"}</p>
+                        </div>
+                        {selectedCapaPlan.audit_id && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Auditoría vinculada</p>
+                            <p className="text-primary">{getAuditTitle(selectedCapaPlan.audit_id)}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Linked incidencias */}
+                      <div className="mt-4 pt-4 border-t">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-medium">Incidencias vinculadas</p>
+                          {canEditContent && (
+                            <Button size="sm" variant="outline" onClick={() => setLinkIncidenciaOpen(true)}>
+                              <Link2 className="mr-1 h-4 w-4" />Vincular
+                            </Button>
+                          )}
+                        </div>
+                        {linkedIncidencias.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No hay incidencias vinculadas.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {linkedIncidencias.map((inc) => (
+                              <div key={inc.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
+                                <span>{inc.title}</span>
+                                {canEditContent && (
+                                  <Button size="sm" variant="ghost" onClick={() => unlinkIncidencia(inc.id)}>
+                                    <Unlink className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Linked NCs */}
+                      <div className="mt-4 pt-4 border-t">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-medium">No conformidades en este plan</p>
+                          {canEditContent && (
+                            <Button size="sm" variant="outline" onClick={() => setLinkNcOpen(true)}>
+                              <Link2 className="mr-1 h-4 w-4" />Vincular NC
+                            </Button>
+                          )}
+                        </div>
+                        {linkedNcs.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No hay no conformidades vinculadas.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {linkedNcs.map((nc) => {
+                              const canUnlink = canEditContent && linkedNcIds.includes(nc.id);
+                              return (
+                                <div key={nc.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
+                                  <div className="flex items-center gap-2">
+                                    <span className="truncate">{nc.title}</span>
+                                    <Badge variant={nc.status === "closed" ? "secondary" : "outline"} className="text-xs">
+                                      {statusLabel(nc.status)}
+                                    </Badge>
+                                  </div>
+                                  {canUnlink && (
+                                    <Button size="sm" variant="ghost" onClick={() => unlinkNc(nc.id)}>
+                                      <Unlink className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions in this CAPA plan */}
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-sm font-medium mb-2">Acciones correctivas en este plan</p>
+                        {(() => {
+                          const capaActions = getActionsForCapaPlan(selectedCapaPlan.id);
+                          return capaActions.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No hay acciones en este plan.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {capaActions.map((action) => (
+                                <div key={action.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <Badge variant="outline" className="text-xs shrink-0">{actionTypeLabel(action.action_type)}</Badge>
+                                    <span className="truncate">{action.description}</span>
+                                    <Badge variant={action.status === "closed" ? "secondary" : "outline"} className="text-xs shrink-0">
+                                      {statusLabel(action.status)}
+                                    </Badge>
+                                  </div>
+                                  {action.due_date && (
+                                    <span className={`text-xs ml-2 shrink-0 ${isOverdue(action.due_date) && action.status !== "closed" ? "text-destructive" : "text-muted-foreground"}`}>
+                                      {action.due_date}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-32 text-muted-foreground">
+                  Selecciona un plan CAPA para ver los detalles
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Dialogs */}
       {/* New CAPA Dialog */}
       <Dialog open={newCapaOpen} onOpenChange={setNewCapaOpen}>
         <DialogContent>
@@ -1111,7 +1164,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           <DialogHeader>
             <DialogTitle>Nueva No Conformidad</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
             <div><Label>Título *</Label><Input value={ncForm.title} onChange={(e) => setNcForm((p) => ({ ...p, title: e.target.value }))} /></div>
             <div><Label>Descripción</Label><Textarea value={ncForm.description} onChange={(e) => setNcForm((p) => ({ ...p, description: e.target.value }))} /></div>
             <div><Label>Severidad</Label><Input value={ncForm.severity} onChange={(e) => setNcForm((p) => ({ ...p, severity: e.target.value }))} placeholder="Ej: Mayor, Menor, Crítica" /></div>
@@ -1121,7 +1174,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               <Select value={ncForm.audit_id || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, audit_id: v === "none" ? "" : v }))}>
                 <SelectTrigger><SelectValue placeholder="Sin auditoría" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sin auditoría</SelectItem>
+                  <SelectItem value="none">Sin origen de auditoría</SelectItem>
                   {audits.map((a) => <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -1158,7 +1211,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           <DialogHeader>
             <DialogTitle>Editar No Conformidad</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
             <div><Label>Título *</Label><Input value={ncForm.title} onChange={(e) => setNcForm((p) => ({ ...p, title: e.target.value }))} /></div>
             <div><Label>Descripción</Label><Textarea value={ncForm.description} onChange={(e) => setNcForm((p) => ({ ...p, description: e.target.value }))} /></div>
             <div><Label>Severidad</Label><Input value={ncForm.severity} onChange={(e) => setNcForm((p) => ({ ...p, severity: e.target.value }))} /></div>
@@ -1168,7 +1221,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               <Select value={ncForm.audit_id || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, audit_id: v === "none" ? "" : v }))}>
                 <SelectTrigger><SelectValue placeholder="Sin auditoría" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sin auditoría</SelectItem>
+                  <SelectItem value="none">Sin origen de auditoría</SelectItem>
                   {audits.map((a) => <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -1210,7 +1263,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       <Dialog open={newActionOpen} onOpenChange={setNewActionOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nueva Acción CAPA</DialogTitle>
+            <DialogTitle>Nueva Acción Correctiva</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -1221,22 +1274,22 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               </Select>
             </div>
             <div>
+              <Label>No conformidad (origen) *</Label>
+              <Select value={actionForm.non_conformity_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, non_conformity_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecciona NC de origen" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin no conformidad</SelectItem>
+                  {nonConformities.map((nc) => <SelectItem key={nc.id} value={nc.id}>{nc.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Plan CAPA (opcional)</Label>
               <Select value={actionForm.capa_plan_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, capa_plan_id: v === "none" ? "" : v }))}>
                 <SelectTrigger><SelectValue placeholder="Sin plan CAPA" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin plan CAPA</SelectItem>
                   {capaPlans.map((c) => <SelectItem key={c.id} value={c.id}>{c.title || c.id}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>No conformidad (opcional)</Label>
-              <Select value={actionForm.non_conformity_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, non_conformity_id: v === "none" ? "" : v }))}>
-                <SelectTrigger><SelectValue placeholder="Sin no conformidad" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin no conformidad</SelectItem>
-                  {nonConformities.map((nc) => <SelectItem key={nc.id} value={nc.id}>{nc.title}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -1261,7 +1314,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       <Dialog open={editActionOpen} onOpenChange={setEditActionOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Acción CAPA</DialogTitle>
+            <DialogTitle>Editar Acción Correctiva</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -1272,22 +1325,22 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               </Select>
             </div>
             <div>
+              <Label>No conformidad (origen)</Label>
+              <Select value={actionForm.non_conformity_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, non_conformity_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin no conformidad" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin no conformidad</SelectItem>
+                  {nonConformities.map((nc) => <SelectItem key={nc.id} value={nc.id}>{nc.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Plan CAPA (opcional)</Label>
               <Select value={actionForm.capa_plan_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, capa_plan_id: v === "none" ? "" : v }))}>
                 <SelectTrigger><SelectValue placeholder="Sin plan CAPA" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin plan CAPA</SelectItem>
                   {capaPlans.map((c) => <SelectItem key={c.id} value={c.id}>{c.title || c.id}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>No conformidad (opcional)</Label>
-              <Select value={actionForm.non_conformity_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, non_conformity_id: v === "none" ? "" : v }))}>
-                <SelectTrigger><SelectValue placeholder="Sin no conformidad" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin no conformidad</SelectItem>
-                  {nonConformities.map((nc) => <SelectItem key={nc.id} value={nc.id}>{nc.title}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
