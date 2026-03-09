@@ -692,33 +692,39 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Información de auditoría</CardTitle>
-            {selectedAudit && canEditContent && (
+            {selectedAudit && (
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => openEditAudit(selectedAudit)}>
-                  <Pencil className="mr-1 h-4 w-4" />Editar
-                </Button>
+                {canEditSelectedAudit && (
+                  <Button size="sm" variant="outline" onClick={() => openEditAudit(selectedAudit)}>
+                    <Pencil className="mr-1 h-4 w-4" />Editar
+                  </Button>
+                )}
                 {canManageCompany && (
-                  <Button size="sm" variant="destructive" onClick={async () => {
-                    setDeletingAuditId(selectedAudit.id);
-                    // Check linked records
-                    const links: string[] = [];
-                    const auditCapas = capaPlans.filter(c => c.audit_id === selectedAudit.id);
-                    const auditNcs = nonConformities.filter(nc => auditCapas.some(c => c.id === nc.capa_plan_id));
-                    const auditActions = actions.filter(a => auditNcs.some(nc => nc.id === a.non_conformity_id));
-                    const auditAtts = auditAttachments.filter(a => a.audit_id === selectedAudit.id);
-                    const auditParts = auditParticipants.filter(p => p.audit_id === selectedAudit.id);
-                    const linkedIncidencias = capaIncidenciaLinks.filter(l => auditCapas.some(c => c.id === l.capa_plan_id));
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={async () => {
+                      setDeletingAuditId(selectedAudit.id);
+                      // Check linked records
+                      const links: string[] = [];
+                      const auditCapas = capaPlans.filter(c => c.audit_id === selectedAudit.id);
+                      const auditNcs = nonConformities.filter(nc => auditCapas.some(c => c.id === nc.capa_plan_id));
+                      const auditActions = actions.filter(a => auditNcs.some(nc => nc.id === a.non_conformity_id));
+                      const auditAtts = auditAttachments.filter(a => a.audit_id === selectedAudit.id);
+                      const auditParts = auditParticipants.filter(p => p.audit_id === selectedAudit.id);
+                      const linkedIncidencias = capaIncidenciaLinks.filter(l => auditCapas.some(c => c.id === l.capa_plan_id));
 
-                    if (auditCapas.length > 0) links.push(`${auditCapas.length} plan(es) CAPA`);
-                    if (auditNcs.length > 0) links.push(`${auditNcs.length} no conformidad(es)`);
-                    if (auditActions.length > 0) links.push(`${auditActions.length} acción(es)`);
-                    if (auditAtts.length > 0) links.push(`${auditAtts.length} adjunto(s)`);
-                    if (auditParts.length > 0) links.push(`${auditParts.length} participante(s)`);
-                    if (linkedIncidencias.length > 0) links.push(`${linkedIncidencias.length} incidencia(s) vinculada(s)`);
+                      if (auditCapas.length > 0) links.push(`${auditCapas.length} plan(es) CAPA`);
+                      if (auditNcs.length > 0) links.push(`${auditNcs.length} no conformidad(es)`);
+                      if (auditActions.length > 0) links.push(`${auditActions.length} acción(es)`);
+                      if (auditAtts.length > 0) links.push(`${auditAtts.length} adjunto(s)`);
+                      if (auditParts.length > 0) links.push(`${auditParts.length} participante(s)`);
+                      if (linkedIncidencias.length > 0) links.push(`${linkedIncidencias.length} incidencia(s) vinculada(s)`);
 
-                    setAuditLinkedInfo(links);
-                    setDeleteAuditConfirmOpen(true);
-                  }}>
+                      setAuditLinkedInfo(links);
+                      setDeleteAuditConfirmOpen(true);
+                    }}
+                  >
                     <Trash2 className="mr-1 h-4 w-4" />Eliminar
                   </Button>
                 )}
