@@ -64,6 +64,13 @@ const actionTypes = [
   { value: "corrective", label: "Correctiva" },
   { value: "preventive", label: "Preventiva" },
 ] as const;
+const severityLevels = [
+  { value: "5", label: "5 - Crítico" },
+  { value: "4", label: "4 - Mayor" },
+  { value: "3", label: "3 - Moderado" },
+  { value: "2", label: "2 - Menor" },
+  { value: "1", label: "1 - Poco Relevante" },
+] as const;
 
 export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewProps) {
   const [capaPlans, setCapaPlans] = useState<CapaPlan[]>([]);
