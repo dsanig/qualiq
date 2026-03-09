@@ -193,7 +193,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const capaPlansFiltered = useMemo(() => {
     if (!normalizedQuery) return capaPlans;
     return capaPlans.filter((plan) => {
-      const relatedNcs = nonConformities.filter((nc) => nc.capa_plan_id === plan.id);
+      const linkedByJoin = capaNcLinks.filter((l) => l.capa_plan_id === plan.id).map((l) => l.non_conformity_id);
+      const relatedNcs = nonConformities.filter((nc) => nc.capa_plan_id === plan.id || linkedByJoin.includes(nc.id));
       const searchFields = [
         plan.title,
         plan.description,
@@ -204,7 +205,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       ];
       return searchFields.some((field) => normalizeText(field).includes(normalizedQuery));
     });
-  }, [capaPlans, nonConformities, normalizedQuery, users, audits]);
+  }, [capaPlans, nonConformities, capaNcLinks, normalizedQuery, users, audits]);
 
   const PAGE_SIZE = 10;
   const totalPages = Math.max(1, Math.ceil(capaPlansFiltered.length / PAGE_SIZE));
