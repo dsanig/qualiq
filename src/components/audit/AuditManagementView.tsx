@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Paperclip, Pencil, Trash2, FileText } from "lucide-react";
+import { Plus, Paperclip, Pencil, Trash2, FileText, ChevronsUpDown, Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuditLog } from "@/hooks/useAuditLog";
@@ -439,28 +442,60 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       </div>
       <div>
         <Label>Empleados asignados</Label>
-        <div className="flex flex-wrap gap-1 mt-1">
-          {users.map((u) => {
-            const isSelected = auditForm.participant_ids.includes(u.id);
+        <div className="flex flex-wrap gap-1 mt-1 mb-1">
+          {auditForm.participant_ids.map((uid) => {
+            const u = users.find((u) => u.id === uid);
             return (
-              <button
-                key={u.id}
-                type="button"
-                disabled={readOnly}
-                onClick={() => {
-                  if (isSelected) {
-                    setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== u.id) }));
-                  } else {
-                    setAuditForm((p) => ({ ...p, participant_ids: [...p.participant_ids, u.id] }));
-                  }
-                }}
-                className={`text-xs px-2 py-1 rounded-full border transition-colors ${isSelected ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border hover:bg-muted/80"}`}
-              >
-                {u.full_name ?? u.email ?? u.id}
-              </button>
+              <Badge key={uid} variant="secondary" className="gap-1">
+                {u?.full_name ?? u?.email ?? uid}
+                {!readOnly && (
+                  <button type="button" onClick={() => setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== uid) }))} className="ml-0.5 rounded-full hover:bg-muted">
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </Badge>
             );
           })}
         </div>
+        {!readOnly && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full justify-between text-sm font-normal">
+                Añadir empleados...
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[300px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Buscar empleado..." />
+                <CommandList>
+                  <CommandEmpty>Sin resultados.</CommandEmpty>
+                  <CommandGroup>
+                    {users.map((u) => {
+                      const isSelected = auditForm.participant_ids.includes(u.id);
+                      return (
+                        <CommandItem
+                          key={u.id}
+                          value={u.full_name ?? u.email ?? u.id}
+                          onSelect={() => {
+                            if (isSelected) {
+                              setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== u.id) }));
+                            } else {
+                              setAuditForm((p) => ({ ...p, participant_ids: [...p.participant_ids, u.id] }));
+                            }
+                          }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`} />
+                          {u.full_name ?? u.email ?? u.id}
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
       <div>
         <Label>Estado</Label>
