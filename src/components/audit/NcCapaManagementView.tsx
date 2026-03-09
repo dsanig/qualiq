@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuditLog } from "@/hooks/useAuditLog";
+import { downloadStorageFile } from "@/utils/storageDownload";
 
 type CapaPlan = {
   id: string;
@@ -366,18 +367,17 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   const downloadAttachment = async (attachment: AttachmentItem) => {
     if (!attachment.bucket_id || !attachment.object_path) return;
-    const { data, error } = await supabase.storage.from(attachment.bucket_id).createSignedUrl(attachment.object_path, 300);
-    if (error || !data?.signedUrl) {
-      toast({ title: "Error", description: "No se pudo generar la descarga.", variant: "destructive" });
-      return;
+
+    const downloaded = await downloadStorageFile({
+      supabase,
+      bucketId: attachment.bucket_id,
+      objectPath: attachment.object_path,
+      downloadFileName: attachment.file_name ?? attachment.object_path.split("/").pop() ?? "file",
+    });
+
+    if (!downloaded) {
+      toast({ title: "Error", description: "No se pudo descargar el archivo.", variant: "destructive" });
     }
-    const link = document.createElement("a");
-    link.href = data.signedUrl;
-    link.download = attachment.file_name;
-    link.target = "_blank";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
   };
 
   const removeExistingActionAttachment = async (attachmentId: string) => {

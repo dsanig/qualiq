@@ -55,6 +55,7 @@ import type { FiltersState } from "@/components/filters/FilterModal";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
 import { verifySignatureConfirmation } from "@/lib/signatureConfirmation";
+import { downloadStorageFile } from "@/utils/storageDownload";
 
 type DocumentTypology = "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro";
 
@@ -995,17 +996,15 @@ export function DocumentsView({
   };
 
   const handleDownloadVersion = async (fileUrl: string, version: number, docCode: string) => {
-    const { data, error } = await supabase.storage.from("documents").download(fileUrl);
-    if (error || !data) {
+    const downloaded = await downloadStorageFile({
+      supabase,
+      bucketId: "documents",
+      objectPath: fileUrl,
+      downloadFileName: `${docCode}-v${version}`,
+    });
+    if (!downloaded) {
       toast({ title: "Error", description: "No se pudo descargar el archivo.", variant: "destructive" });
-      return;
     }
-    const url = URL.createObjectURL(data);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${docCode}-v${version}`;
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
   const handleDeleteVersion = async (versionId: string) => {
@@ -1686,17 +1685,16 @@ export function DocumentsView({
       link.click();
       URL.revokeObjectURL(url);
     } else if (doc.fileUrl && !doc.fileUrl.startsWith("/docs/")) {
-      const { data, error } = await supabase.storage.from("documents").download(doc.fileUrl);
-      if (error || !data) {
+      const downloaded = await downloadStorageFile({
+        supabase,
+        bucketId: "documents",
+        objectPath: doc.fileUrl,
+        downloadFileName: `${doc.code}.${doc.format}`,
+      });
+      if (!downloaded) {
         toast({ title: "Error", description: "No se pudo descargar el archivo.", variant: "destructive" });
         return;
       }
-      const url = URL.createObjectURL(data);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${doc.code}.${doc.format}`;
-      link.click();
-      URL.revokeObjectURL(url);
     } else {
       toast({ title: "Sin archivo", description: "Este documento no tiene un archivo asociado.", variant: "destructive" });
       return;
@@ -1828,16 +1826,13 @@ export function DocumentsView({
 
   const handleDownloadForSigning = async (doc: Document) => {
     if (doc.fileUrl && !doc.fileUrl.startsWith("/docs/")) {
-      const { data, error } = await supabase.storage.from("documents").download(doc.fileUrl);
-      if (!error && data) {
-        const url = URL.createObjectURL(data);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${doc.code}-para-firmar.${doc.format}`;
-        link.click();
-        URL.revokeObjectURL(url);
-        return;
-      }
+      const downloaded = await downloadStorageFile({
+        supabase,
+        bucketId: "documents",
+        objectPath: doc.fileUrl,
+        downloadFileName: `${doc.code}-para-firmar.${doc.format}`,
+      });
+      if (downloaded) return;
     }
     toast({ title: "Sin archivo", description: "Este documento no tiene un archivo asociado.", variant: "destructive" });
   };
