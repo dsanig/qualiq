@@ -919,7 +919,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                       {stats.openNcs > 0 && <Badge variant="outline" className="text-xs">{stats.openNcs} abierta{stats.openNcs !== 1 ? "s" : ""}</Badge>}
                     </div>
                     {capa.audit_id && (
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      <p className="text-xs text-primary mt-1">
                         🔗 {getAuditTitle(capa.audit_id)}
                       </p>
                     )}
