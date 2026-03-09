@@ -89,6 +89,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [deleteCapaOpen, setDeleteCapaOpen] = useState(false);
   const [deletingCapaId, setDeletingCapaId] = useState<string | null>(null);
   const [deleteCapaImpact, setDeleteCapaImpact] = useState<{ ncs: number; actions: number; links: number } | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Forms
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "", audit_id: "" });
@@ -1373,7 +1374,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       </Dialog>
 
       {/* Delete CAPA Confirmation Dialog */}
-      <Dialog open={deleteCapaOpen} onOpenChange={setDeleteCapaOpen}>
+      <Dialog open={deleteCapaOpen} onOpenChange={(open) => { setDeleteCapaOpen(open); if (!open) setDeleteConfirmText(""); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Eliminar Plan CAPA</DialogTitle>
@@ -1394,9 +1395,18 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               </p>
             </div>
           )}
+          <div className="space-y-2">
+            <Label>Escribe <span className="font-bold">ELIMINAR</span> para confirmar</Label>
+            <Input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="ELIMINAR"
+              autoComplete="off"
+            />
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteCapaOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={deleteCapaPlan}>
+            <Button variant="outline" onClick={() => { setDeleteCapaOpen(false); setDeleteConfirmText(""); }}>Cancelar</Button>
+            <Button variant="destructive" onClick={deleteCapaPlan} disabled={deleteConfirmText !== "ELIMINAR"}>
               <Trash2 className="mr-1 h-4 w-4" />Eliminar
             </Button>
           </DialogFooter>
