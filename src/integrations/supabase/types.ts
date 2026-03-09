@@ -63,6 +63,7 @@ export type Database = {
           id: string
           non_conformity_id: string | null
           responsible_id: string | null
+          start_date: string | null
           status: string
         }
         Insert: {
@@ -75,6 +76,7 @@ export type Database = {
           id?: string
           non_conformity_id?: string | null
           responsible_id?: string | null
+          start_date?: string | null
           status?: string
         }
         Update: {
@@ -87,6 +89,7 @@ export type Database = {
           id?: string
           non_conformity_id?: string | null
           responsible_id?: string | null
+          start_date?: string | null
           status?: string
         }
         Relationships: [
