@@ -116,10 +116,23 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   const normalizedQuery = useMemo(() => normalizeText(searchQuery), [searchQuery]);
 
-  const selectedCapaPlan = useMemo(() => capaPlans.find((p) => p.id === selectedCapaPlanId) ?? null, [capaPlans, selectedCapaPlanId]);
-  const filteredNcs = useMemo(() => nonConformities.filter((nc) => nc.capa_plan_id === selectedCapaPlanId), [nonConformities, selectedCapaPlanId]);
+  const filteredNcs = useMemo(() => {
+    if (!selectedCapaPlanId) return [];
+    const linkedByJoin = capaNcLinks
+      .filter((link) => link.capa_plan_id === selectedCapaPlanId)
+      .map((link) => link.non_conformity_id);
+
+    return nonConformities.filter(
+      (nc) => nc.capa_plan_id === selectedCapaPlanId || linkedByJoin.includes(nc.id),
+    );
+  }, [nonConformities, selectedCapaPlanId, capaNcLinks]);
   const selectedNc = useMemo(() => nonConformities.find((nc) => nc.id === selectedNcId) ?? null, [nonConformities, selectedNcId]);
   const ncActions = useMemo(() => actions.filter((a) => a.non_conformity_id === selectedNcId), [actions, selectedNcId]);
+  const capaActions = useMemo(() => {
+    if (!selectedCapaPlanId) return actions.filter((a) => !a.capa_plan_id);
+    const ncIds = filteredNcs.map((nc) => nc.id);
+    return actions.filter((a) => a.capa_plan_id === selectedCapaPlanId || (a.non_conformity_id ? ncIds.includes(a.non_conformity_id) : false));
+  }, [actions, selectedCapaPlanId, filteredNcs]);
 
   const loadData = async () => {
     setIsLoading(true);
