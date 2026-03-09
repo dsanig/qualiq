@@ -41,7 +41,7 @@ type ActionItem = {
   non_conformity_id: string | null;
   capa_plan_id: string | null;
   company_id: string | null;
-  title?: string | null;
+  title: string;
   action_type: "corrective" | "preventive" | "immediate";
   description: string;
   responsible_id: string | null;
@@ -123,6 +123,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "", audit_id: "" });
   const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
   const [actionForm, setActionForm] = useState({
+    title: "",
     non_conformity_id: "",
     capa_plan_id: "",
     action_type: "corrective" as "corrective" | "preventive" | "immediate",
@@ -564,8 +565,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   };
 
   const createAction = async () => {
-    if (!actionForm.responsible_id || !actionForm.due_date) {
-      toast({ title: "Error", description: "Responsable y fecha límite son obligatorios.", variant: "destructive" });
+    if (!actionForm.title.trim() || !actionForm.description.trim() || !actionForm.responsible_id || !actionForm.due_date) {
+      toast({ title: "Error", description: "Título, descripción, responsable y fecha límite son obligatorios.", variant: "destructive" });
       return;
     }
 
@@ -577,8 +578,9 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         non_conformity_id: actionForm.non_conformity_id || null,
         capa_plan_id: actionForm.capa_plan_id || null,
         company_id: companyId,
+        title: actionForm.title.trim(),
         action_type: actionForm.action_type,
-        description: actionForm.description,
+        description: actionForm.description.trim(),
         responsible_id: actionForm.responsible_id,
         start_date: actionForm.start_date || null,
         due_date: actionForm.due_date,
@@ -593,22 +595,28 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     }
 
     toast({ title: "Acción creada" });
-    logAction({ action: "create", entity_type: "action", entity_id: data?.id, entity_title: actionForm.description.slice(0, 50) });
+    logAction({ action: "create", entity_type: "action", entity_id: data?.id, entity_title: actionForm.title.slice(0, 50) });
     setNewActionOpen(false);
-    setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", start_date: "", due_date: "", status: "open" });
+    setActionForm({ title: "", non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", start_date: "", due_date: "", status: "open" });
     await loadData();
   };
 
   const updateAction = async () => {
     if (!editingAction) return;
 
+    if (!actionForm.title.trim() || !actionForm.description.trim() || !actionForm.responsible_id || !actionForm.due_date) {
+      toast({ title: "Error", description: "Título, descripción, responsable y fecha límite son obligatorios.", variant: "destructive" });
+      return;
+    }
+
     const { error } = await (supabase as any)
       .from("actions")
       .update({
         non_conformity_id: actionForm.non_conformity_id || null,
         capa_plan_id: actionForm.capa_plan_id || null,
+        title: actionForm.title.trim(),
         action_type: actionForm.action_type,
-        description: actionForm.description,
+        description: actionForm.description.trim(),
         responsible_id: actionForm.responsible_id,
         start_date: actionForm.start_date || null,
         due_date: actionForm.due_date,
@@ -621,7 +629,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     }
 
     toast({ title: "Acción actualizada" });
-    logAction({ action: "update", entity_type: "action", entity_id: editingAction.id, entity_title: actionForm.description.slice(0, 50) });
+    logAction({ action: "update", entity_type: "action", entity_id: editingAction.id, entity_title: actionForm.title.slice(0, 50) });
     setEditActionOpen(false);
     setEditingAction(null);
     await loadData();
@@ -729,6 +737,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const openEditAction = (action: ActionItem) => {
     setEditingAction(action);
     setActionForm({
+      title: action.title,
       non_conformity_id: action.non_conformity_id ?? "",
       capa_plan_id: action.capa_plan_id ?? "",
       action_type: action.action_type,
@@ -907,7 +916,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                 Todas las Acciones Correctivas
               </CardTitle>
               {canEditContent && (
-                <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", start_date: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
+                <Button size="sm" onClick={() => { setActionForm({ title: "", non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", start_date: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
                   <Plus className="mr-1 h-4 w-4" />Nueva Acción
                 </Button>
               )}
@@ -939,7 +948,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                         return (
                           <TableRow key={action.id}>
                             <TableCell>
-                              <p className="font-medium max-w-xs truncate">{action.title || action.description}</p>
+                              <p className="font-medium max-w-xs truncate">{action.title}</p>
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">{actionTypeLabel(action.action_type)}</Badge>
@@ -1197,7 +1206,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                                 <div key={action.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
                                   <div className="flex items-center gap-2 flex-1 min-w-0">
                                     <Badge variant="outline" className="text-xs shrink-0">{actionTypeLabel(action.action_type)}</Badge>
-                                    <span className="truncate">{action.description}</span>
+                                    <span className="truncate">{action.title}</span>
                                     <Badge variant={action.status === "closed" ? "secondary" : "outline"} className="text-xs shrink-0">
                                       {statusLabel(action.status)}
                                     </Badge>
@@ -1413,6 +1422,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             <DialogTitle>Nueva Acción Correctiva</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <div><Label>Título *</Label><Input value={actionForm.title} onChange={(e) => setActionForm((p) => ({ ...p, title: e.target.value }))} /></div>
             <div>
               <Label>Tipo</Label>
               <Select value={actionForm.action_type} onValueChange={(v: "corrective" | "preventive" | "immediate") => setActionForm((p) => ({ ...p, action_type: v }))}>
@@ -1465,6 +1475,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             <DialogTitle>Editar Acción Correctiva</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <div><Label>Título *</Label><Input value={actionForm.title} onChange={(e) => setActionForm((p) => ({ ...p, title: e.target.value }))} /></div>
             <div>
               <Label>Tipo</Label>
               <Select value={actionForm.action_type} onValueChange={(v: "corrective" | "preventive" | "immediate") => setActionForm((p) => ({ ...p, action_type: v }))}>
@@ -1538,7 +1549,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Actualizar Estado — Acción</DialogTitle>
-            <DialogDescription>{updatingActionStatus?.description?.slice(0, 80)}</DialogDescription>
+            <DialogDescription>{updatingActionStatus?.title?.slice(0, 80)}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
