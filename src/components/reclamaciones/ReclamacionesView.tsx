@@ -355,6 +355,34 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
     }
   };
 
+  const canDelete = canManageCompany || isSuperadmin;
+
+  const handleDeleteReclamacion = async () => {
+    if (!reclamacionToDelete) return;
+    setIsDeletingReclamacion(true);
+    try {
+      const recId = reclamacionToDelete.id;
+      await Promise.all([
+        (supabase as any).from("reclamacion_incidencias").delete().eq("reclamacion_id", recId),
+        (supabase as any).from("reclamacion_participants").delete().eq("reclamacion_id", recId),
+        (supabase as any).from("reclamacion_attachments").delete().eq("reclamacion_id", recId),
+        (supabase as any).from("reclamacion_status_changes").delete().eq("reclamacion_id", recId),
+      ]);
+      const { error } = await (supabase as any).from("reclamaciones").delete().eq("id", recId);
+      if (error) throw error;
+
+      toast({ title: "Reclamación eliminada", description: `"${reclamacionToDelete.title}" fue eliminada correctamente.` });
+      logAction({ action: "delete", entity_type: "reclamacion", entity_id: recId, entity_title: reclamacionToDelete.title });
+      setIsDeleteConfirmOpen(false);
+      setReclamacionToDelete(null);
+      await loadData();
+    } catch (err: any) {
+      toast({ title: "Error al eliminar", description: err?.message || "No se pudo eliminar la reclamación.", variant: "destructive" });
+    } finally {
+      setIsDeletingReclamacion(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-4">
