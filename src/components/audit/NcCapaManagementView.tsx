@@ -475,6 +475,56 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     return incidencias.filter((i) => linkedIds.includes(i.id));
   }, [selectedCapaPlanId, capaIncidenciaLinks, incidencias]);
 
+  const linkedNcIds = useMemo(
+    () => capaNcLinks.filter((l) => l.capa_plan_id === selectedCapaPlanId).map((l) => l.non_conformity_id),
+    [capaNcLinks, selectedCapaPlanId],
+  );
+
+  const linkedNcs = useMemo(
+    () => nonConformities.filter((nc) => linkedNcIds.includes(nc.id) || nc.capa_plan_id === selectedCapaPlanId),
+    [nonConformities, linkedNcIds, selectedCapaPlanId],
+  );
+
+  const availableNcs = useMemo(
+    () => nonConformities.filter((nc) => !linkedNcIds.includes(nc.id) && nc.capa_plan_id !== selectedCapaPlanId),
+    [nonConformities, linkedNcIds, selectedCapaPlanId],
+  );
+
+  const linkNc = async (ncId: string) => {
+    if (!selectedCapaPlanId) return;
+
+    const { error } = await (supabase as any)
+      .from("capa_plan_non_conformities")
+      .insert({ non_conformity_id: ncId, capa_plan_id: selectedCapaPlanId });
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "No conformidad vinculada" });
+    setLinkNcOpen(false);
+    await loadData();
+  };
+
+  const unlinkNc = async (ncId: string) => {
+    if (!selectedCapaPlanId) return;
+
+    const { error } = await (supabase as any)
+      .from("capa_plan_non_conformities")
+      .delete()
+      .eq("non_conformity_id", ncId)
+      .eq("capa_plan_id", selectedCapaPlanId);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "No conformidad desvinculada" });
+    await loadData();
+  };
+
   const availableIncidencias = useMemo(() => {
     const linkedIds = capaIncidenciaLinks.filter((l) => l.capa_plan_id === selectedCapaPlanId).map((l) => l.incidencia_id);
     return incidencias.filter((i) => !linkedIds.includes(i.id));
