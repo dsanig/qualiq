@@ -805,9 +805,14 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>No Conformidades</CardTitle>
             {canEditContent && (
-              <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: selectedCapaPlan?.audit_id ?? "", capa_plan_id: selectedCapaPlanId ?? "" }); setNewNcOpen(true); }}>
-                <Plus className="mr-1 h-4 w-4" />Nueva NC
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
+                  <Plus className="mr-1 h-4 w-4" />Nueva Acción
+                </Button>
+                <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: selectedCapaPlan?.audit_id ?? "", capa_plan_id: selectedCapaPlanId ?? "" }); setNewNcOpen(true); }}>
+                  <Plus className="mr-1 h-4 w-4" />Nueva NC
+                </Button>
+              </div>
             )}
           </CardHeader>
           <CardContent>
