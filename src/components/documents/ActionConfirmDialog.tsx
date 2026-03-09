@@ -20,7 +20,7 @@ interface ActionConfirmDialogProps {
   title: string;
   description: string;
   confirmWord: string;
-  onConfirm: (comment?: string) => void;
+  onConfirm: (payload: { comment?: string; confirmationText: string; password?: string }) => Promise<void> | void;
   isLoading?: boolean;
   loadingText?: string;
   confirmText?: string;
@@ -29,6 +29,10 @@ interface ActionConfirmDialogProps {
   commentLabel?: string;
   commentPlaceholder?: string;
   icon?: React.ReactNode;
+  requirePassword?: boolean;
+  passwordLabel?: string;
+  passwordPlaceholder?: string;
+  strictConfirm?: boolean;
 }
 
 export function ActionConfirmDialog({
@@ -46,25 +50,54 @@ export function ActionConfirmDialog({
   commentLabel = "Comentario (opcional)",
   commentPlaceholder = "",
   icon,
+  requirePassword = false,
+  passwordLabel = "Contraseña",
+  passwordPlaceholder = "Introduce tu contraseña",
+  strictConfirm = false,
 }: ActionConfirmDialogProps) {
   const [typed, setTyped] = useState("");
   const [comment, setComment] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  const isMatch = typed.trim().toLowerCase() === confirmWord.toLowerCase();
+  const isMatch = strictConfirm ? typed === confirmWord : typed.trim().toLowerCase() === confirmWord.toLowerCase();
+  const canConfirm = isMatch && (!requirePassword || !!password);
 
   const handleClose = (val: boolean) => {
     if (!val) {
       setTyped("");
       setComment("");
+      setPassword("");
+      setError(null);
     }
     onOpenChange(val);
   };
 
-  const handleConfirm = () => {
-    if (!isMatch) return;
-    onConfirm(showComment ? comment : undefined);
-    setTyped("");
-    setComment("");
+  const handleConfirm = async () => {
+    if (!isMatch) {
+      setError(`Debes escribir exactamente ${confirmWord}.`);
+      return;
+    }
+
+    if (requirePassword && !password) {
+      setError("Debes introducir tu contraseña actual.");
+      return;
+    }
+
+    setError(null);
+    try {
+      await onConfirm({
+        comment: showComment ? comment : undefined,
+        confirmationText: typed,
+        password: requirePassword ? password : undefined,
+      });
+      setTyped("");
+      setComment("");
+      setPassword("");
+    } catch (confirmError) {
+      const message = confirmError instanceof Error ? confirmError.message : "No se pudo completar la acción.";
+      setError(message);
+    }
   };
 
   return (
@@ -85,11 +118,30 @@ export function ActionConfirmDialog({
             <Input
               className="mt-1"
               value={typed}
-              onChange={(e) => setTyped(e.target.value)}
+              onChange={(e) => {
+                setTyped(e.target.value);
+                if (error) setError(null);
+              }}
               placeholder={confirmWord}
               autoFocus
             />
           </div>
+          {requirePassword && (
+            <div>
+              <Label className="text-sm">{passwordLabel}</Label>
+              <Input
+                className="mt-1"
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder={passwordPlaceholder}
+                autoComplete="current-password"
+              />
+            </div>
+          )}
           {showComment && (
             <div>
               <Label className="text-sm">{commentLabel}</Label>
@@ -102,6 +154,7 @@ export function ActionConfirmDialog({
               />
             </div>
           )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isLoading}>Cancelar</AlertDialogCancel>
@@ -110,7 +163,7 @@ export function ActionConfirmDialog({
               e.preventDefault();
               handleConfirm();
             }}
-            disabled={!isMatch || isLoading}
+            disabled={!canConfirm || isLoading}
             className={cn(
               variant === "destructive" && "bg-destructive text-destructive-foreground hover:bg-destructive/90"
             )}

@@ -277,10 +277,30 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     setConfirmNextStatus(nextStatus);
   };
 
-  const handleDialogConfirm = async (comment?: string) => {
+  const handleDialogConfirm = async ({ comment, confirmationText, password }: { comment?: string; confirmationText: string; password?: string }) => {
     if (!confirmAction) return;
     setIsProcessing(true);
+    let shouldCloseDialog = true;
     try {
+      if (confirmType === "complete" && confirmAction.action_type === "firma") {
+        const { error: verifyError } = await supabase.functions.invoke("verify-signature-confirmation", {
+          body: {
+            confirmation_text: confirmationText,
+            password,
+          },
+        });
+
+        if (verifyError) {
+          const errorMessage = verifyError.message?.toLowerCase().includes("contraseña")
+            ? "La contraseña introducida no es válida."
+            : verifyError.message?.includes("FIRMAR")
+              ? "Debes escribir exactamente FIRMAR para continuar."
+              : "No se pudo validar la confirmación de firma.";
+          shouldCloseDialog = false;
+          throw new Error(errorMessage);
+        }
+      }
+
       if (confirmType === "complete") {
         await executeComplete(confirmAction);
       } else if (confirmType === "reject") {
@@ -290,7 +310,9 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       }
     } finally {
       setIsProcessing(false);
-      setConfirmAction(null);
+      if (shouldCloseDialog) {
+        setConfirmAction(null);
+      }
     }
   };
 
@@ -302,13 +324,18 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     if (confirmType === "complete") {
       const word = confirmWords[confirmAction.action_type] || "CONFIRMAR";
       const actionLabel = actionTypeLabels[confirmAction.action_type] || "Acción";
+      const isSignature = confirmAction.action_type === "firma";
       return {
-        title: `Confirmar ${actionLabel}`,
-        description: `Estás a punto de marcar como completada la acción de ${actionLabel.toLowerCase()} para el documento ${code}.`,
+        title: isSignature ? "Confirmar Firma" : `Confirmar ${actionLabel}`,
+        description: isSignature
+          ? `Para firmar el documento ${code}, escribe exactamente FIRMAR e introduce tu contraseña actual.`
+          : `Estás a punto de marcar como completada la acción de ${actionLabel.toLowerCase()} para el documento ${code}.`,
         confirmWord: word,
         confirmText: actionLabel,
         variant: "default" as const,
         showComment: false,
+        requirePassword: isSignature,
+        strictConfirm: isSignature,
       };
     }
 
@@ -493,6 +520,8 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
           confirmText={dialogConfig.confirmText}
           variant={dialogConfig.variant}
           showComment={dialogConfig.showComment}
+          requirePassword={dialogConfig.requirePassword}
+          strictConfirm={dialogConfig.strictConfirm}
           commentLabel={dialogConfig.showComment ? dialogConfig.commentLabel : undefined}
           commentPlaceholder={dialogConfig.showComment ? dialogConfig.commentPlaceholder : undefined}
           icon={confirmType === "reject" ? <XCircle className="w-5 h-5 text-destructive" /> : <CheckCircle2 className="w-5 h-5 text-success" />}
