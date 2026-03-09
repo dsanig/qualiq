@@ -712,6 +712,90 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                   </div>
                 )}
               </div>
+
+              {/* Linked NCs (opcional) */}
+              <div className="mt-4 pt-4 border-t">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">No conformidades vinculadas</p>
+                  {canEditContent && (
+                    <Button size="sm" variant="outline" onClick={() => setLinkNcOpen(true)}>
+                      <Link2 className="mr-1 h-4 w-4" />Vincular
+                    </Button>
+                  )}
+                </div>
+
+                {linkedNcs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay no conformidades vinculadas.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {linkedNcs.map((nc) => {
+                      const canUnlink = canEditContent && linkedNcIds.includes(nc.id);
+                      return (
+                        <div key={nc.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
+                          <span className="truncate">{nc.title}</span>
+                          {canUnlink && (
+                            <Button size="sm" variant="ghost" onClick={() => unlinkNc(nc.id)}>
+                              <Unlink className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Acciones correctivas directas del plan (sin NC) */}
+              <div className="mt-4 pt-4 border-t">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Acciones correctivas del plan</p>
+                  {canEditContent && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setActionForm({ non_conformity_id: "", capa_plan_id: selectedCapaPlanId ?? "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" });
+                        setNewActionOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-1 h-4 w-4" />Nueva
+                    </Button>
+                  )}
+                </div>
+
+                {directPlanActions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay acciones directas en este plan.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {directPlanActions.map((action) => (
+                      <div key={action.id} className="border rounded p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{actionTypeLabel(action.action_type)}</Badge>
+                            <Badge variant={action.status === "closed" ? "secondary" : action.status === "in_progress" ? "default" : "outline"}>
+                              {statusLabel(action.status)}
+                            </Badge>
+                          </div>
+                          {action.responsible_id === currentUserId && (
+                            <Button size="sm" variant="ghost" onClick={() => openEditAction(action)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm">{action.description}</p>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                          <span>Responsable: {getUserName(action.responsible_id) || "—"}</span>
+                          {action.due_date && (
+                            <span className={isOverdue(action.due_date) && action.status !== "closed" ? "text-destructive flex items-center gap-1" : ""}>
+                              {isOverdue(action.due_date) && action.status !== "closed" && <AlertCircle className="h-3 w-3" />}
+                              Vence: {action.due_date}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
