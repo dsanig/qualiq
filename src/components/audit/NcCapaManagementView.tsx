@@ -335,6 +335,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     await loadData();
   };
 
+  const getCurrentCompanyId = async () => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return null;
 
