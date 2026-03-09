@@ -2238,53 +2238,27 @@ export function DocumentsView({
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <ActionConfirmDialog
         open={isDeleteConfirmOpen}
         onOpenChange={(open) => {
           if (isDeletingDocument) return;
           setIsDeleteConfirmOpen(open);
           if (!open) setDocumentToDelete(null);
         }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Eliminar documento</DialogTitle>
-            <DialogDescription>
-              Esta acción eliminará el documento y todos sus registros asociados de forma permanente.
-            </DialogDescription>
-          </DialogHeader>
-          {deleteLinkedInfo.length > 0 && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-1.5">
-              <p className="text-sm font-medium text-destructive">⚠️ Este documento está vinculado a:</p>
-              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-0.5">
-                {deleteLinkedInfo.map((info, i) => (
-                  <li key={i}>{info}</li>
-                ))}
-              </ul>
-              <p className="text-xs text-muted-foreground mt-2">Todos estos registros serán eliminados junto con el documento.</p>
-            </div>
-          )}
-          <p className="text-sm text-muted-foreground">
-            ¿Seguro que deseas eliminar <span className="font-semibold text-foreground">{documentToDelete?.code}</span>?
-          </p>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (isDeletingDocument) return;
-                setIsDeleteConfirmOpen(false);
-                setDocumentToDelete(null);
-              }}
-              disabled={isDeletingDocument}
-            >
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmDelete} disabled={isDeletingDocument}>
-              {isDeletingDocument ? "Eliminando..." : "Eliminar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Eliminar documento"
+        description={
+          deleteLinkedInfo.length > 0
+            ? `Esta acción eliminará el documento "${documentToDelete?.code}" y todos sus registros asociados de forma permanente.\n\n⚠️ Registros vinculados: ${deleteLinkedInfo.join(", ")}.`
+            : `Esta acción eliminará el documento "${documentToDelete?.code}" de forma permanente e irreversible.`
+        }
+        confirmWord="ELIMINAR"
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeletingDocument}
+        loadingText="Eliminando..."
+        confirmText="Eliminar"
+        variant="destructive"
+        icon={<Trash2 className="w-5 h-5 text-destructive" />}
+      />
 
       {/* Sign Dialog */}
       <Dialog open={isSignOpen} onOpenChange={setIsSignOpen}>
