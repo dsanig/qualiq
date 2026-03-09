@@ -203,6 +203,9 @@ export function SettingsView() {
         </div>
       </div>
 
+      {/* Notification settings */}
+      <NotificationSettings />
+
       {/* 2FA card */}
       <TwoFactorSettings />
     </div>
