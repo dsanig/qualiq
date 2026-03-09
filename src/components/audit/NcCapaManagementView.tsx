@@ -290,7 +290,51 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     await loadData();
   };
 
-  const getCurrentCompanyId = async () => {
+  const openDeleteCapa = async (capaId: string) => {
+    setDeletingCapaId(capaId);
+    const stats = getCapaStats(capaId);
+    const linkedByJoin = capaNcLinks.filter((l) => l.capa_plan_id === capaId);
+    const linkedInc = capaIncidenciaLinks.filter((l) => l.capa_plan_id === capaId);
+    setDeleteCapaImpact({
+      ncs: stats.ncs,
+      actions: stats.actions,
+      links: linkedByJoin.length + linkedInc.length,
+    });
+    setDeleteCapaOpen(true);
+  };
+
+  const deleteCapaPlan = async () => {
+    if (!deletingCapaId) return;
+
+    // Delete join table links first
+    await Promise.all([
+      (supabase as any).from("capa_plan_non_conformities").delete().eq("capa_plan_id", deletingCapaId),
+      (supabase as any).from("incidencia_capa_plans").delete().eq("capa_plan_id", deletingCapaId),
+    ]);
+
+    // Unlink NCs (set capa_plan_id to null)
+    await (supabase as any).from("non_conformities").update({ capa_plan_id: null }).eq("capa_plan_id", deletingCapaId);
+
+    // Unlink actions (set capa_plan_id to null)
+    await (supabase as any).from("actions").update({ capa_plan_id: null }).eq("capa_plan_id", deletingCapaId);
+
+    // Delete the plan
+    const { error } = await (supabase as any).from("capa_plans").delete().eq("id", deletingCapaId);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Plan CAPA eliminado" });
+      logAction({ action: "delete", entity_type: "capa_plan", entity_id: deletingCapaId });
+      if (selectedCapaPlanId === deletingCapaId) setSelectedCapaPlanId(null);
+    }
+
+    setDeleteCapaOpen(false);
+    setDeletingCapaId(null);
+    setDeleteCapaImpact(null);
+    await loadData();
+  };
+
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return null;
 
