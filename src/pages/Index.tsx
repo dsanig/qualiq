@@ -20,6 +20,7 @@ import { TrainingManagementView } from "@/components/training/TrainingManagement
 import { AuditSimulatorView } from "@/components/audit/AuditSimulatorView";
 import { PredictiveAnalyticsView } from "@/components/analytics/PredictiveAnalyticsView";
 import { AuditManagementView } from "@/components/audit/AuditManagementView";
+import { NcCapaManagementView } from "@/components/audit/NcCapaManagementView";
 import { CompanyManagementView } from "@/components/admin/CompanyManagementView";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { AuditTrailView } from "@/components/audit-trail/AuditTrailView";
