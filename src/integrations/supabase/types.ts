@@ -55,35 +55,55 @@ export type Database = {
       actions: {
         Row: {
           action_type: string
+          capa_plan_id: string | null
+          company_id: string | null
           created_at: string
           description: string
           due_date: string | null
           id: string
-          non_conformity_id: string
+          non_conformity_id: string | null
           responsible_id: string | null
           status: string
         }
         Insert: {
           action_type?: string
+          capa_plan_id?: string | null
+          company_id?: string | null
           created_at?: string
           description: string
           due_date?: string | null
           id?: string
-          non_conformity_id: string
+          non_conformity_id?: string | null
           responsible_id?: string | null
           status?: string
         }
         Update: {
           action_type?: string
+          capa_plan_id?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string
           due_date?: string | null
           id?: string
-          non_conformity_id?: string
+          non_conformity_id?: string | null
           responsible_id?: string | null
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "actions_capa_plan_id_fkey"
+            columns: ["capa_plan_id"]
+            isOneToOne: false
+            referencedRelation: "capa_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "actions_non_conformity_id_fkey"
             columns: ["non_conformity_id"]
@@ -387,6 +407,45 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      capa_plan_non_conformities: {
+        Row: {
+          capa_plan_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          non_conformity_id: string
+        }
+        Insert: {
+          capa_plan_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          non_conformity_id: string
+        }
+        Update: {
+          capa_plan_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          non_conformity_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capa_plan_non_conformities_capa_plan_id_fkey"
+            columns: ["capa_plan_id"]
+            isOneToOne: false
+            referencedRelation: "capa_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "capa_plan_non_conformities_non_conformity_id_fkey"
+            columns: ["non_conformity_id"]
+            isOneToOne: false
+            referencedRelation: "non_conformities"
             referencedColumns: ["id"]
           },
         ]
@@ -1049,7 +1108,9 @@ export type Database = {
       }
       non_conformities: {
         Row: {
-          capa_plan_id: string
+          audit_id: string | null
+          capa_plan_id: string | null
+          company_id: string | null
           created_at: string
           deadline: string | null
           description: string | null
@@ -1061,7 +1122,9 @@ export type Database = {
           title: string
         }
         Insert: {
-          capa_plan_id: string
+          audit_id?: string | null
+          capa_plan_id?: string | null
+          company_id?: string | null
           created_at?: string
           deadline?: string | null
           description?: string | null
@@ -1073,7 +1136,9 @@ export type Database = {
           title: string
         }
         Update: {
-          capa_plan_id?: string
+          audit_id?: string | null
+          capa_plan_id?: string | null
+          company_id?: string | null
           created_at?: string
           deadline?: string | null
           description?: string | null
@@ -1086,10 +1151,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "non_conformities_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "non_conformities_capa_plan_id_fkey"
             columns: ["capa_plan_id"]
             isOneToOne: false
             referencedRelation: "capa_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "non_conformities_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

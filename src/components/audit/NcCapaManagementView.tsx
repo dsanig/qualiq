@@ -23,7 +23,9 @@ type CapaPlan = {
 };
 type NonConformity = {
   id: string;
-  capa_plan_id: string;
+  capa_plan_id: string | null;
+  audit_id: string | null;
+  company_id: string | null;
   title: string;
   description: string | null;
   severity: string | null;
@@ -34,17 +36,20 @@ type NonConformity = {
 };
 type ActionItem = {
   id: string;
-  non_conformity_id: string;
+  non_conformity_id: string | null;
+  capa_plan_id: string | null;
+  company_id: string | null;
   action_type: "corrective" | "preventive" | "immediate";
   description: string;
   responsible_id: string | null;
   due_date: string | null;
   status: string;
 };
-type Profile = { id: string; full_name: string | null; email: string | null };
+type Profile = { id: string; user_id?: string; full_name: string | null; email: string | null; company_id?: string | null };
 type Audit = { id: string; title: string };
 type IncidenciaRef = { id: string; title: string; status: string };
 type CapaIncidenciaLink = { capa_plan_id: string; incidencia_id: string };
+type CapaNcLink = { capa_plan_id: string; non_conformity_id: string };
 
 interface NcCapaManagementViewProps {
   searchQuery?: string;
@@ -65,6 +70,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [audits, setAudits] = useState<Audit[]>([]);
   const [incidencias, setIncidencias] = useState<IncidenciaRef[]>([]);
   const [capaIncidenciaLinks, setCapaIncidenciaLinks] = useState<CapaIncidenciaLink[]>([]);
+  const [capaNcLinks, setCapaNcLinks] = useState<CapaNcLink[]>([]);
   const [selectedCapaPlanId, setSelectedCapaPlanId] = useState<string | null>(null);
   const [selectedNcId, setSelectedNcId] = useState<string | null>(null);
   const { canEditContent, canManageCompany } = usePermissions();
@@ -78,13 +84,14 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [newActionOpen, setNewActionOpen] = useState(false);
   const [editActionOpen, setEditActionOpen] = useState(false);
   const [linkIncidenciaOpen, setLinkIncidenciaOpen] = useState(false);
-  const [linkAuditOpen, setLinkAuditOpen] = useState(false);
+  const [linkNcOpen, setLinkNcOpen] = useState(false);
 
   // Forms
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "", audit_id: "" });
-  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
+  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
   const [actionForm, setActionForm] = useState({
     non_conformity_id: "",
+    capa_plan_id: "",
     action_type: "corrective" as "corrective" | "preventive" | "immediate",
     description: "",
     responsible_id: "",
@@ -101,7 +108,13 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const { toast } = useToast();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
+    const loadCurrentUserContext = async () => {
+      const { data } = await supabase.auth.getUser();
+      const userId = data.user?.id ?? null;
+      setCurrentUserId(userId);
+    };
+
+    void loadCurrentUserContext();
   }, []);
 
   const normalizeText = (value: string | null | undefined) =>
@@ -110,21 +123,40 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const normalizedQuery = useMemo(() => normalizeText(searchQuery), [searchQuery]);
 
   const selectedCapaPlan = useMemo(() => capaPlans.find((p) => p.id === selectedCapaPlanId) ?? null, [capaPlans, selectedCapaPlanId]);
-  const filteredNcs = useMemo(() => nonConformities.filter((nc) => nc.capa_plan_id === selectedCapaPlanId), [nonConformities, selectedCapaPlanId]);
+  const filteredNcs = useMemo(() => {
+    if (!selectedCapaPlanId) return [];
+    const linkedByJoin = capaNcLinks
+      .filter((link) => link.capa_plan_id === selectedCapaPlanId)
+      .map((link) => link.non_conformity_id);
+
+    return nonConformities.filter(
+      (nc) => nc.capa_plan_id === selectedCapaPlanId || linkedByJoin.includes(nc.id),
+    );
+  }, [nonConformities, selectedCapaPlanId, capaNcLinks]);
   const selectedNc = useMemo(() => nonConformities.find((nc) => nc.id === selectedNcId) ?? null, [nonConformities, selectedNcId]);
   const ncActions = useMemo(() => actions.filter((a) => a.non_conformity_id === selectedNcId), [actions, selectedNcId]);
+  const capaActions = useMemo(() => {
+    if (!selectedCapaPlanId) return actions.filter((a) => !a.capa_plan_id);
+    const ncIds = filteredNcs.map((nc) => nc.id);
+    return actions.filter((a) => a.capa_plan_id === selectedCapaPlanId || (a.non_conformity_id ? ncIds.includes(a.non_conformity_id) : false));
+  }, [actions, selectedCapaPlanId, filteredNcs]);
+  const directPlanActions = useMemo(
+    () => actions.filter((a) => a.capa_plan_id === selectedCapaPlanId && !a.non_conformity_id),
+    [actions, selectedCapaPlanId],
+  );
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [{ data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: auditsData }, { data: incData }, { data: linksData }] = await Promise.all([
+      const [{ data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: auditsData }, { data: incData }, { data: linksData }, { data: capaNcData }] = await Promise.all([
         (supabase as any).from("capa_plans").select("id,audit_id,company_id,title,description,responsible_id").order("created_at", { ascending: false }),
-        (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline,responsible_id"),
-        (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
-        (supabase as any).from("profiles").select("id,full_name,email"),
+        (supabase as any).from("non_conformities").select("id,capa_plan_id,audit_id,company_id,title,description,severity,root_cause,status,deadline,responsible_id"),
+        (supabase as any).from("actions").select("id,capa_plan_id,company_id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
+        (supabase as any).from("profiles").select("id,user_id,company_id,full_name,email"),
         (supabase as any).from("audits").select("id,title"),
         (supabase as any).from("incidencias").select("id,title,status"),
         (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
+        (supabase as any).from("capa_plan_non_conformities").select("non_conformity_id,capa_plan_id"),
       ]);
       setCapaPlans((capaData ?? []) as CapaPlan[]);
       setNonConformities((ncData ?? []) as NonConformity[]);
@@ -133,6 +165,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       setAudits((auditsData ?? []) as Audit[]);
       setIncidencias((incData ?? []) as IncidenciaRef[]);
       setCapaIncidenciaLinks((linksData ?? []) as CapaIncidenciaLink[]);
+      setCapaNcLinks((capaNcData ?? []) as CapaNcLink[]);
       if (!selectedCapaPlanId && capaData?.[0]?.id) setSelectedCapaPlanId(capaData[0].id);
     } finally {
       setIsLoading(false);
@@ -164,7 +197,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const capaPlansFiltered = useMemo(() => {
     if (!normalizedQuery) return capaPlans;
     return capaPlans.filter((plan) => {
-      const relatedNcs = nonConformities.filter((nc) => nc.capa_plan_id === plan.id);
+      const linkedByJoin = capaNcLinks.filter((l) => l.capa_plan_id === plan.id).map((l) => l.non_conformity_id);
+      const relatedNcs = nonConformities.filter((nc) => nc.capa_plan_id === plan.id || linkedByJoin.includes(nc.id));
       const searchFields = [
         plan.title,
         plan.description,
@@ -175,7 +209,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       ];
       return searchFields.some((field) => normalizeText(field).includes(normalizedQuery));
     });
-  }, [capaPlans, nonConformities, normalizedQuery, users, audits]);
+  }, [capaPlans, nonConformities, capaNcLinks, normalizedQuery, users, audits]);
 
   const PAGE_SIZE = 10;
   const totalPages = Math.max(1, Math.ceil(capaPlansFiltered.length / PAGE_SIZE));
@@ -252,17 +286,33 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     await loadData();
   };
 
+  const getCurrentCompanyId = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return null;
+
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("company_id")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+
+    return profileData?.company_id ?? null;
+  };
+
   const createNc = async () => {
-    if (!selectedCapaPlanId) return;
     if (!ncForm.responsible_id || !ncForm.deadline) {
       toast({ title: "Error", description: "Responsable y fecha límite son obligatorios.", variant: "destructive" });
       return;
     }
 
+    const companyId = await getCurrentCompanyId();
+
     const { data, error } = await (supabase as any)
       .from("non_conformities")
       .insert({
-        capa_plan_id: selectedCapaPlanId,
+        capa_plan_id: ncForm.capa_plan_id || selectedCapaPlanId || null,
+        audit_id: ncForm.audit_id || selectedCapaPlan?.audit_id || null,
+        company_id: companyId,
         title: ncForm.title,
         description: ncForm.description || null,
         severity: ncForm.severity || null,
@@ -282,7 +332,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     toast({ title: "No conformidad creada" });
     logAction({ action: "create", entity_type: "non_conformity", entity_id: data?.id, entity_title: ncForm.title });
     setNewNcOpen(false);
-    setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
+    setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
     await loadData();
   };
 
@@ -303,6 +353,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         status: ncForm.status,
         deadline: ncForm.deadline,
         responsible_id: ncForm.responsible_id,
+        audit_id: ncForm.audit_id || null,
+        capa_plan_id: ncForm.capa_plan_id || null,
       })
       .eq("id", editingNc.id);
 
@@ -319,16 +371,19 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   };
 
   const createAction = async () => {
-    if (!selectedNcId) return;
     if (!actionForm.responsible_id || !actionForm.due_date) {
       toast({ title: "Error", description: "Responsable y fecha son obligatorios.", variant: "destructive" });
       return;
     }
 
+    const companyId = await getCurrentCompanyId();
+
     const { data, error } = await (supabase as any)
       .from("actions")
       .insert({
-        non_conformity_id: selectedNcId,
+        non_conformity_id: actionForm.non_conformity_id || selectedNcId || null,
+        capa_plan_id: actionForm.capa_plan_id || selectedCapaPlanId || null,
+        company_id: companyId,
         action_type: actionForm.action_type,
         description: actionForm.description,
         responsible_id: actionForm.responsible_id,
@@ -346,7 +401,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     toast({ title: "Acción creada" });
     logAction({ action: "create", entity_type: "action", entity_id: data?.id, entity_title: actionForm.description.slice(0, 50) });
     setNewActionOpen(false);
-    setActionForm({ non_conformity_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" });
+    setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" });
     await loadData();
   };
 
@@ -362,6 +417,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     const { error } = await (supabase as any)
       .from("actions")
       .update({
+        non_conformity_id: actionForm.non_conformity_id || null,
+        capa_plan_id: actionForm.capa_plan_id || null,
         action_type: actionForm.action_type,
         description: actionForm.description,
         responsible_id: actionForm.responsible_id,
@@ -423,6 +480,56 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     return incidencias.filter((i) => linkedIds.includes(i.id));
   }, [selectedCapaPlanId, capaIncidenciaLinks, incidencias]);
 
+  const linkedNcIds = useMemo(
+    () => capaNcLinks.filter((l) => l.capa_plan_id === selectedCapaPlanId).map((l) => l.non_conformity_id),
+    [capaNcLinks, selectedCapaPlanId],
+  );
+
+  const linkedNcs = useMemo(
+    () => nonConformities.filter((nc) => linkedNcIds.includes(nc.id) || nc.capa_plan_id === selectedCapaPlanId),
+    [nonConformities, linkedNcIds, selectedCapaPlanId],
+  );
+
+  const availableNcs = useMemo(
+    () => nonConformities.filter((nc) => !linkedNcIds.includes(nc.id) && nc.capa_plan_id !== selectedCapaPlanId),
+    [nonConformities, linkedNcIds, selectedCapaPlanId],
+  );
+
+  const linkNc = async (ncId: string) => {
+    if (!selectedCapaPlanId) return;
+
+    const { error } = await (supabase as any)
+      .from("capa_plan_non_conformities")
+      .insert({ non_conformity_id: ncId, capa_plan_id: selectedCapaPlanId });
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "No conformidad vinculada" });
+    setLinkNcOpen(false);
+    await loadData();
+  };
+
+  const unlinkNc = async (ncId: string) => {
+    if (!selectedCapaPlanId) return;
+
+    const { error } = await (supabase as any)
+      .from("capa_plan_non_conformities")
+      .delete()
+      .eq("non_conformity_id", ncId)
+      .eq("capa_plan_id", selectedCapaPlanId);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "No conformidad desvinculada" });
+    await loadData();
+  };
+
   const availableIncidencias = useMemo(() => {
     const linkedIds = capaIncidenciaLinks.filter((l) => l.capa_plan_id === selectedCapaPlanId).map((l) => l.incidencia_id);
     return incidencias.filter((i) => !linkedIds.includes(i.id));
@@ -461,6 +568,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       status: nc.status,
       deadline: nc.deadline ?? "",
       responsible_id: nc.responsible_id ?? "",
+      audit_id: nc.audit_id ?? "",
+      capa_plan_id: nc.capa_plan_id ?? "",
     });
     setEditNcOpen(true);
   };
@@ -468,7 +577,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const openEditAction = (action: ActionItem) => {
     setEditingAction(action);
     setActionForm({
-      non_conformity_id: action.non_conformity_id,
+      non_conformity_id: action.non_conformity_id ?? "",
+      capa_plan_id: action.capa_plan_id ?? "",
       action_type: action.action_type,
       description: action.description,
       responsible_id: action.responsible_id ?? "",
@@ -480,11 +590,14 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   // Count stats for a CAPA plan
   const getCapaStats = (capaId: string) => {
-    const ncs = nonConformities.filter((nc) => nc.capa_plan_id === capaId);
-    const ncActions = actions.filter((a) => ncs.some((nc) => nc.id === a.non_conformity_id));
+    const linkedByJoin = capaNcLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.non_conformity_id);
+    const ncs = nonConformities.filter((nc) => nc.capa_plan_id === capaId || linkedByJoin.includes(nc.id));
+    const ncActions = actions.filter((a) => (a.non_conformity_id ? ncs.some((nc) => nc.id === a.non_conformity_id) : false));
+    const directActions = actions.filter((a) => a.capa_plan_id === capaId);
+    const allActions = [...ncActions, ...directActions.filter((a) => !ncActions.some((nca) => nca.id === a.id))];
     const openNcs = ncs.filter((nc) => nc.status === "open" || nc.status === "in_progress").length;
-    const openActions = ncActions.filter((a) => a.status === "open" || a.status === "in_progress").length;
-    return { ncs: ncs.length, openNcs, actions: ncActions.length, openActions };
+    const openActions = allActions.filter((a) => a.status === "open" || a.status === "in_progress").length;
+    return { ncs: ncs.length, openNcs, actions: allActions.length, openActions };
   };
 
   return (
@@ -599,6 +712,90 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                   </div>
                 )}
               </div>
+
+              {/* Linked NCs (opcional) */}
+              <div className="mt-4 pt-4 border-t">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">No conformidades vinculadas</p>
+                  {canEditContent && (
+                    <Button size="sm" variant="outline" onClick={() => setLinkNcOpen(true)}>
+                      <Link2 className="mr-1 h-4 w-4" />Vincular
+                    </Button>
+                  )}
+                </div>
+
+                {linkedNcs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay no conformidades vinculadas.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {linkedNcs.map((nc) => {
+                      const canUnlink = canEditContent && linkedNcIds.includes(nc.id);
+                      return (
+                        <div key={nc.id} className="flex items-center justify-between text-sm p-2 bg-muted rounded">
+                          <span className="truncate">{nc.title}</span>
+                          {canUnlink && (
+                            <Button size="sm" variant="ghost" onClick={() => unlinkNc(nc.id)}>
+                              <Unlink className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Acciones correctivas directas del plan (sin NC) */}
+              <div className="mt-4 pt-4 border-t">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Acciones correctivas del plan</p>
+                  {canEditContent && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setActionForm({ non_conformity_id: "", capa_plan_id: selectedCapaPlanId ?? "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" });
+                        setNewActionOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-1 h-4 w-4" />Nueva
+                    </Button>
+                  )}
+                </div>
+
+                {directPlanActions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay acciones directas en este plan.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {directPlanActions.map((action) => (
+                      <div key={action.id} className="border rounded p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{actionTypeLabel(action.action_type)}</Badge>
+                            <Badge variant={action.status === "closed" ? "secondary" : action.status === "in_progress" ? "default" : "outline"}>
+                              {statusLabel(action.status)}
+                            </Badge>
+                          </div>
+                          {action.responsible_id === currentUserId && (
+                            <Button size="sm" variant="ghost" onClick={() => openEditAction(action)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm">{action.description}</p>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                          <span>Responsable: {getUserName(action.responsible_id) || "—"}</span>
+                          {action.due_date && (
+                            <span className={isOverdue(action.due_date) && action.status !== "closed" ? "text-destructive flex items-center gap-1" : ""}>
+                              {isOverdue(action.due_date) && action.status !== "closed" && <AlertCircle className="h-3 w-3" />}
+                              Vence: {action.due_date}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
@@ -607,10 +804,15 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>No Conformidades</CardTitle>
-            {canEditContent && selectedCapaPlanId && (
-              <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" }); setNewNcOpen(true); }}>
-                <Plus className="mr-1 h-4 w-4" />Nueva NC
-              </Button>
+            {canEditContent && (
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
+                  <Plus className="mr-1 h-4 w-4" />Nueva Acción
+                </Button>
+                <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: selectedCapaPlan?.audit_id ?? "", capa_plan_id: selectedCapaPlanId ?? "" }); setNewNcOpen(true); }}>
+                  <Plus className="mr-1 h-4 w-4" />Nueva NC
+                </Button>
+              </div>
             )}
           </CardHeader>
           <CardContent>
@@ -667,7 +869,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                     <Button size="sm" variant="outline" onClick={() => openEditNc(selectedNc)}>
                       <Pencil className="mr-1 h-4 w-4" />Editar NC
                     </Button>
-                    <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: selectedNcId!, action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
+                    <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: selectedNcId!, capa_plan_id: selectedCapaPlanId ?? "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
                       <Plus className="mr-1 h-4 w-4" />Nueva Acción
                     </Button>
                   </>
@@ -794,6 +996,26 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             <div><Label>Severidad</Label><Input value={ncForm.severity} onChange={(e) => setNcForm((p) => ({ ...p, severity: e.target.value }))} placeholder="Ej: Mayor, Menor, Crítica" /></div>
             <div><Label>Causa raíz</Label><Textarea value={ncForm.root_cause} onChange={(e) => setNcForm((p) => ({ ...p, root_cause: e.target.value }))} /></div>
             <div>
+              <Label>Auditoría de origen (opcional)</Label>
+              <Select value={ncForm.audit_id || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, audit_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin auditoría" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin auditoría</SelectItem>
+                  {audits.map((a) => <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Plan CAPA (opcional)</Label>
+              <Select value={ncForm.capa_plan_id || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, capa_plan_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin plan CAPA" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin plan CAPA</SelectItem>
+                  {capaPlans.map((c) => <SelectItem key={c.id} value={c.id}>{c.title || c.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Responsable *</Label>
               <Select value={ncForm.responsible_id} onValueChange={(v) => setNcForm((p) => ({ ...p, responsible_id: v }))}>
                 <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
@@ -820,6 +1042,26 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             <div><Label>Descripción</Label><Textarea value={ncForm.description} onChange={(e) => setNcForm((p) => ({ ...p, description: e.target.value }))} /></div>
             <div><Label>Severidad</Label><Input value={ncForm.severity} onChange={(e) => setNcForm((p) => ({ ...p, severity: e.target.value }))} /></div>
             <div><Label>Causa raíz</Label><Textarea value={ncForm.root_cause} onChange={(e) => setNcForm((p) => ({ ...p, root_cause: e.target.value }))} /></div>
+            <div>
+              <Label>Auditoría de origen (opcional)</Label>
+              <Select value={ncForm.audit_id || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, audit_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin auditoría" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin auditoría</SelectItem>
+                  {audits.map((a) => <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Plan CAPA (opcional)</Label>
+              <Select value={ncForm.capa_plan_id || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, capa_plan_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin plan CAPA" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin plan CAPA</SelectItem>
+                  {capaPlans.map((c) => <SelectItem key={c.id} value={c.id}>{c.title || c.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label>Responsable *</Label>
               <Select value={ncForm.responsible_id} onValueChange={(v) => setNcForm((p) => ({ ...p, responsible_id: v }))}>
@@ -857,6 +1099,26 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                 <SelectContent>{actionTypes.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Plan CAPA (opcional)</Label>
+              <Select value={actionForm.capa_plan_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, capa_plan_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin plan CAPA" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin plan CAPA</SelectItem>
+                  {capaPlans.map((c) => <SelectItem key={c.id} value={c.id}>{c.title || c.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>No conformidad (opcional)</Label>
+              <Select value={actionForm.non_conformity_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, non_conformity_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin no conformidad" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin no conformidad</SelectItem>
+                  {nonConformities.map((nc) => <SelectItem key={nc.id} value={nc.id}>{nc.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div><Label>Descripción *</Label><Textarea value={actionForm.description} onChange={(e) => setActionForm((p) => ({ ...p, description: e.target.value }))} /></div>
             <div>
               <Label>Responsable *</Label>
@@ -886,6 +1148,26 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               <Select value={actionForm.action_type} onValueChange={(v: "corrective" | "preventive" | "immediate") => setActionForm((p) => ({ ...p, action_type: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{actionTypes.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Plan CAPA (opcional)</Label>
+              <Select value={actionForm.capa_plan_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, capa_plan_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin plan CAPA" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin plan CAPA</SelectItem>
+                  {capaPlans.map((c) => <SelectItem key={c.id} value={c.id}>{c.title || c.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>No conformidad (opcional)</Label>
+              <Select value={actionForm.non_conformity_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, non_conformity_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin no conformidad" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin no conformidad</SelectItem>
+                  {nonConformities.map((nc) => <SelectItem key={nc.id} value={nc.id}>{nc.title}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
             <div><Label>Descripción *</Label><Textarea value={actionForm.description} onChange={(e) => setActionForm((p) => ({ ...p, description: e.target.value }))} /></div>
@@ -937,6 +1219,35 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLinkIncidenciaOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link NC Dialog */}
+      <Dialog open={linkNcOpen} onOpenChange={setLinkNcOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vincular No Conformidad</DialogTitle>
+            <DialogDescription>Selecciona una no conformidad para vincular a este plan CAPA.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {availableNcs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No hay no conformidades disponibles.</p>
+            ) : (
+              availableNcs.map((nc) => (
+                <button
+                  key={nc.id}
+                  onClick={() => linkNc(nc.id)}
+                  className="w-full rounded border p-3 text-left hover:bg-muted"
+                >
+                  <p className="font-medium">{nc.title}</p>
+                  <p className="text-xs text-muted-foreground">{statusLabel(nc.status)}</p>
+                </button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkNcOpen(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
