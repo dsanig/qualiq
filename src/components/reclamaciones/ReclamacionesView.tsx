@@ -98,8 +98,11 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
   const [newAttachments, setNewAttachments] = useState<AttachmentInfo[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<AttachmentInfo[]>([]);
   const { toast } = useToast();
-  const { canEditContent, isSuperadmin } = usePermissions();
+  const { canEditContent, canManageCompany, isSuperadmin } = usePermissions();
   const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [reclamacionToDelete, setReclamacionToDelete] = useState<Reclamacion | null>(null);
+  const [isDeletingReclamacion, setIsDeletingReclamacion] = useState(false);
   const { user } = useAuth();
   const { logAction } = useAuditLog();
 
