@@ -62,6 +62,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [deleteAuditConfirmOpen, setDeleteAuditConfirmOpen] = useState(false);
   const [deletingAuditId, setDeletingAuditId] = useState<string | null>(null);
   const [auditLinkedInfo, setAuditLinkedInfo] = useState<string[]>([]);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [newCapaOpen, setNewCapaOpen] = useState(false);
   const [newNcOpen, setNewNcOpen] = useState(false);
   const [newActionOpen, setNewActionOpen] = useState(false);
