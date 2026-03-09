@@ -108,7 +108,13 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const { toast } = useToast();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
+    const loadCurrentUserContext = async () => {
+      const { data } = await supabase.auth.getUser();
+      const userId = data.user?.id ?? null;
+      setCurrentUserId(userId);
+    };
+
+    void loadCurrentUserContext();
   }, []);
 
   const normalizeText = (value: string | null | undefined) =>
@@ -116,6 +122,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   const normalizedQuery = useMemo(() => normalizeText(searchQuery), [searchQuery]);
 
+  const selectedCapaPlan = useMemo(() => capaPlans.find((p) => p.id === selectedCapaPlanId) ?? null, [capaPlans, selectedCapaPlanId]);
   const filteredNcs = useMemo(() => {
     if (!selectedCapaPlanId) return [];
     const linkedByJoin = capaNcLinks
@@ -137,14 +144,15 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [{ data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: auditsData }, { data: incData }, { data: linksData }] = await Promise.all([
+      const [{ data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: auditsData }, { data: incData }, { data: linksData }, { data: capaNcData }] = await Promise.all([
         (supabase as any).from("capa_plans").select("id,audit_id,company_id,title,description,responsible_id").order("created_at", { ascending: false }),
-        (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline,responsible_id"),
-        (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
-        (supabase as any).from("profiles").select("id,full_name,email"),
+        (supabase as any).from("non_conformities").select("id,capa_plan_id,audit_id,company_id,title,description,severity,root_cause,status,deadline,responsible_id"),
+        (supabase as any).from("actions").select("id,capa_plan_id,company_id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
+        (supabase as any).from("profiles").select("id,user_id,company_id,full_name,email"),
         (supabase as any).from("audits").select("id,title"),
         (supabase as any).from("incidencias").select("id,title,status"),
         (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
+        (supabase as any).from("capa_plan_non_conformities").select("non_conformity_id,capa_plan_id"),
       ]);
       setCapaPlans((capaData ?? []) as CapaPlan[]);
       setNonConformities((ncData ?? []) as NonConformity[]);
