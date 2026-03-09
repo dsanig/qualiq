@@ -27,6 +27,7 @@ import {
   GraduationCap,
   Plus,
   Loader2,
+  Download,
   FileText,
   Users,
   PenLine,
@@ -42,6 +43,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { toast } from "@/hooks/use-toast";
+import { downloadStorageFile } from "@/utils/storageDownload";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -368,6 +370,42 @@ export function TrainingManagementView() {
     setIsUploading(false);
   };
 
+  const handleDownloadAttachment = async (attachment: Attachment) => {
+    if (!attachment.object_path) {
+      toast({ title: "Error", description: "No se pudo descargar el archivo.", variant: "destructive" });
+      return;
+    }
+
+    const downloaded = await downloadStorageFile({
+      supabase,
+      bucketId: "documents",
+      objectPath: attachment.object_path,
+      downloadFileName: attachment.file_name ?? attachment.object_path.split("/").pop() ?? "file",
+    });
+
+    if (!downloaded) {
+      toast({ title: "Error", description: "No se pudo descargar el archivo.", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: Attachment) => {
+    try {
+      const { error: storageError } = await supabase.storage.from("documents").remove([attachment.object_path]);
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await (supabase as any).from("training_record_attachments").delete().eq("id", attachment.id);
+      if (dbError) throw dbError;
+
+      toast({ title: "Adjunto eliminado" });
+      if (detailRecord) {
+        await openDetail(detailRecord);
+      }
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "No se pudo eliminar el archivo.", variant: "destructive" });
+    }
+  };
+
   /* ---------------------------------------------------------------- */
   /* Helpers                                                           */
   /* ---------------------------------------------------------------- */
@@ -494,10 +532,28 @@ export function TrainingManagementView() {
               <Label className="text-xs text-muted-foreground">Archivos adjuntos</Label>
               <div className="flex flex-wrap gap-2 mt-1">
                 {detailAttachments.map((att) => (
-                  <Badge key={att.id} variant="outline" className="text-xs">
-                    <Paperclip className="w-3 h-3 mr-1" />
-                    {att.file_name || "Archivo"}
-                  </Badge>
+                  <div key={att.id} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
+                    <Paperclip className="w-3 h-3 text-muted-foreground" />
+                    <span className="max-w-40 truncate">{att.file_name || "Archivo"}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => void handleDownloadAttachment(att)}
+                    >
+                      <Download className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-destructive"
+                      onClick={() => void handleDeleteAttachment(att)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 ))}
                 <label className="cursor-pointer">
                   <Badge variant="secondary" className="text-xs cursor-pointer">
