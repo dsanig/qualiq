@@ -1,5 +1,5 @@
 -- Add mandatory title field to corrective/preventive actions with safe backfill.
-ALTER TABLE public.actions
+ALTER TABLE IF EXISTS public.actions
   ADD COLUMN IF NOT EXISTS title text;
 
 WITH normalized AS (
@@ -33,8 +33,40 @@ FROM backfill b
 WHERE a.id = b.id
   AND (a.title IS NULL OR btrim(a.title) = '');
 
-ALTER TABLE public.actions
-  ALTER COLUMN title SET NOT NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'actions'
+      AND column_name = 'title'
+      AND is_nullable = 'YES'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.actions
+    WHERE title IS NULL OR btrim(title) = ''
+  ) THEN
+    ALTER TABLE public.actions
+      ALTER COLUMN title SET NOT NULL;
+  END IF;
+END
+$$;
 
-ALTER TABLE public.actions
-  ADD CONSTRAINT actions_title_not_blank CHECK (char_length(btrim(title)) > 0);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'actions_title_not_blank'
+      AND conrelid = 'public.actions'::regclass
+  ) THEN
+    ALTER TABLE public.actions
+      ADD CONSTRAINT actions_title_not_blank CHECK (char_length(btrim(title)) > 0);
+  END IF;
+END
+$$;
+
+-- Ensure PostgREST (Supabase API) refreshes the schema cache immediately after DDL.
+NOTIFY pgrst, 'reload schema';
