@@ -624,6 +624,24 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
           getUserName={getUserName}
         />
       )}
+
+      <ActionConfirmDialog
+        open={isDeleteConfirmOpen}
+        onOpenChange={(open) => {
+          if (isDeletingReclamacion) return;
+          setIsDeleteConfirmOpen(open);
+          if (!open) setReclamacionToDelete(null);
+        }}
+        title="Eliminar reclamación"
+        description={`Esta acción eliminará la reclamación "${reclamacionToDelete?.title}" y todos sus registros asociados (adjuntos, participantes, incidencias vinculadas e historial de estados) de forma permanente e irreversible.`}
+        confirmWord="ELIMINAR"
+        onConfirm={handleDeleteReclamacion}
+        isLoading={isDeletingReclamacion}
+        loadingText="Eliminando..."
+        confirmText="Eliminar"
+        variant="destructive"
+        icon={<Trash2 className="w-5 h-5 text-destructive" />}
+      />
     </div>
   );
 }
