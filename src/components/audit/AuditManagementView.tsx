@@ -779,7 +779,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                           <button onClick={() => downloadAttachment(att)} className="flex items-center gap-2 text-sm hover:underline text-primary">
                             <FileText className="h-4 w-4" />{att.file_name ?? att.object_path}
                           </button>
-                          {canEditContent && (
+                          {canEditSelectedAudit && (
                             <button onClick={() => deleteAuditAttachment(att)} className="text-destructive hover:text-destructive/80">
                               <Trash2 className="h-4 w-4" />
                             </button>
