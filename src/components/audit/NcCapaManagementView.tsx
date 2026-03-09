@@ -732,10 +732,10 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             </div>
             <div>
               <Label>Vincular a auditoría (opcional)</Label>
-              <Select value={capaForm.audit_id} onValueChange={(v) => setCapaForm((p) => ({ ...p, audit_id: v }))}>
+              <Select value={capaForm.audit_id || "none"} onValueChange={(v) => setCapaForm((p) => ({ ...p, audit_id: v === "none" ? "" : v }))}>
                 <SelectTrigger><SelectValue placeholder="Sin auditoría" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin auditoría</SelectItem>
+                  <SelectItem value="none">Sin auditoría</SelectItem>
                   {audits.map((a) => <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -766,10 +766,10 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             </div>
             <div>
               <Label>Vincular a auditoría</Label>
-              <Select value={capaForm.audit_id} onValueChange={(v) => setCapaForm((p) => ({ ...p, audit_id: v }))}>
+              <Select value={capaForm.audit_id || "none"} onValueChange={(v) => setCapaForm((p) => ({ ...p, audit_id: v === "none" ? "" : v }))}>
                 <SelectTrigger><SelectValue placeholder="Sin auditoría" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin auditoría</SelectItem>
+                  <SelectItem value="none">Sin auditoría</SelectItem>
                   {audits.map((a) => <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>)}
                 </SelectContent>
               </Select>
