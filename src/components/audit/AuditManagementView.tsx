@@ -428,7 +428,26 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       )}
       <div>
         <Label>Fecha de auditoría</Label>
-        <Input disabled={readOnly} type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              disabled={readOnly}
+              className={cn("w-full justify-start text-left font-normal", !auditForm.audit_date && "text-muted-foreground")}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {auditForm.audit_date ? format(new Date(auditForm.audit_date), "dd/MM/yyyy", { locale: es }) : "Seleccionar fecha"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={auditForm.audit_date ? new Date(auditForm.audit_date) : undefined}
+              onSelect={(d) => setAuditForm((p) => ({ ...p, audit_date: d ? format(d, "yyyy-MM-dd") : "" }))}
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
       <div>
         <Label>Auditor *</Label>
