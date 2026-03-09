@@ -13,6 +13,7 @@ import { useAuditLog } from "@/hooks/useAuditLog";
 import type { FiltersState } from "@/components/filters/FilterModal";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
+import { downloadStorageFile } from "@/utils/storageDownload";
 import { IncidentFormFields, type IncidentFormData, type CapaPlanRef } from "./IncidentFormFields";
 import { format } from "date-fns";
 import { StatusChangeDialog } from "@/components/shared/StatusChangeDialog";
@@ -40,6 +41,7 @@ interface UserRef { id: string; full_name: string | null; email: string | null; 
 interface AttachmentInfo {
   id?: string;
   file_name: string;
+  object_path?: string;
   isNew?: boolean;
   file?: File;
 }
@@ -392,8 +394,8 @@ export function IncidentsView({
   };
 
   const loadExistingAttachments = async (incidenciaId: string) => {
-    const { data } = await (supabase as any).from("incidencia_attachments").select("id,file_name").eq("incidencia_id", incidenciaId);
-    setExistingAttachments(Array.isArray(data) ? data.map((a: any) => ({ id: a.id, file_name: a.file_name ?? "archivo" })) : []);
+    const { data } = await (supabase as any).from("incidencia_attachments").select("id,file_name,object_path").eq("incidencia_id", incidenciaId);
+    setExistingAttachments(Array.isArray(data) ? data.map((a: any) => ({ id: a.id, file_name: a.file_name ?? "archivo", object_path: a.object_path })) : []);
   };
 
   const openEdit = (incident: Incident) => {
@@ -469,6 +471,24 @@ export function IncidentsView({
 
   const handleRemoveNewAttachment = (index: number) => {
     setNewAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDownloadAttachment = async (attachment: AttachmentInfo) => {
+    if (!attachment.object_path) {
+      toast({ title: "Error", description: "No se pudo descargar el archivo.", variant: "destructive" });
+      return;
+    }
+
+    const downloaded = await downloadStorageFile({
+      supabase,
+      bucketId: "documents",
+      objectPath: attachment.object_path,
+      downloadFileName: attachment.file_name ?? attachment.object_path.split("/").pop() ?? "file",
+    });
+
+    if (!downloaded) {
+      toast({ title: "Error", description: "No se pudo descargar el archivo.", variant: "destructive" });
+    }
   };
 
   const allAttachments = [...existingAttachments, ...newAttachments];
@@ -740,6 +760,7 @@ export function IncidentsView({
             users={users}
             isEditing
             attachments={allAttachments}
+            onDownloadAttachment={handleDownloadAttachment}
             onAddFiles={canEditContent ? handleAddFiles : undefined}
             onRemoveAttachment={canEditContent ? (idx) => {
               if (idx < existingAttachments.length) {
