@@ -358,8 +358,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   };
 
   const createNc = async () => {
-    if (!ncForm.responsible_id || !ncForm.deadline) {
-      toast({ title: "Error", description: "Responsable y fecha límite son obligatorios.", variant: "destructive" });
+    if (!ncForm.title || !ncForm.description || !ncForm.severity || !ncForm.responsible_id || !ncForm.deadline) {
+      toast({ title: "Error", description: "Título, descripción, severidad, responsable y fecha límite son obligatorios.", variant: "destructive" });
       return;
     }
 
