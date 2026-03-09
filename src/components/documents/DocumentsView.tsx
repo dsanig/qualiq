@@ -33,6 +33,7 @@ import { DocumentPendingActions } from "./DocumentPendingActions";
 import { ShareDocumentDialog } from "./ShareDocumentDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -1872,6 +1873,46 @@ export function DocumentsView({
   };
 
 
+  const getSignatureConfirmationErrorMessage = async (error: unknown) => {
+    if (error instanceof FunctionsHttpError) {
+      const response = error.context;
+      let parsedBody: unknown = null;
+      const rawBody = await response.clone().text();
+
+      if (rawBody) {
+        try {
+          parsedBody = JSON.parse(rawBody);
+        } catch {
+          parsedBody = null;
+        }
+      }
+
+      const backendError =
+        parsedBody && typeof parsedBody === "object" && "error" in parsedBody
+          ? (parsedBody as { error?: { code?: string; message?: string } | string }).error
+          : null;
+
+      const backendCode =
+        backendError && typeof backendError === "object" && "code" in backendError
+          ? backendError.code
+          : null;
+
+      if (backendCode === "INVALID_CONFIRMATION_TEXT") return "Debe escribir exactamente FIRMAR.";
+      if (backendCode === "PASSWORD_REQUIRED") return "Debe introducir su contraseña actual.";
+      if (backendCode === "PASSWORD_INVALID") return "La contraseña introducida no es correcta.";
+      if (backendCode === "AUTH_USER_UNAVAILABLE" || backendCode === "AUTH_CONTEXT_MISSING") {
+        return "No se pudo verificar la identidad del usuario actual.";
+      }
+
+      if (backendError && typeof backendError === "object" && typeof backendError.message === "string") {
+        return backendError.message;
+      }
+
+      return `No se pudo validar la confirmación de firma (HTTP ${response.status}).`;
+    }
+
+    return "No se pudo validar la confirmación de firma.";
+  };
 
   const handleConfirmSignature = async () => {
     if (!selectedDocument || !user || !pendingSignMethod) return;
@@ -1901,11 +1942,7 @@ export function DocumentsView({
     });
 
     if (verifyError) {
-      const errorMessage = verifyError.message?.includes("FIRMAR")
-        ? "Debes escribir exactamente FIRMAR."
-        : verifyError.message?.toLowerCase().includes("contraseña")
-          ? "La contraseña introducida no es válida."
-          : "No se pudo validar la confirmación reforzada de firma.";
+      const errorMessage = await getSignatureConfirmationErrorMessage(verifyError);
       setSignConfirmationError(errorMessage);
       setIsConfirmingSignature(false);
       await logAction({

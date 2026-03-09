@@ -10,46 +10,59 @@ type Payload = {
   password?: string;
 };
 
+type ErrorCode =
+  | "INVALID_CONFIRMATION_TEXT"
+  | "PASSWORD_REQUIRED"
+  | "AUTH_CONTEXT_MISSING"
+  | "AUTH_USER_UNAVAILABLE"
+  | "PASSWORD_INVALID"
+  | "IDENTITY_VERIFICATION_FAILED"
+  | "INTERNAL_ERROR";
+
+const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+const errorResponse = (status: number, code: ErrorCode, message: string) =>
+  new Response(JSON.stringify({ ok: false, error: { code, message } }), {
+    status,
+    headers: jsonHeaders,
+  });
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Método no permitido." }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return errorResponse(405, "INTERNAL_ERROR", "Método no permitido.");
   }
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No autenticado." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse(401, "AUTH_CONTEXT_MISSING", "No se pudo verificar la sesión actual.");
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    if (!supabaseUrl || !anonKey) {
+      console.error("[verify-signature-confirmation] missing Supabase environment configuration", {
+        hasUrl: Boolean(supabaseUrl),
+        hasAnonOrServiceRole: Boolean(anonKey),
+      });
+      return errorResponse(500, "INTERNAL_ERROR", "La validación de firma no está disponible temporalmente.");
+    }
 
     const payload = (await req.json().catch(() => ({}))) as Payload;
     const confirmationText = payload.confirmation_text ?? "";
     const password = payload.password ?? "";
 
     if (confirmationText !== "FIRMAR") {
-      return new Response(JSON.stringify({ error: "Debes escribir exactamente FIRMAR." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse(400, "INVALID_CONFIRMATION_TEXT", "Debe escribir exactamente FIRMAR.");
     }
 
     if (!password) {
-      return new Response(JSON.stringify({ error: "La contraseña es obligatoria." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse(400, "PASSWORD_REQUIRED", "Debe introducir su contraseña actual.");
     }
 
     const authClient = createClient(supabaseUrl, anonKey, {
@@ -62,33 +75,42 @@ Deno.serve(async (req) => {
     } = await authClient.auth.getUser();
 
     if (userError || !user?.email) {
-      return new Response(JSON.stringify({ error: "Sesión inválida." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      console.error("[verify-signature-confirmation] auth user unavailable", {
+        userError: userError?.message,
+        hasUser: Boolean(user),
+        hasEmail: Boolean(user?.email),
       });
+      return errorResponse(401, "AUTH_USER_UNAVAILABLE", "No se pudo verificar la identidad del usuario actual.");
     }
 
-    const verifyClient = createClient(supabaseUrl, anonKey);
+    const verifyClient = createClient(supabaseUrl, anonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
     const { error: verifyError } = await verifyClient.auth.signInWithPassword({
       email: user.email,
       password,
     });
 
     if (verifyError) {
-      return new Response(JSON.stringify({ error: "La contraseña introducida no es válida." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      console.warn("[verify-signature-confirmation] credential verification failed", {
+        userId: user.id,
+        email: user.email,
+        authError: verifyError.message,
       });
+      return errorResponse(401, "PASSWORD_INVALID", "La contraseña introducida no es correcta.");
     }
 
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: jsonHeaders,
     });
-  } catch (_error) {
-    return new Response(JSON.stringify({ error: "No se pudo validar la confirmación de firma." }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+  } catch (error) {
+    console.error("[verify-signature-confirmation] unexpected error", {
+      message: error instanceof Error ? error.message : "unknown",
     });
+    return errorResponse(500, "IDENTITY_VERIFICATION_FAILED", "No se pudo validar la confirmación de firma.");
   }
 });
