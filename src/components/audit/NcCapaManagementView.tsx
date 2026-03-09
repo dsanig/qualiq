@@ -1137,6 +1137,35 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Link NC Dialog */}
+      <Dialog open={linkNcOpen} onOpenChange={setLinkNcOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vincular No Conformidad</DialogTitle>
+            <DialogDescription>Selecciona una no conformidad para vincular a este plan CAPA.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {availableNcs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No hay no conformidades disponibles.</p>
+            ) : (
+              availableNcs.map((nc) => (
+                <button
+                  key={nc.id}
+                  onClick={() => linkNc(nc.id)}
+                  className="w-full rounded border p-3 text-left hover:bg-muted"
+                >
+                  <p className="font-medium">{nc.title}</p>
+                  <p className="text-xs text-muted-foreground">{statusLabel(nc.status)}</p>
+                </button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkNcOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
