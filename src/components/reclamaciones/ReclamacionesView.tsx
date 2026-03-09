@@ -479,6 +479,16 @@ export function ReclamacionesView({ searchQuery, onSearchChange, onOpenNewIncide
                         <History className="h-3 w-3 mr-1" />Estado
                       </Button>
                     )}
+                    {canDelete && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-destructive hover:text-destructive"
+                        onClick={(e) => { e.stopPropagation(); setReclamacionToDelete(rec); setIsDeleteConfirmOpen(true); }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
                     {canEditContent && <Pencil className="h-3.5 w-3.5 text-muted-foreground" />}
                   </div>
                 </div>
