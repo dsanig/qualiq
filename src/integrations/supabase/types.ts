@@ -393,7 +393,8 @@ export type Database = {
       }
       capa_plans: {
         Row: {
-          audit_id: string
+          audit_id: string | null
+          company_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -401,7 +402,8 @@ export type Database = {
           title: string | null
         }
         Insert: {
-          audit_id: string
+          audit_id?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -409,7 +411,8 @@ export type Database = {
           title?: string | null
         }
         Update: {
-          audit_id?: string
+          audit_id?: string | null
+          company_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -422,6 +425,13 @@ export type Database = {
             columns: ["audit_id"]
             isOneToOne: false
             referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "capa_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

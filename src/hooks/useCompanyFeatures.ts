@@ -6,6 +6,7 @@ export const ALL_FEATURES = [
   { key: "incidents", label: "Incidencias" },
   { key: "reclamaciones", label: "Reclamaciones" },
   { key: "audits", label: "Auditorías" },
+  { key: "nc-capa", label: "NC y CAPA" },
   { key: "training", label: "Formación" },
   { key: "audit-simulator", label: "Simulador Auditoría" },
   { key: "predictive-analytics", label: "Análisis Predictivo" },

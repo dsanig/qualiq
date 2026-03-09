@@ -20,6 +20,7 @@ import { TrainingManagementView } from "@/components/training/TrainingManagement
 import { AuditSimulatorView } from "@/components/audit/AuditSimulatorView";
 import { PredictiveAnalyticsView } from "@/components/analytics/PredictiveAnalyticsView";
 import { AuditManagementView } from "@/components/audit/AuditManagementView";
+import { NcCapaManagementView } from "@/components/audit/NcCapaManagementView";
 import { CompanyManagementView } from "@/components/admin/CompanyManagementView";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { AuditTrailView } from "@/components/audit-trail/AuditTrailView";
@@ -31,7 +32,8 @@ const moduleConfig: Record<string, { title: string; subtitle?: string }> = {
   documents: { title: "Gestión Documental", subtitle: "SOPs, PNTs y documentación de calidad" },
   incidents: { title: "Incidencias", subtitle: "No conformidades, desviaciones y CAPAs" },
   reclamaciones: { title: "Reclamaciones", subtitle: "Gestión de reclamaciones de clientes, proveedores y terceros" },
-  audits: { title: "Auditorías y CAPA", subtitle: "Gestión de auditorías, CAPA y acciones" },
+  audits: { title: "Auditorías", subtitle: "Gestión de auditorías internas y externas" },
+  "nc-capa": { title: "NC y CAPA", subtitle: "No conformidades y acciones correctivas/preventivas" },
   training: { title: "Gestión de Formaciones", subtitle: "Registros de formaciones impartidas y recibidas" },
   "training-exam": { title: "Examen de Formación", subtitle: "Evaluación de comprensión de procedimientos" },
   "audit-simulator": { title: "Simulador de Auditoría", subtitle: "Simulación de inspecciones FDA/EMA" },
@@ -274,6 +276,8 @@ const Index = () => {
         );
       case "audits":
         return <AuditManagementView searchQuery={activeSearchQuery} />;
+      case "nc-capa":
+        return <NcCapaManagementView searchQuery={activeSearchQuery} />;
       case "chatbot":
         return <ChatbotView />;
       case "training":
