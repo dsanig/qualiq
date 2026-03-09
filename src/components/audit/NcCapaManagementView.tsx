@@ -70,6 +70,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [audits, setAudits] = useState<Audit[]>([]);
   const [incidencias, setIncidencias] = useState<IncidenciaRef[]>([]);
   const [capaIncidenciaLinks, setCapaIncidenciaLinks] = useState<CapaIncidenciaLink[]>([]);
+  const [capaNcLinks, setCapaNcLinks] = useState<CapaNcLink[]>([]);
   const [selectedCapaPlanId, setSelectedCapaPlanId] = useState<string | null>(null);
   const [selectedNcId, setSelectedNcId] = useState<string | null>(null);
   const { canEditContent, canManageCompany } = usePermissions();
@@ -83,13 +84,14 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [newActionOpen, setNewActionOpen] = useState(false);
   const [editActionOpen, setEditActionOpen] = useState(false);
   const [linkIncidenciaOpen, setLinkIncidenciaOpen] = useState(false);
-  const [linkAuditOpen, setLinkAuditOpen] = useState(false);
+  const [linkNcOpen, setLinkNcOpen] = useState(false);
 
   // Forms
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "", audit_id: "" });
-  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
+  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
   const [actionForm, setActionForm] = useState({
     non_conformity_id: "",
+    capa_plan_id: "",
     action_type: "corrective" as "corrective" | "preventive" | "immediate",
     description: "",
     responsible_id: "",
