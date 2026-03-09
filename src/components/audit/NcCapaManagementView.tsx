@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
