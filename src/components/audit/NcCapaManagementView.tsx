@@ -255,52 +255,94 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const getTenantPrefix = async () => {
     const { data: userData } = await supabase.auth.getUser();
     const authId = userData.user?.id;
-    if (!authId) return "unknown";
+    if (!authId) return null;
     const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", authId).maybeSingle();
-    return profileData?.company_id ?? "unknown";
+    return profileData?.company_id ?? null;
   };
 
-  const uploadActionAttachments = async (actionId: string) => {
+  const persistActionAttachments = async (actionId: string) => {
     if (newActionAttachments.length === 0) return;
     const authUserId = (await supabase.auth.getUser()).data.user?.id;
     const tenantPrefix = await getTenantPrefix();
-    for (const att of newActionAttachments) {
-      if (!att.file) continue;
-      const path = `${tenantPrefix}/actions/${actionId}/${Date.now()}_${att.file.name}`;
-      const { error: uploadError } = await supabase.storage.from("documents").upload(path, att.file);
-      if (uploadError) {
-        toast({ title: "Error subiendo archivo", description: att.file.name, variant: "destructive" });
-        continue;
+    if (!tenantPrefix) throw new Error("No se pudo resolver la compañía del usuario para subir adjuntos.");
+
+    const uploadedPaths: string[] = [];
+    const insertedIds: string[] = [];
+
+    try {
+      for (const att of newActionAttachments) {
+        if (!att.file) continue;
+        const path = `${tenantPrefix}/actions/${actionId}/${Date.now()}_${crypto.randomUUID()}_${att.file.name}`;
+        const { error: uploadError } = await supabase.storage.from("documents").upload(path, att.file);
+        if (uploadError) throw new Error(`No se pudo subir ${att.file.name}: ${uploadError.message}`);
+        uploadedPaths.push(path);
+
+        const { data: attachment, error: insertError } = await (supabase as any)
+          .from("action_attachments")
+          .insert({
+            action_id: actionId,
+            bucket_id: "documents",
+            object_path: path,
+            file_name: att.file.name,
+            created_by: authUserId,
+          })
+          .select("id")
+          .single();
+
+        if (insertError) throw new Error(`No se pudo guardar ${att.file.name}: ${insertError.message}`);
+        insertedIds.push(attachment.id);
       }
-      await (supabase as any).from("action_attachments").insert({
-        action_id: actionId,
-        bucket_id: "documents",
-        object_path: path,
-        file_name: att.file.name,
-        created_by: authUserId,
-      });
+    } catch (error) {
+      if (insertedIds.length > 0) {
+        await (supabase as any).from("action_attachments").delete().in("id", insertedIds);
+      }
+      if (uploadedPaths.length > 0) {
+        await supabase.storage.from("documents").remove(uploadedPaths);
+      }
+      throw error;
     }
   };
 
-  const uploadNcAttachments = async (nonConformityId: string) => {
+  const persistNcAttachments = async (nonConformityId: string) => {
     if (newNcAttachments.length === 0) return;
     const authUserId = (await supabase.auth.getUser()).data.user?.id;
     const tenantPrefix = await getTenantPrefix();
-    for (const att of newNcAttachments) {
-      if (!att.file) continue;
-      const path = `${tenantPrefix}/non-conformities/${nonConformityId}/${Date.now()}_${att.file.name}`;
-      const { error: uploadError } = await supabase.storage.from("documents").upload(path, att.file);
-      if (uploadError) {
-        toast({ title: "Error subiendo archivo", description: att.file.name, variant: "destructive" });
-        continue;
+    if (!tenantPrefix) throw new Error("No se pudo resolver la compañía del usuario para subir adjuntos.");
+
+    const uploadedPaths: string[] = [];
+    const insertedIds: string[] = [];
+
+    try {
+      for (const att of newNcAttachments) {
+        if (!att.file) continue;
+        const path = `${tenantPrefix}/non-conformities/${nonConformityId}/${Date.now()}_${crypto.randomUUID()}_${att.file.name}`;
+        const { error: uploadError } = await supabase.storage.from("documents").upload(path, att.file);
+        if (uploadError) throw new Error(`No se pudo subir ${att.file.name}: ${uploadError.message}`);
+        uploadedPaths.push(path);
+
+        const { data: attachment, error: insertError } = await (supabase as any)
+          .from("non_conformity_attachments")
+          .insert({
+            non_conformity_id: nonConformityId,
+            bucket_id: "documents",
+            object_path: path,
+            file_name: att.file.name,
+            created_by: authUserId,
+          })
+          .select("id")
+          .single();
+
+        if (insertError) throw new Error(`No se pudo guardar ${att.file.name}: ${insertError.message}`);
+        insertedIds.push(attachment.id);
       }
-      await (supabase as any).from("non_conformity_attachments").insert({
-        non_conformity_id: nonConformityId,
-        bucket_id: "documents",
-        object_path: path,
-        file_name: att.file.name,
-        created_by: authUserId,
-      });
+    } catch (error) {
+      if (insertedIds.length > 0) {
+        await (supabase as any).from("non_conformity_attachments").delete().in("id", insertedIds);
+      }
+      if (uploadedPaths.length > 0) {
+        await supabase.storage.from("documents").remove(uploadedPaths);
+      }
+      throw error;
     }
   };
 
@@ -542,7 +584,16 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
-    if (data?.id && newNcAttachments.length > 0) await uploadNcAttachments(data.id);
+    if (data?.id && newNcAttachments.length > 0) {
+      try {
+        await persistNcAttachments(data.id);
+      } catch (attachmentError) {
+        await (supabase as any).from("non_conformities").delete().eq("id", data.id);
+        const message = attachmentError instanceof Error ? attachmentError.message : "No se pudieron guardar los adjuntos.";
+        toast({ title: "Error", description: message, variant: "destructive" });
+        return;
+      }
+    }
 
     toast({ title: "No conformidad creada" });
     logAction({ action: "create", entity_type: "non_conformity", entity_id: data?.id, entity_title: ncForm.title });
@@ -581,7 +632,15 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
-    if (newNcAttachments.length > 0) await uploadNcAttachments(editingNc.id);
+    if (newNcAttachments.length > 0) {
+      try {
+        await persistNcAttachments(editingNc.id);
+      } catch (attachmentError) {
+        const message = attachmentError instanceof Error ? attachmentError.message : "No se pudieron guardar los adjuntos.";
+        toast({ title: "Error", description: message, variant: "destructive" });
+        return;
+      }
+    }
 
     toast({ title: "No conformidad actualizada" });
     logAction({ action: "update", entity_type: "non_conformity", entity_id: editingNc.id, entity_title: ncForm.title });
@@ -736,7 +795,16 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
-    if (data?.id && newActionAttachments.length > 0) await uploadActionAttachments(data.id);
+    if (data?.id && newActionAttachments.length > 0) {
+      try {
+        await persistActionAttachments(data.id);
+      } catch (attachmentError) {
+        await (supabase as any).from("actions").delete().eq("id", data.id);
+        const message = attachmentError instanceof Error ? attachmentError.message : "No se pudieron guardar los adjuntos.";
+        toast({ title: "Error", description: message, variant: "destructive" });
+        return;
+      }
+    }
 
     toast({ title: "Acción creada" });
     logAction({ action: "create", entity_type: "action", entity_id: data?.id, entity_title: actionForm.title.slice(0, 50) });
@@ -773,7 +841,15 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
-    if (newActionAttachments.length > 0) await uploadActionAttachments(editingAction.id);
+    if (newActionAttachments.length > 0) {
+      try {
+        await persistActionAttachments(editingAction.id);
+      } catch (attachmentError) {
+        const message = attachmentError instanceof Error ? attachmentError.message : "No se pudieron guardar los adjuntos.";
+        toast({ title: "Error", description: message, variant: "destructive" });
+        return;
+      }
+    }
 
     toast({ title: "Acción actualizada" });
     logAction({ action: "update", entity_type: "action", entity_id: editingAction.id, entity_title: actionForm.title.slice(0, 50) });
@@ -1537,6 +1613,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                   <div key={`new-nc-${idx}`} className="flex items-center gap-2 text-sm border rounded px-2 py-1">
                     <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span className="truncate flex-1">{att.file_name}</span>
+                    <span className="text-xs text-muted-foreground">Pendiente de subir</span>
                     <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveNewNcAttachment(idx)}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -1614,10 +1691,26 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             <div>
               <Label>Documentos adjuntos</Label>
               <div className="mt-1 space-y-2">
+                {existingNcAttachments.map((att) => (
+                  <div key={att.id} className="space-y-1 border rounded px-2 py-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="truncate flex-1">{att.file_name}</span>
+                      <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => void downloadAttachment(att)}>
+                        <Download className="h-3 w-3" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => att.id && void removeExistingNcAttachment(att.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Subido por: {getUploadedByName(att.created_by)} • {formatDateTime(att.created_at)}</p>
+                  </div>
+                ))}
                 {newNcAttachments.map((att, idx) => (
                   <div key={`new-nc-${idx}`} className="flex items-center gap-2 text-sm border rounded px-2 py-1">
                     <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span className="truncate flex-1">{att.file_name}</span>
+                    <span className="text-xs text-muted-foreground">Pendiente de subir</span>
                     <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveNewNcAttachment(idx)}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -1694,6 +1787,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                   <div key={`new-action-${idx}`} className="flex items-center gap-2 text-sm border rounded px-2 py-1">
                     <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span className="truncate flex-1">{att.file_name}</span>
+                    <span className="text-xs text-muted-foreground">Pendiente de subir</span>
                     <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveNewActionAttachment(idx)}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
