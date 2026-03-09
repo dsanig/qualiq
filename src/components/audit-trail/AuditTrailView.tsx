@@ -5,7 +5,7 @@ import {
   Settings, Building2, GraduationCap, TrendingUp, FileWarning,
   LogIn, LogOut, Key, Eye, Download, Trash2
 } from "lucide-react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -264,10 +264,20 @@ export function AuditTrailView() {
       "Detalles": e.details ? Object.entries(e.details).map(([k, v]) => `${detailKeyLabels[k] || k}: ${String(v)}`).join("; ") : "",
     }));
 
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Pista de Auditoría");
-    XLSX.writeFile(wb, `pista_auditoria_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Pista de Auditoría");
+    if (rows.length > 0) {
+      ws.columns = Object.keys(rows[0]).map((key) => ({ header: key, key, width: 25 }));
+      rows.forEach((row) => ws.addRow(row));
+    }
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pista_auditoria_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const deleteAllEntries = async () => {
