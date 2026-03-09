@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { CalendarIcon, Paperclip, Trash2, X } from "lucide-react";
+import { CalendarIcon, Download, Paperclip, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +30,7 @@ interface IncidenciaRef { id: string; title: string; }
 interface AttachmentInfo {
   id?: string;
   file_name: string;
+  object_path?: string;
   isNew?: boolean;
   file?: File;
 }
@@ -42,6 +43,7 @@ interface ReclamacionFormFieldsProps {
   attachments?: AttachmentInfo[];
   onAddFiles?: (files: FileList) => void;
   onRemoveAttachment?: (index: number) => void;
+  onDownloadAttachment?: (attachment: AttachmentInfo) => void;
   incidencias?: IncidenciaRef[];
   selectedIncidenciaIds?: string[];
   onIncidenciaToggle?: (id: string) => void;
@@ -52,6 +54,7 @@ interface ReclamacionFormFieldsProps {
 export function ReclamacionFormFields({
   form, onFormChange, users, isEditing,
   attachments = [], onAddFiles, onRemoveAttachment,
+  onDownloadAttachment,
   incidencias = [], selectedIncidenciaIds = [], onIncidenciaToggle,
   participantIds = [], onParticipantToggle,
 }: ReclamacionFormFieldsProps) {
@@ -183,6 +186,11 @@ export function ReclamacionFormFields({
             <div key={att.id ?? idx} className="flex items-center gap-2 text-sm border rounded px-2 py-1">
               <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               <span className="truncate flex-1">{att.file_name}</span>
+              {onDownloadAttachment && att.object_path && (
+                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDownloadAttachment(att)}>
+                  <Download className="h-3 w-3" />
+                </Button>
+              )}
               {onRemoveAttachment && (
                 <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveAttachment(idx)}>
                   <Trash2 className="h-3 w-3" />
