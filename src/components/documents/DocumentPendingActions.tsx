@@ -303,6 +303,8 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
           : null;
 
       if (backendCode === "INVALID_CONFIRMATION_TEXT") return "Debe escribir exactamente FIRMAR.";
+      if (backendCode === "USER_IDENTIFIER_REQUIRED") return "Debe introducir su ID de usuario.";
+      if (backendCode === "USER_IDENTIFIER_MISMATCH") return "El ID de usuario no coincide con el usuario autenticado.";
       if (backendCode === "PASSWORD_REQUIRED") return "Debe introducir su contraseña actual.";
       if (backendCode === "PASSWORD_INVALID") return "La contraseña introducida no es correcta.";
       if (backendCode === "AUTH_USER_UNAVAILABLE" || backendCode === "AUTH_CONTEXT_MISSING") {
@@ -319,7 +321,7 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     return "No se pudo validar la confirmación de firma.";
   };
 
-  const handleDialogConfirm = async ({ comment, confirmationText, password }: { comment?: string; confirmationText: string; password?: string }) => {
+  const handleDialogConfirm = async ({ comment, confirmationText, userIdentifier, password }: { comment?: string; confirmationText: string; userIdentifier?: string; password?: string }) => {
     if (!confirmAction) return;
     setIsProcessing(true);
     let shouldCloseDialog = true;
@@ -328,7 +330,9 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
         const { error: verifyError } = await supabase.functions.invoke("verify-signature-confirmation", {
           body: {
             confirmation_text: confirmationText,
+            user_identifier: userIdentifier,
             password,
+            document_id: confirmAction.document_id,
           },
         });
 
@@ -366,12 +370,15 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
       return {
         title: isSignature ? "Confirmar Firma" : `Confirmar ${actionLabel}`,
         description: isSignature
-          ? `Para firmar el documento ${code}, escribe exactamente FIRMAR e introduce tu contraseña actual.`
+          ? `Para firmar el documento ${code}, escribe exactamente FIRMAR e introduce tu ID de usuario y contraseña actual.`
           : `Estás a punto de marcar como completada la acción de ${actionLabel.toLowerCase()} para el documento ${code}.`,
         confirmWord: word,
         confirmText: actionLabel,
         variant: "default" as const,
         showComment: false,
+        requireUserIdentifier: isSignature,
+        userIdentifierLabel: "ID de usuario",
+        userIdentifierPlaceholder: "Introduce tu email corporativo",
         requirePassword: isSignature,
         strictConfirm: isSignature,
       };
@@ -558,6 +565,9 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
           confirmText={dialogConfig.confirmText}
           variant={dialogConfig.variant}
           showComment={dialogConfig.showComment}
+          requireUserIdentifier={dialogConfig.requireUserIdentifier}
+          userIdentifierLabel={dialogConfig.requireUserIdentifier ? dialogConfig.userIdentifierLabel : undefined}
+          userIdentifierPlaceholder={dialogConfig.requireUserIdentifier ? dialogConfig.userIdentifierPlaceholder : undefined}
           requirePassword={dialogConfig.requirePassword}
           strictConfirm={dialogConfig.strictConfirm}
           commentLabel={dialogConfig.showComment ? dialogConfig.commentLabel : undefined}

@@ -20,7 +20,7 @@ interface ActionConfirmDialogProps {
   title: string;
   description: string;
   confirmWord: string;
-  onConfirm: (payload: { comment?: string; confirmationText: string; password?: string }) => Promise<void> | void;
+  onConfirm: (payload: { comment?: string; confirmationText: string; userIdentifier?: string; password?: string }) => Promise<void> | void;
   isLoading?: boolean;
   loadingText?: string;
   confirmText?: string;
@@ -29,6 +29,9 @@ interface ActionConfirmDialogProps {
   commentLabel?: string;
   commentPlaceholder?: string;
   icon?: React.ReactNode;
+  requireUserIdentifier?: boolean;
+  userIdentifierLabel?: string;
+  userIdentifierPlaceholder?: string;
   requirePassword?: boolean;
   passwordLabel?: string;
   passwordPlaceholder?: string;
@@ -50,6 +53,9 @@ export function ActionConfirmDialog({
   commentLabel = "Comentario (opcional)",
   commentPlaceholder = "",
   icon,
+  requireUserIdentifier = false,
+  userIdentifierLabel = "ID de usuario",
+  userIdentifierPlaceholder = "Introduce tu ID de usuario",
   requirePassword = false,
   passwordLabel = "Contraseña",
   passwordPlaceholder = "Introduce tu contraseña",
@@ -57,16 +63,18 @@ export function ActionConfirmDialog({
 }: ActionConfirmDialogProps) {
   const [typed, setTyped] = useState("");
   const [comment, setComment] = useState("");
+  const [userIdentifier, setUserIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const isMatch = strictConfirm ? typed === confirmWord : typed.trim().toLowerCase() === confirmWord.toLowerCase();
-  const canConfirm = isMatch && (!requirePassword || !!password);
+  const canConfirm = isMatch && (!requireUserIdentifier || !!userIdentifier.trim()) && (!requirePassword || !!password);
 
   const handleClose = (val: boolean) => {
     if (!val) {
       setTyped("");
       setComment("");
+      setUserIdentifier("");
       setPassword("");
       setError(null);
     }
@@ -76,6 +84,11 @@ export function ActionConfirmDialog({
   const handleConfirm = async () => {
     if (!isMatch) {
       setError(`Debes escribir exactamente ${confirmWord}.`);
+      return;
+    }
+
+    if (requireUserIdentifier && !userIdentifier.trim()) {
+      setError("Debes introducir tu ID de usuario.");
       return;
     }
 
@@ -89,10 +102,12 @@ export function ActionConfirmDialog({
       await onConfirm({
         comment: showComment ? comment : undefined,
         confirmationText: typed,
+        userIdentifier: requireUserIdentifier ? userIdentifier.trim() : undefined,
         password: requirePassword ? password : undefined,
       });
       setTyped("");
       setComment("");
+      setUserIdentifier("");
       setPassword("");
     } catch (confirmError) {
       const message = confirmError instanceof Error ? confirmError.message : "No se pudo completar la acción.";
@@ -126,6 +141,21 @@ export function ActionConfirmDialog({
               autoFocus
             />
           </div>
+          {requireUserIdentifier && (
+            <div>
+              <Label className="text-sm">{userIdentifierLabel}</Label>
+              <Input
+                className="mt-1"
+                value={userIdentifier}
+                onChange={(e) => {
+                  setUserIdentifier(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder={userIdentifierPlaceholder}
+                autoComplete="username"
+              />
+            </div>
+          )}
           {requirePassword && (
             <div>
               <Label className="text-sm">{passwordLabel}</Label>

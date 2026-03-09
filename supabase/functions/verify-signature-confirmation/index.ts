@@ -7,15 +7,20 @@ const corsHeaders = {
 
 type Payload = {
   confirmation_text?: string;
+  user_identifier?: string;
   password?: string;
+  document_id?: string;
 };
 
 type ErrorCode =
   | "INVALID_CONFIRMATION_TEXT"
+  | "USER_IDENTIFIER_REQUIRED"
+  | "USER_IDENTIFIER_MISMATCH"
   | "PASSWORD_REQUIRED"
   | "AUTH_CONTEXT_MISSING"
   | "AUTH_USER_UNAVAILABLE"
   | "PASSWORD_INVALID"
+  | "PERMISSION_DENIED"
   | "IDENTITY_VERIFICATION_FAILED"
   | "INTERNAL_ERROR";
 
@@ -55,10 +60,16 @@ Deno.serve(async (req) => {
 
     const payload = (await req.json().catch(() => ({}))) as Payload;
     const confirmationText = payload.confirmation_text ?? "";
+    const userIdentifier = payload.user_identifier?.trim() ?? "";
     const password = payload.password ?? "";
+    const documentId = payload.document_id?.trim() ?? "";
 
     if (confirmationText !== "FIRMAR") {
       return errorResponse(400, "INVALID_CONFIRMATION_TEXT", "Debe escribir exactamente FIRMAR.");
+    }
+
+    if (!userIdentifier) {
+      return errorResponse(400, "USER_IDENTIFIER_REQUIRED", "Debe introducir su ID de usuario.");
     }
 
     if (!password) {
@@ -83,6 +94,25 @@ Deno.serve(async (req) => {
       return errorResponse(401, "AUTH_USER_UNAVAILABLE", "No se pudo verificar la identidad del usuario actual.");
     }
 
+    const normalizedIdentifier = userIdentifier.toLowerCase();
+    const normalizedEmail = user.email.toLowerCase();
+
+    if (normalizedIdentifier !== normalizedEmail) {
+      return errorResponse(401, "USER_IDENTIFIER_MISMATCH", "El ID de usuario no coincide con el usuario autenticado.");
+    }
+
+    if (documentId) {
+      const { data: canSign, error: permissionError } = await authClient.rpc("can_perform_document_action", {
+        _user_id: user.id,
+        _document_id: documentId,
+        _action_type: "firma",
+      });
+
+      if (permissionError || !canSign) {
+        return errorResponse(403, "PERMISSION_DENIED", "No tienes permisos para firmar este documento.");
+      }
+    }
+
     const verifyClient = createClient(supabaseUrl, anonKey, {
       auth: {
         persistSession: false,
@@ -96,8 +126,6 @@ Deno.serve(async (req) => {
 
     if (verifyError) {
       console.warn("[verify-signature-confirmation] credential verification failed", {
-        userId: user.id,
-        email: user.email,
         authError: verifyError.message,
       });
       return errorResponse(401, "PASSWORD_INVALID", "La contraseña introducida no es correcta.");
