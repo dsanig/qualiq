@@ -1186,7 +1186,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       </Dialog>
 
       {/* Delete Audit Confirm */}
-      <AlertDialog open={deleteAuditConfirmOpen} onOpenChange={setDeleteAuditConfirmOpen}>
+      <AlertDialog open={deleteAuditConfirmOpen} onOpenChange={(open) => { setDeleteAuditConfirmOpen(open); if (!open) setDeleteConfirmText(""); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar auditoría?</AlertDialogTitle>
@@ -1204,10 +1204,28 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                 <p className="text-xs text-muted-foreground mt-1">Todos estos registros serán eliminados junto con la auditoría.</p>
               </div>
             )}
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="delete-confirm" className="text-sm">
+                Escribe <span className="font-bold text-destructive">ELIMINAR</span> para confirmar:
+              </Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="ELIMINAR"
+                className="font-mono"
+              />
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { if (deletingAuditId) deleteAudit(deletingAuditId); setDeleteAuditConfirmOpen(false); }}>Eliminar</AlertDialogAction>
+            <AlertDialogAction
+              disabled={deleteConfirmText !== "ELIMINAR"}
+              onClick={() => { if (deletingAuditId) deleteAudit(deletingAuditId); setDeleteAuditConfirmOpen(false); setDeleteConfirmText(""); }}
+              className="disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Eliminar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
