@@ -522,7 +522,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const openEditAction = (action: ActionItem) => {
     setEditingAction(action);
     setActionForm({
-      non_conformity_id: action.non_conformity_id,
+      non_conformity_id: action.non_conformity_id ?? "",
+      capa_plan_id: action.capa_plan_id ?? "",
       action_type: action.action_type,
       description: action.description,
       responsible_id: action.responsible_id ?? "",
