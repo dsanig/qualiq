@@ -146,8 +146,24 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   useEffect(() => { void loadData(); }, []);
 
   const selectedAudit = audits.find((a) => a.id === selectedAuditId) ?? null;
-  const selectedAuditAttachments = useMemo(() => auditAttachments.filter((a) => a.audit_id === selectedAuditId), [auditAttachments, selectedAuditId]);
-  const selectedAuditParticipants = useMemo(() => auditParticipants.filter((p) => p.audit_id === selectedAuditId), [auditParticipants, selectedAuditId]);
+  const selectedAuditAttachments = useMemo(
+    () => auditAttachments.filter((a) => a.audit_id === selectedAuditId),
+    [auditAttachments, selectedAuditId],
+  );
+  const selectedAuditParticipants = useMemo(
+    () => auditParticipants.filter((p) => p.audit_id === selectedAuditId),
+    [auditParticipants, selectedAuditId],
+  );
+
+  const canEditSelectedAudit = useMemo(() => {
+    if (!selectedAudit || !currentUserId) return false;
+    return selectedAudit.auditor_id === currentUserId || selectedAudit.responsible_id === currentUserId;
+  }, [selectedAudit, currentUserId]);
+
+  const canEditEditingAudit = useMemo(() => {
+    if (!editingAudit || !currentUserId) return false;
+    return editingAudit.auditor_id === currentUserId || editingAudit.responsible_id === currentUserId;
+  }, [editingAudit, currentUserId]);
 
   const getUserName = (id: string | null) => {
     if (!id) return null;
