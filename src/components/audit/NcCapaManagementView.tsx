@@ -32,6 +32,9 @@ type NonConformity = {
   description: string | null;
   severity: string | null;
   root_cause: string | null;
+  internal_investigation: string | null;
+  resolution: string | null;
+  conclusion: string | null;
   status: string;
   deadline: string | null;
   responsible_id: string | null;
@@ -121,7 +124,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   // Forms
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "", audit_id: "" });
-  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
+  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", internal_investigation: "", resolution: "", conclusion: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
   const [actionForm, setActionForm] = useState({
     title: "",
     non_conformity_id: "",
@@ -190,7 +193,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     try {
       const [{ data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: auditsData }, { data: incData }, { data: recData }, { data: linksData }, { data: capaNcData }] = await Promise.all([
         (supabase as any).from("capa_plans").select("id,audit_id,company_id,title,description,responsible_id").order("created_at", { ascending: false }),
-        (supabase as any).from("non_conformities").select("id,capa_plan_id,audit_id,company_id,title,description,severity,root_cause,status,deadline,responsible_id"),
+        (supabase as any).from("non_conformities").select("id,capa_plan_id,audit_id,company_id,title,description,severity,root_cause,internal_investigation,resolution,conclusion,status,deadline,responsible_id"),
         (supabase as any).from("actions").select("*"),
         (supabase as any).from("profiles").select("id,user_id,company_id,full_name,email"),
         (supabase as any).from("audits").select("id,title"),
@@ -400,6 +403,9 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         description: ncForm.description,
         severity: ncForm.severity,
         root_cause: ncForm.root_cause || null,
+        internal_investigation: ncForm.internal_investigation || null,
+        resolution: ncForm.resolution || null,
+        conclusion: ncForm.conclusion || null,
         status: "open",
         deadline: ncForm.deadline,
         responsible_id: ncForm.responsible_id,
@@ -415,7 +421,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     toast({ title: "No conformidad creada" });
     logAction({ action: "create", entity_type: "non_conformity", entity_id: data?.id, entity_title: ncForm.title });
     setNewNcOpen(false);
-    setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
+    setNcForm({ title: "", description: "", severity: "", root_cause: "", internal_investigation: "", resolution: "", conclusion: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
     await loadData();
   };
 
@@ -433,6 +439,9 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         description: ncForm.description,
         severity: ncForm.severity,
         root_cause: ncForm.root_cause || null,
+        internal_investigation: ncForm.internal_investigation || null,
+        resolution: ncForm.resolution || null,
+        conclusion: ncForm.conclusion || null,
         deadline: ncForm.deadline,
         responsible_id: ncForm.responsible_id,
         audit_id: ncForm.audit_id || null,
@@ -725,6 +734,9 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       description: nc.description ?? "",
       severity: nc.severity ?? "",
       root_cause: nc.root_cause ?? "",
+      internal_investigation: nc.internal_investigation ?? "",
+      resolution: nc.resolution ?? "",
+      conclusion: nc.conclusion ?? "",
       status: nc.status,
       deadline: nc.deadline ?? "",
       responsible_id: nc.responsible_id ?? "",
@@ -798,7 +810,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                 Todas las No Conformidades
               </CardTitle>
               {canEditContent && (
-                <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" }); setNewNcOpen(true); }}>
+                <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", internal_investigation: "", resolution: "", conclusion: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" }); setNewNcOpen(true); }}>
                   <Plus className="mr-1 h-4 w-4" />Nueva NC
                 </Button>
               )}
@@ -1324,6 +1336,9 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               </Select>
             </div>
             <div><Label>Causa raíz</Label><Textarea value={ncForm.root_cause} onChange={(e) => setNcForm((p) => ({ ...p, root_cause: e.target.value }))} /></div>
+            <div><Label>Investigación interna</Label><Textarea rows={4} value={ncForm.internal_investigation} onChange={(e) => setNcForm((p) => ({ ...p, internal_investigation: e.target.value }))} /></div>
+            <div><Label>Resolución</Label><Textarea rows={4} value={ncForm.resolution} onChange={(e) => setNcForm((p) => ({ ...p, resolution: e.target.value }))} /></div>
+            <div><Label>Conclusión</Label><Textarea rows={4} value={ncForm.conclusion} onChange={(e) => setNcForm((p) => ({ ...p, conclusion: e.target.value }))} /></div>
             <div>
               <Label>Auditoría de origen (opcional)</Label>
               <Select value={ncForm.audit_id || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, audit_id: v === "none" ? "" : v }))}>
@@ -1379,6 +1394,9 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               </Select>
             </div>
             <div><Label>Causa raíz</Label><Textarea value={ncForm.root_cause} onChange={(e) => setNcForm((p) => ({ ...p, root_cause: e.target.value }))} /></div>
+            <div><Label>Investigación interna</Label><Textarea rows={4} value={ncForm.internal_investigation} onChange={(e) => setNcForm((p) => ({ ...p, internal_investigation: e.target.value }))} /></div>
+            <div><Label>Resolución</Label><Textarea rows={4} value={ncForm.resolution} onChange={(e) => setNcForm((p) => ({ ...p, resolution: e.target.value }))} /></div>
+            <div><Label>Conclusión</Label><Textarea rows={4} value={ncForm.conclusion} onChange={(e) => setNcForm((p) => ({ ...p, conclusion: e.target.value }))} /></div>
             <div>
               <Label>Auditoría de origen (opcional)</Label>
               <Select value={ncForm.audit_id || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, audit_id: v === "none" ? "" : v }))}>
