@@ -1230,7 +1230,16 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">
             <div><Label>Título *</Label><Input value={ncForm.title} onChange={(e) => setNcForm((p) => ({ ...p, title: e.target.value }))} /></div>
             <div><Label>Descripción</Label><Textarea value={ncForm.description} onChange={(e) => setNcForm((p) => ({ ...p, description: e.target.value }))} /></div>
-            <div><Label>Severidad</Label><Input value={ncForm.severity} onChange={(e) => setNcForm((p) => ({ ...p, severity: e.target.value }))} /></div>
+            <div>
+              <Label>Severidad</Label>
+              <Select value={ncForm.severity || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, severity: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecciona severidad" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin severidad</SelectItem>
+                  {severityLevels.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div><Label>Causa raíz</Label><Textarea value={ncForm.root_cause} onChange={(e) => setNcForm((p) => ({ ...p, root_cause: e.target.value }))} /></div>
             <div>
               <Label>Auditoría de origen (opcional)</Label>
