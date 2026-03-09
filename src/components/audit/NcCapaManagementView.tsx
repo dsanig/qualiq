@@ -161,6 +161,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       setAudits((auditsData ?? []) as Audit[]);
       setIncidencias((incData ?? []) as IncidenciaRef[]);
       setCapaIncidenciaLinks((linksData ?? []) as CapaIncidenciaLink[]);
+      setCapaNcLinks((capaNcData ?? []) as CapaNcLink[]);
       if (!selectedCapaPlanId && capaData?.[0]?.id) setSelectedCapaPlanId(capaData[0].id);
     } finally {
       setIsLoading(false);
