@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2, Trash2, FileText, AlertTriangle, Users, Calendar, RefreshCw, Paperclip } from "lucide-react";
+import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2, Trash2, FileText, AlertTriangle, Users, Calendar, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,8 +14,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuditLog } from "@/hooks/useAuditLog";
-import { QmsAttachmentsPanel } from "@/components/audit/QmsAttachmentsPanel";
-import { QMS_ATTACHMENTS_MAX_FILES, QMS_ATTACHMENTS_MAX_FILE_SIZE_BYTES } from "@/constants/attachments";
 
 type CapaPlan = {
   id: string;
@@ -139,8 +137,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [currentCapaPage, setCurrentCapaPage] = useState(1);
-  const [newNcFiles, setNewNcFiles] = useState<File[]>([]);
-  const [newActionFiles, setNewActionFiles] = useState<File[]>([]);
 
   const { toast } = useToast();
 
@@ -384,45 +380,11 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     return profileData?.company_id ?? null;
   };
 
-  const uploadPendingQmsAttachments = async (entityType: "non_conformity" | "action", entityId: string, files: File[]) => {
-    if (!files.length) return;
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) return;
-    const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", userId).maybeSingle();
-    const companyId = profileData?.company_id;
-    if (!companyId) return;
-
-    for (const file of files) {
-      if (file.size > QMS_ATTACHMENTS_MAX_FILE_SIZE_BYTES) continue;
-      const encodedName = encodeURIComponent(file.name || "archivo").slice(0, 180);
-      const path = `qms/${companyId}/${entityType}/${entityId}/${crypto.randomUUID()}_${encodedName}`;
-      const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
-      if (uploadError) continue;
-      const { error: registerError } = await (supabase as any).rpc("register_qms_attachment", {
-        p_entity_type: entityType,
-        p_entity_id: entityId,
-        p_bucket_id: "documents",
-        p_object_path: path,
-        p_file_name: file.name,
-      });
-      if (registerError) {
-        await supabase.storage.from("documents").remove([path]);
-      }
-    }
-  };
-
   const createNc = async () => {
     if (!ncForm.title || !ncForm.description || !ncForm.severity || !ncForm.responsible_id || !ncForm.deadline) {
       toast({ title: "Error", description: "Título, descripción, severidad, responsable y fecha límite son obligatorios.", variant: "destructive" });
       return;
     }
-
-    if (newNcFiles.length > QMS_ATTACHMENTS_MAX_FILES) {
-      toast({ title: "Error", description: `Máximo ${QMS_ATTACHMENTS_MAX_FILES} adjuntos por registro.`, variant: "destructive" });
-      return;
-    }
-
 
     const companyId = await getCurrentCompanyId();
 
@@ -448,13 +410,10 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
-    await uploadPendingQmsAttachments("non_conformity", data.id, newNcFiles);
-
     toast({ title: "No conformidad creada" });
     logAction({ action: "create", entity_type: "non_conformity", entity_id: data?.id, entity_title: ncForm.title });
     setNewNcOpen(false);
     setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
-    setNewNcFiles([]);
     await loadData();
   };
 
@@ -531,6 +490,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const deleteAction = async () => {
     if (!deletingActionId) return;
 
+    // Remove related attachments
+    await (supabase as any).from("action_attachments").delete().eq("action_id", deletingActionId);
 
     const { error } = await (supabase as any).from("actions").delete().eq("id", deletingActionId);
 
@@ -607,11 +568,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
-    if (newActionFiles.length > QMS_ATTACHMENTS_MAX_FILES) {
-      toast({ title: "Error", description: `Máximo ${QMS_ATTACHMENTS_MAX_FILES} adjuntos por registro.`, variant: "destructive" });
-      return;
-    }
-
     const companyId = await getCurrentCompanyId();
 
     const { data, error } = await (supabase as any)
@@ -635,13 +591,10 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
-    await uploadPendingQmsAttachments("action", data.id, newActionFiles);
-
     toast({ title: "Acción creada" });
     logAction({ action: "create", entity_type: "action", entity_id: data?.id, entity_title: actionForm.description.slice(0, 50) });
     setNewActionOpen(false);
     setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", start_date: "", due_date: "", status: "open" });
-    setNewActionFiles([]);
     await loadData();
   };
 
@@ -1390,12 +1343,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             </div>
             <div><Label>Fecha límite *</Label><Input type="date" value={ncForm.deadline} onChange={(e) => setNcForm((p) => ({ ...p, deadline: e.target.value }))} /></div>
           </div>
-          <div className="space-y-2">
-            <Label>Adjuntos (opcional)</Label>
-            <Button type="button" variant="outline" size="sm" onClick={() => { const input = document.createElement("input"); input.type = "file"; input.multiple = true; input.onchange = () => setNewNcFiles((prev) => [...prev, ...Array.from(input.files ?? [])].slice(0, QMS_ATTACHMENTS_MAX_FILES)); input.click(); }}><Paperclip className="h-4 w-4 mr-1" />Adjuntar archivos</Button>
-            <p className="text-xs text-muted-foreground">Máx. {QMS_ATTACHMENTS_MAX_FILES} archivos / {(QMS_ATTACHMENTS_MAX_FILE_SIZE_BYTES / (1024 * 1024)).toFixed(0)}MB c/u.</p>
-            {newNcFiles.length > 0 && <div className="border rounded p-2 space-y-1">{newNcFiles.map((f, idx) => <div key={`${f.name}-${idx}`} className="text-xs flex justify-between"><span className="truncate">{f.name}</span><button type="button" className="text-destructive" onClick={() => setNewNcFiles((prev) => prev.filter((_, i) => i !== idx))}>Quitar</button></div>)}</div>}
-          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewNcOpen(false)}>Cancelar</Button>
             <Button onClick={createNc}>Crear</Button>
@@ -1451,7 +1398,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             </div>
             <div><Label>Fecha límite *</Label><Input type="date" value={ncForm.deadline} onChange={(e) => setNcForm((p) => ({ ...p, deadline: e.target.value }))} /></div>
           </div>
-          {editingNc && <QmsAttachmentsPanel entityType="non_conformity" entityId={editingNc.id} editable={canEditContent} />}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditNcOpen(false)}>Cancelar</Button>
             <Button onClick={updateNc}>Guardar</Button>
@@ -1503,12 +1449,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             </div>
             <div><Label>Fecha de Inicio</Label><Input type="date" value={actionForm.start_date} onChange={(e) => setActionForm((p) => ({ ...p, start_date: e.target.value }))} /></div>
             <div><Label>Fecha Límite *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
-          </div>
-          <div className="space-y-2">
-            <Label>Adjuntos (opcional)</Label>
-            <Button type="button" variant="outline" size="sm" onClick={() => { const input = document.createElement("input"); input.type = "file"; input.multiple = true; input.onchange = () => setNewActionFiles((prev) => [...prev, ...Array.from(input.files ?? [])].slice(0, QMS_ATTACHMENTS_MAX_FILES)); input.click(); }}><Paperclip className="h-4 w-4 mr-1" />Adjuntar archivos</Button>
-            <p className="text-xs text-muted-foreground">Máx. {QMS_ATTACHMENTS_MAX_FILES} archivos / {(QMS_ATTACHMENTS_MAX_FILE_SIZE_BYTES / (1024 * 1024)).toFixed(0)}MB c/u.</p>
-            {newActionFiles.length > 0 && <div className="border rounded p-2 space-y-1">{newActionFiles.map((f, idx) => <div key={`${f.name}-${idx}`} className="text-xs flex justify-between"><span className="truncate">{f.name}</span><button type="button" className="text-destructive" onClick={() => setNewActionFiles((prev) => prev.filter((_, i) => i !== idx))}>Quitar</button></div>)}</div>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewActionOpen(false)}>Cancelar</Button>
@@ -1562,7 +1502,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             <div><Label>Fecha de Inicio</Label><Input type="date" value={actionForm.start_date} onChange={(e) => setActionForm((p) => ({ ...p, start_date: e.target.value }))} /></div>
             <div><Label>Fecha Límite *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
           </div>
-          {editingAction && <QmsAttachmentsPanel entityType="action" entityId={editingAction.id} editable={canEditContent} />}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditActionOpen(false)}>Cancelar</Button>
             <Button onClick={updateAction}>Guardar</Button>
