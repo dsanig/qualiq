@@ -470,13 +470,25 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   };
 
   // --- Audit form fields ---
-  const renderAuditFields = () => (
+  type RenderAuditFieldsOptions = { readOnly?: boolean };
+
+  const renderAuditFields = ({ readOnly = false }: RenderAuditFieldsOptions = {}) => (
     <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-      <div><Label>Título *</Label><Input value={auditForm.title} onChange={(e) => setAuditForm((p) => ({ ...p, title: e.target.value }))} /></div>
-      <div><Label>Fecha</Label><Input type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} /></div>
+      <div>
+        <Label>Título *</Label>
+        <Input disabled={readOnly} value={auditForm.title} onChange={(e) => setAuditForm((p) => ({ ...p, title: e.target.value }))} />
+      </div>
+      <div>
+        <Label>Fecha</Label>
+        <Input disabled={readOnly} type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} />
+      </div>
       <div>
         <Label>Tipo de auditoría</Label>
-        <Select value={auditForm.audit_type} onValueChange={(v: "interna" | "externa") => setAuditForm((p) => ({ ...p, audit_type: v, external_entity_id: v === "interna" ? "" : p.external_entity_id }))}>
+        <Select
+          disabled={readOnly}
+          value={auditForm.audit_type}
+          onValueChange={(v: "interna" | "externa") => setAuditForm((p) => ({ ...p, audit_type: v, external_entity_id: v === "interna" ? "" : p.external_entity_id }))}
+        >
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="interna">Interna</SelectItem>
@@ -487,23 +499,24 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       {auditForm.audit_type === "externa" && (
         <div>
           <Label>Identificación del cliente / proveedor *</Label>
-          <Input 
-            value={auditForm.external_entity_id} 
-            onChange={(e) => setAuditForm((p) => ({ ...p, external_entity_id: e.target.value }))} 
+          <Input
+            disabled={readOnly}
+            value={auditForm.external_entity_id}
+            onChange={(e) => setAuditForm((p) => ({ ...p, external_entity_id: e.target.value }))}
             placeholder="Nombre o código del cliente/proveedor externo"
           />
         </div>
       )}
       <div>
-        <Label>Auditor</Label>
-        <Select value={auditForm.auditor_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, auditor_id: v }))}>
+        <Label>Auditor *</Label>
+        <Select disabled={readOnly} value={auditForm.auditor_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, auditor_id: v }))}>
           <SelectTrigger><SelectValue placeholder="Selecciona auditor" /></SelectTrigger>
           <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div>
-        <Label>Responsable de la auditoría</Label>
-        <Select value={auditForm.responsible_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, responsible_id: v }))}>
+        <Label>Responsable de la auditoría *</Label>
+        <Select disabled={readOnly} value={auditForm.responsible_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, responsible_id: v }))}>
           <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
           <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
         </Select>
@@ -514,20 +527,32 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
           {auditForm.participant_ids.map((uid) => (
             <span key={uid} className="inline-flex items-center gap-1 text-xs bg-secondary text-secondary-foreground rounded-full px-2 py-1">
               {getUserName(uid) ?? uid}
-              <button type="button" onClick={() => setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== uid) }))} className="hover:text-destructive">
-                <X className="h-3 w-3" />
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== uid) }))}
+                  className="hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </span>
           ))}
         </div>
-        <Select value="" onValueChange={(v) => { if (v && !auditForm.participant_ids.includes(v)) setAuditForm((p) => ({ ...p, participant_ids: [...p.participant_ids, v] })); }}>
+        <Select
+          disabled={readOnly}
+          value=""
+          onValueChange={(v) => {
+            if (v && !auditForm.participant_ids.includes(v)) setAuditForm((p) => ({ ...p, participant_ids: [...p.participant_ids, v] }));
+          }}
+        >
           <SelectTrigger><SelectValue placeholder="Añadir empleado" /></SelectTrigger>
           <SelectContent>{users.filter((u) => !auditForm.participant_ids.includes(u.id)).map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div>
         <Label>Estado</Label>
-        <Select value={auditForm.status} onValueChange={(v) => setAuditForm((p) => ({ ...p, status: v }))}>
+        <Select disabled={readOnly} value={auditForm.status} onValueChange={(v) => setAuditForm((p) => ({ ...p, status: v }))}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="open">Abierta</SelectItem>
@@ -536,13 +561,25 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
           </SelectContent>
         </Select>
       </div>
-      <div><Label>Descripción</Label><Textarea value={auditForm.description} onChange={(e) => setAuditForm((p) => ({ ...p, description: e.target.value }))} rows={3} /></div>
-      <div><Label>Observaciones</Label><Textarea value={auditForm.observations} onChange={(e) => setAuditForm((p) => ({ ...p, observations: e.target.value }))} rows={3} placeholder="Observaciones generales de la auditoría" /></div>
-      <div><Label>Hallazgos</Label><Textarea value={auditForm.findings} onChange={(e) => setAuditForm((p) => ({ ...p, findings: e.target.value }))} rows={3} placeholder="Hallazgos detectados durante la auditoría" /></div>
-      <div><Label>Conclusiones</Label><Textarea value={auditForm.conclusions} onChange={(e) => setAuditForm((p) => ({ ...p, conclusions: e.target.value }))} rows={3} placeholder="Conclusiones finales de la auditoría" /></div>
+      <div>
+        <Label>Descripción</Label>
+        <Textarea disabled={readOnly} value={auditForm.description} onChange={(e) => setAuditForm((p) => ({ ...p, description: e.target.value }))} rows={3} />
+      </div>
+      <div>
+        <Label>Observaciones</Label>
+        <Textarea disabled={readOnly} value={auditForm.observations} onChange={(e) => setAuditForm((p) => ({ ...p, observations: e.target.value }))} rows={3} placeholder="Observaciones generales de la auditoría" />
+      </div>
+      <div>
+        <Label>Hallazgos</Label>
+        <Textarea disabled={readOnly} value={auditForm.findings} onChange={(e) => setAuditForm((p) => ({ ...p, findings: e.target.value }))} rows={3} placeholder="Hallazgos detectados durante la auditoría" />
+      </div>
+      <div>
+        <Label>Conclusiones</Label>
+        <Textarea disabled={readOnly} value={auditForm.conclusions} onChange={(e) => setAuditForm((p) => ({ ...p, conclusions: e.target.value }))} rows={3} placeholder="Conclusiones finales de la auditoría" />
+      </div>
       <div>
         <Label>Documentos adjuntos</Label>
-        <Input type="file" multiple onChange={(e) => setAuditFiles(e.target.files)} />
+        <Input disabled={readOnly} type="file" multiple onChange={(e) => setAuditFiles(e.target.files)} />
         {auditFiles && Array.from(auditFiles).map((f, i) => (
           <p key={i} className="mt-1 text-xs text-muted-foreground flex items-center gap-1"><Paperclip className="h-3 w-3" />{f.name}</p>
         ))}
