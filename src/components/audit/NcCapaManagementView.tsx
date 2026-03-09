@@ -41,6 +41,7 @@ type ActionItem = {
   non_conformity_id: string | null;
   capa_plan_id: string | null;
   company_id: string | null;
+  title?: string | null;
   action_type: "corrective" | "preventive" | "immediate";
   description: string;
   responsible_id: string | null;
@@ -175,7 +176,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const allActionsFiltered = useMemo(() => {
     if (!normalizedQuery) return actions;
     return actions.filter((action) => {
-      const searchFields = [action.description, getUserName(action.responsible_id)];
+      const searchFields = [action.title, action.description, getUserName(action.responsible_id)];
       return searchFields.some((field) => normalizeText(field).includes(normalizedQuery));
     });
   }, [actions, normalizedQuery]);
@@ -189,7 +190,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       const [{ data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: auditsData }, { data: incData }, { data: recData }, { data: linksData }, { data: capaNcData }] = await Promise.all([
         (supabase as any).from("capa_plans").select("id,audit_id,company_id,title,description,responsible_id").order("created_at", { ascending: false }),
         (supabase as any).from("non_conformities").select("id,capa_plan_id,audit_id,company_id,title,description,severity,root_cause,status,deadline,responsible_id"),
-        (supabase as any).from("actions").select("id,capa_plan_id,company_id,non_conformity_id,action_type,description,responsible_id,start_date,due_date,status"),
+        (supabase as any).from("actions").select("*"),
         (supabase as any).from("profiles").select("id,user_id,company_id,full_name,email"),
         (supabase as any).from("audits").select("id,title"),
         (supabase as any).from("incidencias").select("id,title,status"),
@@ -921,7 +922,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Descripción</TableHead>
+                        <TableHead>Título</TableHead>
                         <TableHead>Tipo</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Responsable</TableHead>
@@ -938,7 +939,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                         return (
                           <TableRow key={action.id}>
                             <TableCell>
-                              <p className="font-medium max-w-xs truncate">{action.description}</p>
+                              <p className="font-medium max-w-xs truncate">{action.title || action.description}</p>
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">{actionTypeLabel(action.action_type)}</Badge>
