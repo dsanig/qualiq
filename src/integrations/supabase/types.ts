@@ -333,7 +333,7 @@ export type Database = {
         Row: {
           audit_date: string | null
           audit_type: string
-          auditor_id: string | null
+          auditor_id: string
           company_id: string | null
           conclusions: string | null
           created_at: string
@@ -343,14 +343,14 @@ export type Database = {
           findings: string | null
           id: string
           observations: string | null
-          responsible_id: string | null
+          responsible_id: string
           status: string
           title: string
         }
         Insert: {
           audit_date?: string | null
           audit_type?: string
-          auditor_id?: string | null
+          auditor_id: string
           company_id?: string | null
           conclusions?: string | null
           created_at?: string
@@ -360,14 +360,14 @@ export type Database = {
           findings?: string | null
           id?: string
           observations?: string | null
-          responsible_id?: string | null
+          responsible_id: string
           status?: string
           title: string
         }
         Update: {
           audit_date?: string | null
           audit_type?: string
-          auditor_id?: string | null
+          auditor_id?: string
           company_id?: string | null
           conclusions?: string | null
           created_at?: string
@@ -377,7 +377,7 @@ export type Database = {
           findings?: string | null
           id?: string
           observations?: string | null
-          responsible_id?: string | null
+          responsible_id?: string
           status?: string
           title?: string
         }

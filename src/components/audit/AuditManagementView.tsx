@@ -87,10 +87,15 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [editingAction, setEditingAction] = useState<ActionItem | null>(null);
   const [editingCapa, setEditingCapa] = useState<CapaPlan | null>(null);
   const [editingAudit, setEditingAudit] = useState<Audit | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null)).catch(() => setCurrentUserId(null));
+  }, []);
 
   const normalizeText = (value: string | null | undefined) =>
     (value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -141,8 +146,24 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   useEffect(() => { void loadData(); }, []);
 
   const selectedAudit = audits.find((a) => a.id === selectedAuditId) ?? null;
-  const selectedAuditAttachments = useMemo(() => auditAttachments.filter((a) => a.audit_id === selectedAuditId), [auditAttachments, selectedAuditId]);
-  const selectedAuditParticipants = useMemo(() => auditParticipants.filter((p) => p.audit_id === selectedAuditId), [auditParticipants, selectedAuditId]);
+  const selectedAuditAttachments = useMemo(
+    () => auditAttachments.filter((a) => a.audit_id === selectedAuditId),
+    [auditAttachments, selectedAuditId],
+  );
+  const selectedAuditParticipants = useMemo(
+    () => auditParticipants.filter((p) => p.audit_id === selectedAuditId),
+    [auditParticipants, selectedAuditId],
+  );
+
+  const canEditSelectedAudit = useMemo(() => {
+    if (!selectedAudit || !currentUserId) return false;
+    return selectedAudit.auditor_id === currentUserId || selectedAudit.responsible_id === currentUserId;
+  }, [selectedAudit, currentUserId]);
+
+  const canEditEditingAudit = useMemo(() => {
+    if (!editingAudit || !currentUserId) return false;
+    return editingAudit.auditor_id === currentUserId || editingAudit.responsible_id === currentUserId;
+  }, [editingAudit, currentUserId]);
 
   const getUserName = (id: string | null) => {
     if (!id) return null;
@@ -193,21 +214,78 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   // --- CRUD ---
   const createAudit = async () => {
-    const user = (await supabase.auth.getUser()).data.user;
-    const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", user?.id ?? "").maybeSingle();
-    const { data, error } = await (supabase as any).from("audits").insert({
-      title: auditForm.title, description: auditForm.description || null,
-      audit_date: auditForm.audit_date || null, auditor_id: auditForm.auditor_id || null,
-      responsible_id: auditForm.responsible_id || null,
-      observations: auditForm.observations || null, findings: auditForm.findings || null,
-      conclusions: auditForm.conclusions || null, status: auditForm.status,
-      audit_type: auditForm.audit_type,
-      external_entity_id: auditForm.audit_type === "externa" ? (auditForm.external_entity_id || null) : null,
-      company_id: profileData?.company_id, created_by: user?.id,
-    }).select("id").single();
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData.user;
+
+    if (userError || !user) {
+      toast({ title: "Error", description: "Debes iniciar sesión para crear una auditoría.", variant: "destructive" });
+      return;
+    }
+
+    if (!auditForm.auditor_id || !auditForm.responsible_id) {
+      toast({ title: "Error", description: "Auditor y responsable son obligatorios.", variant: "destructive" });
+      return;
+    }
+
+    if (auditForm.audit_type === "externa" && !auditForm.external_entity_id.trim()) {
+      toast({ title: "Error", description: "La identificación del cliente/proveedor es obligatoria.", variant: "destructive" });
+      return;
+    }
+
+    const callerIsAssignee = user.id === auditForm.auditor_id || user.id === auditForm.responsible_id;
+
+    if ((auditFiles?.length ?? 0) > 0 && !callerIsAssignee) {
+      toast({
+        title: "Sin permisos",
+        description: "Solo el auditor o el responsable pueden adjuntar documentos a la auditoría.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (auditForm.participant_ids.length > 0 && !callerIsAssignee) {
+      toast({
+        title: "Sin permisos",
+        description: "Solo el auditor o el responsable pueden gestionar los participantes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("company_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const { data, error } = await (supabase as any)
+      .from("audits")
+      .insert({
+        title: auditForm.title,
+        description: auditForm.description || null,
+        audit_date: auditForm.audit_date || null,
+        auditor_id: auditForm.auditor_id,
+        responsible_id: auditForm.responsible_id,
+        observations: auditForm.observations || null,
+        findings: auditForm.findings || null,
+        conclusions: auditForm.conclusions || null,
+        status: auditForm.status,
+        audit_type: auditForm.audit_type,
+        external_entity_id: auditForm.audit_type === "externa" ? auditForm.external_entity_id.trim() : null,
+        company_id: profileData?.company_id,
+        created_by: user.id,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
     if (auditFiles) await uploadAuditAttachments(data.id, auditFiles);
     await syncParticipants(data.id, auditForm.participant_ids);
+
     toast({ title: "Auditoría creada" });
     logAction({ action: "create", entity_type: "audit", entity_id: data?.id, entity_title: auditForm.title, details: { status: auditForm.status } });
     setNewAuditOpen(false);
@@ -217,18 +295,77 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const updateAudit = async () => {
     if (!editingAudit) return;
-    const { error } = await (supabase as any).from("audits").update({
-      title: auditForm.title, description: auditForm.description || null,
-      audit_date: auditForm.audit_date || null, auditor_id: auditForm.auditor_id || null,
-      responsible_id: auditForm.responsible_id || null,
-      observations: auditForm.observations || null, findings: auditForm.findings || null,
-      conclusions: auditForm.conclusions || null, status: auditForm.status,
-      audit_type: auditForm.audit_type,
-      external_entity_id: auditForm.audit_type === "externa" ? (auditForm.external_entity_id || null) : null,
-    }).eq("id", editingAudit.id);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData.user;
+
+    if (userError || !user) {
+      toast({ title: "Error", description: "Debes iniciar sesión para actualizar una auditoría.", variant: "destructive" });
+      return;
+    }
+
+    if (!auditForm.auditor_id || !auditForm.responsible_id) {
+      toast({ title: "Error", description: "Auditor y responsable son obligatorios.", variant: "destructive" });
+      return;
+    }
+
+    if (auditForm.audit_type === "externa" && !auditForm.external_entity_id.trim()) {
+      toast({ title: "Error", description: "La identificación del cliente/proveedor es obligatoria.", variant: "destructive" });
+      return;
+    }
+
+    const callerIsAssigneeAfter = user.id === auditForm.auditor_id || user.id === auditForm.responsible_id;
+
+    const existingParticipantIds = auditParticipants
+      .filter((p) => p.audit_id === editingAudit.id)
+      .map((p) => p.user_id)
+      .sort();
+    const nextParticipantIds = [...auditForm.participant_ids].sort();
+    const participantsChanged = existingParticipantIds.join(",") !== nextParticipantIds.join(",");
+
+    if ((auditFiles?.length ?? 0) > 0 && !callerIsAssigneeAfter) {
+      toast({
+        title: "Sin permisos",
+        description: "Solo el auditor o el responsable pueden adjuntar documentos a la auditoría.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (participantsChanged && !callerIsAssigneeAfter) {
+      toast({
+        title: "Sin permisos",
+        description: "Solo el auditor o el responsable pueden gestionar los participantes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await (supabase as any)
+      .from("audits")
+      .update({
+        title: auditForm.title,
+        description: auditForm.description || null,
+        audit_date: auditForm.audit_date || null,
+        auditor_id: auditForm.auditor_id,
+        responsible_id: auditForm.responsible_id,
+        observations: auditForm.observations || null,
+        findings: auditForm.findings || null,
+        conclusions: auditForm.conclusions || null,
+        status: auditForm.status,
+        audit_type: auditForm.audit_type,
+        external_entity_id: auditForm.audit_type === "externa" ? auditForm.external_entity_id.trim() : null,
+      })
+      .eq("id", editingAudit.id);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
     if (auditFiles) await uploadAuditAttachments(editingAudit.id, auditFiles);
-    await syncParticipants(editingAudit.id, auditForm.participant_ids);
+    if (participantsChanged) await syncParticipants(editingAudit.id, auditForm.participant_ids);
+
     toast({ title: "Auditoría actualizada" });
     logAction({ action: "update", entity_type: "audit", entity_id: editingAudit.id, entity_title: auditForm.title, details: { status: auditForm.status } });
     setEditAuditOpen(false);
@@ -295,6 +432,15 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   };
 
   const openEditAudit = (audit: Audit) => {
+    if (!currentUserId || (audit.auditor_id !== currentUserId && audit.responsible_id !== currentUserId)) {
+      toast({
+        title: "Sin permisos",
+        description: "Solo el auditor o el responsable asignado pueden editar esta auditoría.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setEditingAudit(audit);
     const participantUserIds = auditParticipants.filter((p) => p.audit_id === audit.id).map((p) => p.user_id);
     setAuditForm({
@@ -470,13 +616,25 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   };
 
   // --- Audit form fields ---
-  const renderAuditFields = () => (
+  type RenderAuditFieldsOptions = { readOnly?: boolean };
+
+  const renderAuditFields = ({ readOnly = false }: RenderAuditFieldsOptions = {}) => (
     <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-      <div><Label>Título *</Label><Input value={auditForm.title} onChange={(e) => setAuditForm((p) => ({ ...p, title: e.target.value }))} /></div>
-      <div><Label>Fecha</Label><Input type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} /></div>
+      <div>
+        <Label>Título *</Label>
+        <Input disabled={readOnly} value={auditForm.title} onChange={(e) => setAuditForm((p) => ({ ...p, title: e.target.value }))} />
+      </div>
+      <div>
+        <Label>Fecha</Label>
+        <Input disabled={readOnly} type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} />
+      </div>
       <div>
         <Label>Tipo de auditoría</Label>
-        <Select value={auditForm.audit_type} onValueChange={(v: "interna" | "externa") => setAuditForm((p) => ({ ...p, audit_type: v, external_entity_id: v === "interna" ? "" : p.external_entity_id }))}>
+        <Select
+          disabled={readOnly}
+          value={auditForm.audit_type}
+          onValueChange={(v: "interna" | "externa") => setAuditForm((p) => ({ ...p, audit_type: v, external_entity_id: v === "interna" ? "" : p.external_entity_id }))}
+        >
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="interna">Interna</SelectItem>
@@ -487,23 +645,24 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       {auditForm.audit_type === "externa" && (
         <div>
           <Label>Identificación del cliente / proveedor *</Label>
-          <Input 
-            value={auditForm.external_entity_id} 
-            onChange={(e) => setAuditForm((p) => ({ ...p, external_entity_id: e.target.value }))} 
+          <Input
+            disabled={readOnly}
+            value={auditForm.external_entity_id}
+            onChange={(e) => setAuditForm((p) => ({ ...p, external_entity_id: e.target.value }))}
             placeholder="Nombre o código del cliente/proveedor externo"
           />
         </div>
       )}
       <div>
-        <Label>Auditor</Label>
-        <Select value={auditForm.auditor_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, auditor_id: v }))}>
+        <Label>Auditor *</Label>
+        <Select disabled={readOnly} value={auditForm.auditor_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, auditor_id: v }))}>
           <SelectTrigger><SelectValue placeholder="Selecciona auditor" /></SelectTrigger>
           <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div>
-        <Label>Responsable de la auditoría</Label>
-        <Select value={auditForm.responsible_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, responsible_id: v }))}>
+        <Label>Responsable de la auditoría *</Label>
+        <Select disabled={readOnly} value={auditForm.responsible_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, responsible_id: v }))}>
           <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
           <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
         </Select>
@@ -514,20 +673,32 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
           {auditForm.participant_ids.map((uid) => (
             <span key={uid} className="inline-flex items-center gap-1 text-xs bg-secondary text-secondary-foreground rounded-full px-2 py-1">
               {getUserName(uid) ?? uid}
-              <button type="button" onClick={() => setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== uid) }))} className="hover:text-destructive">
-                <X className="h-3 w-3" />
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== uid) }))}
+                  className="hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </span>
           ))}
         </div>
-        <Select value="" onValueChange={(v) => { if (v && !auditForm.participant_ids.includes(v)) setAuditForm((p) => ({ ...p, participant_ids: [...p.participant_ids, v] })); }}>
+        <Select
+          disabled={readOnly}
+          value=""
+          onValueChange={(v) => {
+            if (v && !auditForm.participant_ids.includes(v)) setAuditForm((p) => ({ ...p, participant_ids: [...p.participant_ids, v] }));
+          }}
+        >
           <SelectTrigger><SelectValue placeholder="Añadir empleado" /></SelectTrigger>
           <SelectContent>{users.filter((u) => !auditForm.participant_ids.includes(u.id)).map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div>
         <Label>Estado</Label>
-        <Select value={auditForm.status} onValueChange={(v) => setAuditForm((p) => ({ ...p, status: v }))}>
+        <Select disabled={readOnly} value={auditForm.status} onValueChange={(v) => setAuditForm((p) => ({ ...p, status: v }))}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="open">Abierta</SelectItem>
@@ -536,13 +707,25 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
           </SelectContent>
         </Select>
       </div>
-      <div><Label>Descripción</Label><Textarea value={auditForm.description} onChange={(e) => setAuditForm((p) => ({ ...p, description: e.target.value }))} rows={3} /></div>
-      <div><Label>Observaciones</Label><Textarea value={auditForm.observations} onChange={(e) => setAuditForm((p) => ({ ...p, observations: e.target.value }))} rows={3} placeholder="Observaciones generales de la auditoría" /></div>
-      <div><Label>Hallazgos</Label><Textarea value={auditForm.findings} onChange={(e) => setAuditForm((p) => ({ ...p, findings: e.target.value }))} rows={3} placeholder="Hallazgos detectados durante la auditoría" /></div>
-      <div><Label>Conclusiones</Label><Textarea value={auditForm.conclusions} onChange={(e) => setAuditForm((p) => ({ ...p, conclusions: e.target.value }))} rows={3} placeholder="Conclusiones finales de la auditoría" /></div>
+      <div>
+        <Label>Descripción</Label>
+        <Textarea disabled={readOnly} value={auditForm.description} onChange={(e) => setAuditForm((p) => ({ ...p, description: e.target.value }))} rows={3} />
+      </div>
+      <div>
+        <Label>Observaciones</Label>
+        <Textarea disabled={readOnly} value={auditForm.observations} onChange={(e) => setAuditForm((p) => ({ ...p, observations: e.target.value }))} rows={3} placeholder="Observaciones generales de la auditoría" />
+      </div>
+      <div>
+        <Label>Hallazgos</Label>
+        <Textarea disabled={readOnly} value={auditForm.findings} onChange={(e) => setAuditForm((p) => ({ ...p, findings: e.target.value }))} rows={3} placeholder="Hallazgos detectados durante la auditoría" />
+      </div>
+      <div>
+        <Label>Conclusiones</Label>
+        <Textarea disabled={readOnly} value={auditForm.conclusions} onChange={(e) => setAuditForm((p) => ({ ...p, conclusions: e.target.value }))} rows={3} placeholder="Conclusiones finales de la auditoría" />
+      </div>
       <div>
         <Label>Documentos adjuntos</Label>
-        <Input type="file" multiple onChange={(e) => setAuditFiles(e.target.files)} />
+        <Input disabled={readOnly} type="file" multiple onChange={(e) => setAuditFiles(e.target.files)} />
         {auditFiles && Array.from(auditFiles).map((f, i) => (
           <p key={i} className="mt-1 text-xs text-muted-foreground flex items-center gap-1"><Paperclip className="h-3 w-3" />{f.name}</p>
         ))}
@@ -692,33 +875,39 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Información de auditoría</CardTitle>
-            {selectedAudit && canEditContent && (
+            {selectedAudit && (
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => openEditAudit(selectedAudit)}>
-                  <Pencil className="mr-1 h-4 w-4" />Editar
-                </Button>
+                {canEditSelectedAudit && (
+                  <Button size="sm" variant="outline" onClick={() => openEditAudit(selectedAudit)}>
+                    <Pencil className="mr-1 h-4 w-4" />Editar
+                  </Button>
+                )}
                 {canManageCompany && (
-                  <Button size="sm" variant="destructive" onClick={async () => {
-                    setDeletingAuditId(selectedAudit.id);
-                    // Check linked records
-                    const links: string[] = [];
-                    const auditCapas = capaPlans.filter(c => c.audit_id === selectedAudit.id);
-                    const auditNcs = nonConformities.filter(nc => auditCapas.some(c => c.id === nc.capa_plan_id));
-                    const auditActions = actions.filter(a => auditNcs.some(nc => nc.id === a.non_conformity_id));
-                    const auditAtts = auditAttachments.filter(a => a.audit_id === selectedAudit.id);
-                    const auditParts = auditParticipants.filter(p => p.audit_id === selectedAudit.id);
-                    const linkedIncidencias = capaIncidenciaLinks.filter(l => auditCapas.some(c => c.id === l.capa_plan_id));
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={async () => {
+                      setDeletingAuditId(selectedAudit.id);
+                      // Check linked records
+                      const links: string[] = [];
+                      const auditCapas = capaPlans.filter(c => c.audit_id === selectedAudit.id);
+                      const auditNcs = nonConformities.filter(nc => auditCapas.some(c => c.id === nc.capa_plan_id));
+                      const auditActions = actions.filter(a => auditNcs.some(nc => nc.id === a.non_conformity_id));
+                      const auditAtts = auditAttachments.filter(a => a.audit_id === selectedAudit.id);
+                      const auditParts = auditParticipants.filter(p => p.audit_id === selectedAudit.id);
+                      const linkedIncidencias = capaIncidenciaLinks.filter(l => auditCapas.some(c => c.id === l.capa_plan_id));
 
-                    if (auditCapas.length > 0) links.push(`${auditCapas.length} plan(es) CAPA`);
-                    if (auditNcs.length > 0) links.push(`${auditNcs.length} no conformidad(es)`);
-                    if (auditActions.length > 0) links.push(`${auditActions.length} acción(es)`);
-                    if (auditAtts.length > 0) links.push(`${auditAtts.length} adjunto(s)`);
-                    if (auditParts.length > 0) links.push(`${auditParts.length} participante(s)`);
-                    if (linkedIncidencias.length > 0) links.push(`${linkedIncidencias.length} incidencia(s) vinculada(s)`);
+                      if (auditCapas.length > 0) links.push(`${auditCapas.length} plan(es) CAPA`);
+                      if (auditNcs.length > 0) links.push(`${auditNcs.length} no conformidad(es)`);
+                      if (auditActions.length > 0) links.push(`${auditActions.length} acción(es)`);
+                      if (auditAtts.length > 0) links.push(`${auditAtts.length} adjunto(s)`);
+                      if (auditParts.length > 0) links.push(`${auditParts.length} participante(s)`);
+                      if (linkedIncidencias.length > 0) links.push(`${linkedIncidencias.length} incidencia(s) vinculada(s)`);
 
-                    setAuditLinkedInfo(links);
-                    setDeleteAuditConfirmOpen(true);
-                  }}>
+                      setAuditLinkedInfo(links);
+                      setDeleteAuditConfirmOpen(true);
+                    }}
+                  >
                     <Trash2 className="mr-1 h-4 w-4" />Eliminar
                   </Button>
                 )}
@@ -773,7 +962,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                           <button onClick={() => downloadAttachment(att)} className="flex items-center gap-2 text-sm hover:underline text-primary">
                             <FileText className="h-4 w-4" />{att.file_name ?? att.object_path}
                           </button>
-                          {canEditContent && (
+                          {canEditSelectedAudit && (
                             <button onClick={() => deleteAuditAttachment(att)} className="text-destructive hover:text-destructive/80">
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -927,8 +1116,20 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       <Dialog open={newAuditOpen} onOpenChange={setNewAuditOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Nueva auditoría</DialogTitle></DialogHeader>
-          {renderAuditFields()}
-          <DialogFooter><Button onClick={createAudit} disabled={!auditForm.title}>Crear</Button></DialogFooter>
+          {renderAuditFields({ readOnly: false })}
+          <DialogFooter>
+            <Button
+              onClick={createAudit}
+              disabled={
+                !auditForm.title.trim() ||
+                !auditForm.auditor_id ||
+                !auditForm.responsible_id ||
+                (auditForm.audit_type === "externa" && !auditForm.external_entity_id.trim())
+              }
+            >
+              Crear
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -936,7 +1137,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       <Dialog open={editAuditOpen} onOpenChange={(o) => { setEditAuditOpen(o); if (!o) setEditingAudit(null); }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Editar auditoría</DialogTitle></DialogHeader>
-          {renderAuditFields()}
+          {renderAuditFields({ readOnly: !canEditEditingAudit })}
           {/* Existing attachments */}
           {editingAudit && (
             <div>
@@ -947,13 +1148,31 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
               {auditAttachments.filter((a) => a.audit_id === editingAudit.id).map((att) => (
                 <div key={att.id} className="flex items-center justify-between rounded border p-2 mt-1">
                   <span className="text-sm flex items-center gap-1"><FileText className="h-3 w-3" />{att.file_name ?? att.object_path}</span>
-                  <button onClick={() => deleteAuditAttachment(att)} className="text-destructive hover:text-destructive/80"><Trash2 className="h-4 w-4" /></button>
+                  {canEditEditingAudit && (
+                    <button onClick={() => deleteAuditAttachment(att)} className="text-destructive hover:text-destructive/80">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           )}
           <DialogFooter>
-            {canEditContent ? <Button onClick={updateAudit} disabled={!auditForm.title}>Guardar cambios</Button> : <p className="text-sm text-muted-foreground">Solo lectura</p>}
+            {canEditEditingAudit ? (
+              <Button
+                onClick={updateAudit}
+                disabled={
+                  !auditForm.title.trim() ||
+                  !auditForm.auditor_id ||
+                  !auditForm.responsible_id ||
+                  (auditForm.audit_type === "externa" && !auditForm.external_entity_id.trim())
+                }
+              >
+                Guardar cambios
+              </Button>
+            ) : (
+              <p className="text-sm text-muted-foreground">Solo lectura</p>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
