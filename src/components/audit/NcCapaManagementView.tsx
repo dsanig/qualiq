@@ -23,7 +23,9 @@ type CapaPlan = {
 };
 type NonConformity = {
   id: string;
-  capa_plan_id: string;
+  capa_plan_id: string | null;
+  audit_id: string | null;
+  company_id: string | null;
   title: string;
   description: string | null;
   severity: string | null;
@@ -34,17 +36,20 @@ type NonConformity = {
 };
 type ActionItem = {
   id: string;
-  non_conformity_id: string;
+  non_conformity_id: string | null;
+  capa_plan_id: string | null;
+  company_id: string | null;
   action_type: "corrective" | "preventive" | "immediate";
   description: string;
   responsible_id: string | null;
   due_date: string | null;
   status: string;
 };
-type Profile = { id: string; full_name: string | null; email: string | null };
+type Profile = { id: string; user_id?: string; full_name: string | null; email: string | null; company_id?: string | null };
 type Audit = { id: string; title: string };
 type IncidenciaRef = { id: string; title: string; status: string };
 type CapaIncidenciaLink = { capa_plan_id: string; incidencia_id: string };
+type CapaNcLink = { capa_plan_id: string; non_conformity_id: string };
 
 interface NcCapaManagementViewProps {
   searchQuery?: string;
