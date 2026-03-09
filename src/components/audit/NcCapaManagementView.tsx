@@ -1371,6 +1371,37 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete CAPA Confirmation Dialog */}
+      <Dialog open={deleteCapaOpen} onOpenChange={setDeleteCapaOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Plan CAPA</DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará el plan CAPA y desvinculará todos los elementos relacionados.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteCapaImpact && (
+            <div className="space-y-2 py-4">
+              <p className="text-sm font-medium">Elementos afectados:</p>
+              <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                <li>• {deleteCapaImpact.ncs} No Conformidad{deleteCapaImpact.ncs !== 1 ? "es" : ""} (serán desvinculadas)</li>
+                <li>• {deleteCapaImpact.actions} Acción{deleteCapaImpact.actions !== 1 ? "es" : ""} Correctiva{deleteCapaImpact.actions !== 1 ? "s" : ""} (serán desvinculadas)</li>
+                <li>• {deleteCapaImpact.links} Vinculación{deleteCapaImpact.links !== 1 ? "es" : ""} a Incidencias/NCs (serán eliminadas)</li>
+              </ul>
+              <p className="text-sm text-destructive font-medium mt-3">
+                ⚠️ Esta acción no se puede deshacer.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteCapaOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={deleteCapaPlan}>
+              <Trash2 className="mr-1 h-4 w-4" />Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
