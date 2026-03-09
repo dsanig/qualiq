@@ -1173,13 +1173,12 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           </DialogHeader>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">
             <div><Label>Título *</Label><Input value={ncForm.title} onChange={(e) => setNcForm((p) => ({ ...p, title: e.target.value }))} /></div>
-            <div><Label>Descripción</Label><Textarea value={ncForm.description} onChange={(e) => setNcForm((p) => ({ ...p, description: e.target.value }))} /></div>
+            <div><Label>Descripción *</Label><Textarea value={ncForm.description} onChange={(e) => setNcForm((p) => ({ ...p, description: e.target.value }))} /></div>
             <div>
-              <Label>Severidad</Label>
-              <Select value={ncForm.severity || "none"} onValueChange={(v) => setNcForm((p) => ({ ...p, severity: v === "none" ? "" : v }))}>
+              <Label>Severidad *</Label>
+              <Select value={ncForm.severity} onValueChange={(v) => setNcForm((p) => ({ ...p, severity: v }))}>
                 <SelectTrigger><SelectValue placeholder="Selecciona severidad" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sin severidad</SelectItem>
                   {severityLevels.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                 </SelectContent>
               </Select>
