@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,6 +86,9 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [editActionOpen, setEditActionOpen] = useState(false);
   const [linkIncidenciaOpen, setLinkIncidenciaOpen] = useState(false);
   const [linkNcOpen, setLinkNcOpen] = useState(false);
+  const [deleteCapaOpen, setDeleteCapaOpen] = useState(false);
+  const [deletingCapaId, setDeletingCapaId] = useState<string | null>(null);
+  const [deleteCapaImpact, setDeleteCapaImpact] = useState<{ ncs: number; actions: number; links: number } | null>(null);
 
   // Forms
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "", audit_id: "" });
@@ -284,6 +287,51 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     logAction({ action: "update", entity_type: "capa_plan", entity_id: editingCapa.id, entity_title: capaForm.title });
     setEditCapaOpen(false);
     setEditingCapa(null);
+    await loadData();
+  };
+
+  const openDeleteCapa = async (capaId: string) => {
+    setDeletingCapaId(capaId);
+    const stats = getCapaStats(capaId);
+    const linkedByJoin = capaNcLinks.filter((l) => l.capa_plan_id === capaId);
+    const linkedInc = capaIncidenciaLinks.filter((l) => l.capa_plan_id === capaId);
+    setDeleteCapaImpact({
+      ncs: stats.ncs,
+      actions: stats.actions,
+      links: linkedByJoin.length + linkedInc.length,
+    });
+    setDeleteCapaOpen(true);
+  };
+
+  const deleteCapaPlan = async () => {
+    if (!deletingCapaId) return;
+
+    // Delete join table links first
+    await Promise.all([
+      (supabase as any).from("capa_plan_non_conformities").delete().eq("capa_plan_id", deletingCapaId),
+      (supabase as any).from("incidencia_capa_plans").delete().eq("capa_plan_id", deletingCapaId),
+    ]);
+
+    // Unlink NCs (set capa_plan_id to null)
+    await (supabase as any).from("non_conformities").update({ capa_plan_id: null }).eq("capa_plan_id", deletingCapaId);
+
+    // Unlink actions (set capa_plan_id to null)
+    await (supabase as any).from("actions").update({ capa_plan_id: null }).eq("capa_plan_id", deletingCapaId);
+
+    // Delete the plan
+    const { error } = await (supabase as any).from("capa_plans").delete().eq("id", deletingCapaId);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Plan CAPA eliminado" });
+      logAction({ action: "delete", entity_type: "capa_plan", entity_id: deletingCapaId });
+      if (selectedCapaPlanId === deletingCapaId) setSelectedCapaPlanId(null);
+    }
+
+    setDeleteCapaOpen(false);
+    setDeletingCapaId(null);
+    setDeleteCapaImpact(null);
     await loadData();
   };
 
@@ -662,9 +710,16 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               <CardTitle>{selectedCapaPlan.title || "Plan CAPA"}</CardTitle>
               <div className="flex gap-2">
                 {canEditContent && (
-                  <Button size="sm" variant="outline" onClick={() => openEditCapa(selectedCapaPlan)}>
-                    <Pencil className="mr-1 h-4 w-4" />Editar
-                  </Button>
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => openEditCapa(selectedCapaPlan)}>
+                      <Pencil className="mr-1 h-4 w-4" />Editar
+                    </Button>
+                    {canManageCompany && (
+                      <Button size="sm" variant="destructive" onClick={() => openDeleteCapa(selectedCapaPlan.id)}>
+                        <Trash2 className="mr-1 h-4 w-4" />Eliminar
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </CardHeader>
@@ -1313,6 +1368,37 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLinkNcOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete CAPA Confirmation Dialog */}
+      <Dialog open={deleteCapaOpen} onOpenChange={setDeleteCapaOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Plan CAPA</DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará el plan CAPA y desvinculará todos los elementos relacionados.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteCapaImpact && (
+            <div className="space-y-2 py-4">
+              <p className="text-sm font-medium">Elementos afectados:</p>
+              <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                <li>• {deleteCapaImpact.ncs} No Conformidad{deleteCapaImpact.ncs !== 1 ? "es" : ""} (serán desvinculadas)</li>
+                <li>• {deleteCapaImpact.actions} Acción{deleteCapaImpact.actions !== 1 ? "es" : ""} Correctiva{deleteCapaImpact.actions !== 1 ? "s" : ""} (serán desvinculadas)</li>
+                <li>• {deleteCapaImpact.links} Vinculación{deleteCapaImpact.links !== 1 ? "es" : ""} a Incidencias/NCs (serán eliminadas)</li>
+              </ul>
+              <p className="text-sm text-destructive font-medium mt-3">
+                ⚠️ Esta acción no se puede deshacer.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteCapaOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={deleteCapaPlan}>
+              <Trash2 className="mr-1 h-4 w-4" />Eliminar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
