@@ -1145,6 +1145,26 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                 <SelectContent>{actionTypes.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Plan CAPA (opcional)</Label>
+              <Select value={actionForm.capa_plan_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, capa_plan_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin plan CAPA" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin plan CAPA</SelectItem>
+                  {capaPlans.map((c) => <SelectItem key={c.id} value={c.id}>{c.title || c.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>No conformidad (opcional)</Label>
+              <Select value={actionForm.non_conformity_id || "none"} onValueChange={(v) => setActionForm((p) => ({ ...p, non_conformity_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sin no conformidad" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin no conformidad</SelectItem>
+                  {nonConformities.map((nc) => <SelectItem key={nc.id} value={nc.id}>{nc.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div><Label>Descripción *</Label><Textarea value={actionForm.description} onChange={(e) => setActionForm((p) => ({ ...p, description: e.target.value }))} /></div>
             <div>
               <Label>Responsable *</Label>
