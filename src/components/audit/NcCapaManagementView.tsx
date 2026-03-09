@@ -722,7 +722,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                     <Button size="sm" variant="outline" onClick={() => openEditNc(selectedNc)}>
                       <Pencil className="mr-1 h-4 w-4" />Editar NC
                     </Button>
-                    <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: selectedNcId!, action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
+                    <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: selectedNcId!, capa_plan_id: selectedCapaPlanId ?? "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
                       <Plus className="mr-1 h-4 w-4" />Nueva Acción
                     </Button>
                   </>
