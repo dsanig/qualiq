@@ -44,6 +44,13 @@ export function NotificationsDropdown() {
     }
   }, [user]);
 
+  // Refresh notifications when dropdown opens
+  useEffect(() => {
+    if (isOpen && user) {
+      fetchNotifications();
+    }
+  }, [isOpen]);
+
   const fetchNotifications = async () => {
     if (!user) return;
     
