@@ -115,6 +115,7 @@ export function IncidentsView({
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [newAttachments, setNewAttachments] = useState<AttachmentInfo[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<AttachmentInfo[]>([]);
+  const [attachmentsPendingDeletion, setAttachmentsPendingDeletion] = useState<AttachmentInfo[]>([]);
   const [sourceInsightId, setSourceInsightId] = useState<string | null>(null);
   const [sourceReclamacionId, setSourceReclamacionId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -411,6 +412,7 @@ export function IncidentsView({
       resolution_notes: incident.resolution_notes ?? "",
     });
     setNewAttachments([]);
+    setAttachmentsPendingDeletion([]);
     setSelectedCapaPlanIds(incidentCapaLinks[incident.id] ?? []);
     void loadExistingAttachments(incident.id);
     setIsEditOpen(true);
@@ -449,6 +451,34 @@ export function IncidentsView({
       resolution_notes: form.resolution_notes || null,
     }).eq("id", editingIncident.id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    if (attachmentsPendingDeletion.length > 0) {
+      const attachmentIdsToDelete = attachmentsPendingDeletion
+        .map((attachment) => attachment.id)
+        .filter((id): id is string => Boolean(id));
+      const objectPathsToDelete = attachmentsPendingDeletion
+        .map((attachment) => attachment.object_path)
+        .filter((path): path is string => Boolean(path));
+
+      if (objectPathsToDelete.length > 0) {
+        const { error: storageDeleteError } = await supabase.storage.from("documents").remove(objectPathsToDelete);
+        if (storageDeleteError) {
+          toast({ title: "Error", description: "No se pudieron eliminar archivos adjuntos del almacenamiento.", variant: "destructive" });
+          return;
+        }
+      }
+
+      if (attachmentIdsToDelete.length > 0) {
+        const { error: attachmentDeleteError } = await (supabase as any)
+          .from("incidencia_attachments")
+          .delete()
+          .in("id", attachmentIdsToDelete);
+        if (attachmentDeleteError) {
+          toast({ title: "Error", description: attachmentDeleteError.message, variant: "destructive" });
+          return;
+        }
+      }
+    }
+
     if (newAttachments.length > 0) await uploadAttachments(editingIncident.id);
     await syncCapaLinks(editingIncident.id);
     toast({ title: "Incidencia actualizada" });
@@ -458,6 +488,7 @@ export function IncidentsView({
     setForm(defaultForm(initialIncidentType));
     setNewAttachments([]);
     setExistingAttachments([]);
+    setAttachmentsPendingDeletion([]);
     setSelectedCapaPlanIds([]);
     setSourceInsightId(null);
     setSourceReclamacionId(null);
@@ -743,7 +774,7 @@ export function IncidentsView({
       </Dialog>
 
       {/* Edit incident dialog */}
-      <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingIncident(null); setNewAttachments([]); setExistingAttachments([]); setSelectedCapaPlanIds([]); } }}>
+      <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingIncident(null); setNewAttachments([]); setExistingAttachments([]); setAttachmentsPendingDeletion([]); setSelectedCapaPlanIds([]); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar incidencia</DialogTitle>
@@ -764,7 +795,13 @@ export function IncidentsView({
             onAddFiles={canEditContent ? handleAddFiles : undefined}
             onRemoveAttachment={canEditContent ? (idx) => {
               if (idx < existingAttachments.length) {
-                setExistingAttachments((prev) => prev.filter((_, i) => i !== idx));
+                setExistingAttachments((prev) => {
+                  const attachmentToDelete = prev[idx];
+                  if (attachmentToDelete?.id) {
+                    setAttachmentsPendingDeletion((pending) => [...pending, attachmentToDelete]);
+                  }
+                  return prev.filter((_, i) => i !== idx);
+                });
               } else {
                 handleRemoveNewAttachment(idx - existingAttachments.length);
               }
