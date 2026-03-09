@@ -896,13 +896,20 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                       const auditAtts = auditAttachments.filter(a => a.audit_id === selectedAudit.id);
                       const auditParts = auditParticipants.filter(p => p.audit_id === selectedAudit.id);
                       const linkedIncidencias = capaIncidenciaLinks.filter(l => auditCapas.some(c => c.id === l.capa_plan_id));
+                      // Check incidencias directly linked to audit
+                      const { data: directIncidencias } = await supabase
+                        .from("incidencias")
+                        .select("id")
+                        .eq("audit_id", selectedAudit.id);
+                      const directIncCount = directIncidencias?.length ?? 0;
 
                       if (auditCapas.length > 0) links.push(`${auditCapas.length} plan(es) CAPA`);
                       if (auditNcs.length > 0) links.push(`${auditNcs.length} no conformidad(es)`);
                       if (auditActions.length > 0) links.push(`${auditActions.length} acción(es)`);
                       if (auditAtts.length > 0) links.push(`${auditAtts.length} adjunto(s)`);
                       if (auditParts.length > 0) links.push(`${auditParts.length} participante(s)`);
-                      if (linkedIncidencias.length > 0) links.push(`${linkedIncidencias.length} incidencia(s) vinculada(s)`);
+                      if (linkedIncidencias.length > 0) links.push(`${linkedIncidencias.length} incidencia(s) vinculada(s) vía CAPA`);
+                      if (directIncCount > 0) links.push(`${directIncCount} incidencia(s) directa(s) (se desvinculará(n))`);
 
                       setAuditLinkedInfo(links);
                       setDeleteAuditConfirmOpen(true);
