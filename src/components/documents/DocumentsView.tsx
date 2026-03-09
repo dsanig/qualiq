@@ -312,6 +312,14 @@ export function DocumentsView({
   const [isOwnersOpen, setIsOwnersOpen] = useState(false);
   const [isSignOpen, setIsSignOpen] = useState(false);
   const [isManualSignOpen, setIsManualSignOpen] = useState(false);
+  const [isSignConfirmationOpen, setIsSignConfirmationOpen] = useState(false);
+  const [signConfirmationText, setSignConfirmationText] = useState("");
+  const [signConfirmationPassword, setSignConfirmationPassword] = useState("");
+  const [signConfirmationError, setSignConfirmationError] = useState<string | null>(null);
+  const [isConfirmingSignature, setIsConfirmingSignature] = useState(false);
+  const [isSignatureSubmitting, setIsSignatureSubmitting] = useState(false);
+  const [pendingSignMethod, setPendingSignMethod] = useState<"autofirma" | "manual" | null>(null);
+  const [pendingSignedFile, setPendingSignedFile] = useState<File | undefined>(undefined);
   const [manualSignName, setManualSignName] = useState("");
   const [manualSignReason, setManualSignReason] = useState("");
   const [signStatus, setSignStatus] = useState<"idle" | "waiting" | "completed">("idle");
@@ -1732,6 +1740,26 @@ export function DocumentsView({
     setIsSignOpen(true);
   };
 
+
+
+  const resetSignatureConfirmation = useCallback(() => {
+    setSignConfirmationText("");
+    setSignConfirmationPassword("");
+    setSignConfirmationError(null);
+    setPendingSignMethod(null);
+    setPendingSignedFile(undefined);
+    setIsConfirmingSignature(false);
+  }, []);
+
+  const openSignatureConfirmation = useCallback((method: "autofirma" | "manual", signedFile?: File) => {
+    setPendingSignMethod(method);
+    setPendingSignedFile(signedFile);
+    setSignConfirmationText("");
+    setSignConfirmationPassword("");
+    setSignConfirmationError(null);
+    setIsSignConfirmationOpen(true);
+  }, []);
+
   const canPerformAction = useCallback(async (userId: string, documentId: string, actionType: string) => {
     // No superadmin bypass — only assigned responsible users can perform actions
     const { count, error } = await (supabase as any)
@@ -1783,40 +1811,12 @@ export function DocumentsView({
       toast({ title: "Falta el firmante", description: "Indica el nombre del firmante.", variant: "destructive" });
       return;
     }
-    const signedAt = new Date().toISOString();
-    const allowed = await canPerformAction(user.id, selectedDocument.id, "firma");
-    if (!allowed) {
-      toast({
-        title: "Permisos insuficientes",
-        description: "Solo el responsable de firma puede firmar este documento.",
-        variant: "destructive",
-      });
+
+    if (isSignatureSubmitting || isConfirmingSignature) {
       return;
     }
 
-    try {
-      await saveDocumentSignature({
-      document_id: selectedDocument.id,
-      signed_by: user.id,
-      signer_name: signerName.trim(),
-      signer_email: user.email || null,
-      signature_method: "autofirma_dnie",
-      signature_data: signReason.trim() || null,
-      signed_at: signedAt,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "No se pudo registrar la firma.";
-      toast({ title: "Error al registrar firma", description: message, variant: "destructive" });
-      return;
-    }
-    setSignedDocuments((prev) => ({
-      ...prev,
-      [selectedDocument.id]: { file, signedAt, signerName: signerName.trim(), reason: signReason.trim() || undefined },
-    }));
-    setSignStatus("completed");
-    toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado.` });
-    logAction({ action: "sign_autofirma", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { method: "autofirma_dnie" } });
-    fetchFirmaStatus();
+    openSignatureConfirmation("autofirma", file);
   };
 
   const handleSignedFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1863,40 +1863,133 @@ export function DocumentsView({
       toast({ title: "Nombre requerido", description: "Escribe tu nombre completo para firmar.", variant: "destructive" });
       return;
     }
-    const signedAt = new Date().toISOString();
-    const allowed = await canPerformAction(user.id, selectedDocument.id, "firma");
-    if (!allowed) {
-      toast({
-        title: "Permisos insuficientes",
-        description: "Solo el responsable de firma puede firmar este documento.",
-        variant: "destructive",
+
+    if (isSignatureSubmitting || isConfirmingSignature) {
+      return;
+    }
+
+    openSignatureConfirmation("manual");
+  };
+
+
+
+  const handleConfirmSignature = async () => {
+    if (!selectedDocument || !user || !pendingSignMethod) return;
+
+    if (signConfirmationText !== "FIRMAR") {
+      setSignConfirmationError("Debes escribir exactamente FIRMAR para continuar.");
+      return;
+    }
+
+    if (!signConfirmationPassword) {
+      setSignConfirmationError("Debes introducir tu contraseña actual.");
+      return;
+    }
+
+    if (isConfirmingSignature || isSignatureSubmitting) {
+      return;
+    }
+
+    setIsConfirmingSignature(true);
+    setSignConfirmationError(null);
+
+    const { error: verifyError } = await supabase.functions.invoke("verify-signature-confirmation", {
+      body: {
+        confirmation_text: signConfirmationText,
+        password: signConfirmationPassword,
+      },
+    });
+
+    if (verifyError) {
+      const errorMessage = verifyError.message?.includes("FIRMAR")
+        ? "Debes escribir exactamente FIRMAR."
+        : verifyError.message?.toLowerCase().includes("contraseña")
+          ? "La contraseña introducida no es válida."
+          : "No se pudo validar la confirmación reforzada de firma.";
+      setSignConfirmationError(errorMessage);
+      setIsConfirmingSignature(false);
+      await logAction({
+        action: "sign_confirmation_failed",
+        entity_type: "document",
+        entity_id: selectedDocument.id,
+        entity_title: selectedDocument.title,
+        details: { method: pendingSignMethod, reason: "validation_failed" },
       });
       return;
     }
 
+    setIsSignatureSubmitting(true);
+
     try {
-      await saveDocumentSignature({
-      document_id: selectedDocument.id,
-      signed_by: user.id,
-      signer_name: manualSignName.trim(),
-      signer_email: user.email || null,
-      signature_method: "nombre_completo",
-      signature_data: manualSignReason.trim() || null,
-      signed_at: signedAt,
-      });
+      const allowed = await canPerformAction(user.id, selectedDocument.id, "firma");
+      if (!allowed) {
+        toast({
+          title: "Permisos insuficientes",
+          description: "Solo el responsable de firma puede firmar este documento.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const signedAt = new Date().toISOString();
+
+      if (pendingSignMethod === "autofirma") {
+        await saveDocumentSignature({
+          document_id: selectedDocument.id,
+          signed_by: user.id,
+          signer_name: signerName.trim(),
+          signer_email: user.email || null,
+          signature_method: "autofirma_dnie",
+          signature_data: signReason.trim() || null,
+          signed_at: signedAt,
+        });
+
+        setSignedDocuments((prev) => ({
+          ...prev,
+          [selectedDocument.id]: {
+            file: pendingSignedFile,
+            signedAt,
+            signerName: signerName.trim(),
+            reason: signReason.trim() || undefined,
+          },
+        }));
+        setSignStatus("completed");
+        toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado.` });
+        await logAction({ action: "sign_autofirma", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { method: "autofirma_dnie" } });
+      } else {
+        await saveDocumentSignature({
+          document_id: selectedDocument.id,
+          signed_by: user.id,
+          signer_name: manualSignName.trim(),
+          signer_email: user.email || null,
+          signature_method: "nombre_completo",
+          signature_data: manualSignReason.trim() || null,
+          signed_at: signedAt,
+        });
+
+        setSignedDocuments((prev) => ({
+          ...prev,
+          [selectedDocument.id]: {
+            signedAt,
+            signerName: manualSignName.trim(),
+            reason: manualSignReason.trim() || undefined,
+          },
+        }));
+        toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado con nombre completo.` });
+        await logAction({ action: "sign_manual", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { method: "nombre_completo", signer_name: manualSignName.trim() } });
+        setIsManualSignOpen(false);
+      }
+
+      fetchFirmaStatus();
+      setIsSignConfirmationOpen(false);
+      resetSignatureConfirmation();
     } catch (error) {
       const message = error instanceof Error ? error.message : "No se pudo registrar la firma.";
       toast({ title: "Error al registrar firma", description: message, variant: "destructive" });
-      return;
+    } finally {
+      setIsConfirmingSignature(false);
+      setIsSignatureSubmitting(false);
     }
-    setSignedDocuments((prev) => ({
-      ...prev,
-      [selectedDocument.id]: { signedAt, signerName: manualSignName.trim(), reason: manualSignReason.trim() || undefined },
-    }));
-    toast({ title: "Documento firmado", description: `${selectedDocument.code} ha sido firmado con nombre completo.` });
-    logAction({ action: "sign_manual", entity_type: "document", entity_id: selectedDocument.id, entity_title: selectedDocument.title, details: { method: "nombre_completo", signer_name: manualSignName.trim() } });
-    setIsManualSignOpen(false);
-    fetchFirmaStatus();
   };
 
   const getSignatureStatusLabel = (docId: string): { label: string; class: string; icon: typeof PenTool } | null => {
@@ -2262,7 +2355,7 @@ export function DocumentsView({
       />
 
       {/* Sign Dialog */}
-      <Dialog open={isSignOpen} onOpenChange={setIsSignOpen}>
+      <Dialog open={isSignOpen} onOpenChange={(open) => { if (isSignatureSubmitting || isConfirmingSignature) return; setIsSignOpen(open); }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Firma electrónica con DNIe</DialogTitle>
@@ -2305,18 +2398,18 @@ export function DocumentsView({
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setIsSignOpen(false)}>Cerrar</Button>
+            <Button variant="outline" onClick={() => setIsSignOpen(false)} disabled={isSignatureSubmitting || isConfirmingSignature}>Cerrar</Button>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => selectedDocument && handleDownloadForSigning(selectedDocument)} disabled={!selectedDocument || signStatus === "completed"}>Descargar para firmar</Button>
-              <Button variant="accent" onClick={handleStartSigning} disabled={signStatus !== "idle"}>Iniciar firma con DNIe</Button>
-              {signStatus === "waiting" && <Button variant="default" onClick={() => handleCompleteSigning()} disabled={!signerName.trim()}>Confirmar firma</Button>}
+              <Button variant="accent" onClick={handleStartSigning} disabled={signStatus !== "idle" || isSignatureSubmitting || isConfirmingSignature}>Iniciar firma con DNIe</Button>
+              {signStatus === "waiting" && <Button variant="default" onClick={() => handleCompleteSigning()} disabled={!signerName.trim() || isSignatureSubmitting || isConfirmingSignature}>Confirmar firma</Button>}
             </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Manual Sign Dialog */}
-      <Dialog open={isManualSignOpen} onOpenChange={setIsManualSignOpen}>
+      <Dialog open={isManualSignOpen} onOpenChange={(open) => { if (isSignatureSubmitting || isConfirmingSignature) return; setIsManualSignOpen(open); }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Firmar con nombre completo</DialogTitle>
@@ -2350,8 +2443,84 @@ export function DocumentsView({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsManualSignOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCompleteManualSign} disabled={!manualSignName.trim()}>Firmar documento</Button>
+            <Button variant="outline" onClick={() => setIsManualSignOpen(false)} disabled={isSignatureSubmitting || isConfirmingSignature}>Cancelar</Button>
+            <Button onClick={handleCompleteManualSign} disabled={!manualSignName.trim() || isSignatureSubmitting || isConfirmingSignature}>Firmar documento</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isSignConfirmationOpen}
+        onOpenChange={(open) => {
+          if (isSignatureSubmitting || isConfirmingSignature) return;
+          setIsSignConfirmationOpen(open);
+          if (!open) {
+            resetSignatureConfirmation();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirmar firma</DialogTitle>
+            <DialogDescription>
+              Para firmar este documento, escriba FIRMAR y confirme su contraseña.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="signature-confirmation-text">Texto de confirmación</Label>
+              <Input
+                id="signature-confirmation-text"
+                value={signConfirmationText}
+                onChange={(event) => {
+                  setSignConfirmationText(event.target.value);
+                  if (signConfirmationError) setSignConfirmationError(null);
+                }}
+                placeholder="Escribe FIRMAR"
+                autoFocus
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="signature-confirmation-password">Contraseña actual</Label>
+              <Input
+                id="signature-confirmation-password"
+                type="password"
+                value={signConfirmationPassword}
+                onChange={(event) => {
+                  setSignConfirmationPassword(event.target.value);
+                  if (signConfirmationError) setSignConfirmationError(null);
+                }}
+                placeholder="Introduce tu contraseña"
+                autoComplete="current-password"
+              />
+            </div>
+            {signConfirmationError && (
+              <p className="text-sm text-destructive">{signConfirmationError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsSignConfirmationOpen(false);
+                resetSignatureConfirmation();
+              }}
+              disabled={isSignatureSubmitting || isConfirmingSignature}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmSignature}
+              disabled={
+                isSignatureSubmitting ||
+                isConfirmingSignature ||
+                !signConfirmationPassword ||
+                signConfirmationText !== "FIRMAR"
+              }
+            >
+              {isConfirmingSignature || isSignatureSubmitting ? "Firmando..." : "Firmar documento"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
