@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Paperclip, Pencil, Trash2, FileText, ChevronsUpDown, Check, X } from "lucide-react";
+import { Plus, Paperclip, Pencil, Trash2, FileText, ChevronsUpDown, Check, X, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuditLog } from "@/hooks/useAuditLog";
@@ -424,7 +428,26 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       )}
       <div>
         <Label>Fecha de auditoría</Label>
-        <Input disabled={readOnly} type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              disabled={readOnly}
+              className={cn("w-full justify-start text-left font-normal", !auditForm.audit_date && "text-muted-foreground")}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {auditForm.audit_date ? format(new Date(auditForm.audit_date), "dd/MM/yyyy", { locale: es }) : "Seleccionar fecha"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={auditForm.audit_date ? new Date(auditForm.audit_date) : undefined}
+              onSelect={(d) => setAuditForm((p) => ({ ...p, audit_date: d ? format(d, "yyyy-MM-dd") : "" }))}
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
       <div>
         <Label>Auditor *</Label>
