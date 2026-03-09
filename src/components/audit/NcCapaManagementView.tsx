@@ -140,6 +140,10 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     const ncIds = filteredNcs.map((nc) => nc.id);
     return actions.filter((a) => a.capa_plan_id === selectedCapaPlanId || (a.non_conformity_id ? ncIds.includes(a.non_conformity_id) : false));
   }, [actions, selectedCapaPlanId, filteredNcs]);
+  const directPlanActions = useMemo(
+    () => actions.filter((a) => a.capa_plan_id === selectedCapaPlanId && !a.non_conformity_id),
+    [actions, selectedCapaPlanId],
+  );
 
   const loadData = async () => {
     setIsLoading(true);
