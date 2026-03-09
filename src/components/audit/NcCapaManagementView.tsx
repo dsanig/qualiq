@@ -513,6 +513,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       status: nc.status,
       deadline: nc.deadline ?? "",
       responsible_id: nc.responsible_id ?? "",
+      audit_id: nc.audit_id ?? "",
+      capa_plan_id: nc.capa_plan_id ?? "",
     });
     setEditNcOpen(true);
   };
