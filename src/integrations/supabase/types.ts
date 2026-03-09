@@ -1121,6 +1121,9 @@ export type Database = {
           deadline: string | null
           description: string | null
           id: string
+          internal_investigation: string | null
+          resolution: string | null
+          conclusion: string | null
           responsible_id: string | null
           root_cause: string | null
           severity: string | null
@@ -1135,6 +1138,9 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           id?: string
+          internal_investigation?: string | null
+          resolution?: string | null
+          conclusion?: string | null
           responsible_id?: string | null
           root_cause?: string | null
           severity?: string | null
@@ -1149,6 +1155,9 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           id?: string
+          internal_investigation?: string | null
+          resolution?: string | null
+          conclusion?: string | null
           responsible_id?: string | null
           root_cause?: string | null
           severity?: string | null
