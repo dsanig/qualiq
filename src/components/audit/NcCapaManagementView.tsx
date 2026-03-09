@@ -143,8 +143,15 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   useEffect(() => {
     const loadCurrentUserContext = async () => {
       const { data } = await supabase.auth.getUser();
-      const userId = data.user?.id ?? null;
-      setCurrentUserId(userId);
+      const authId = data.user?.id;
+      if (!authId) { setCurrentUserId(null); return; }
+      // responsible_id stores profile.id, so we need the profile ID
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", authId)
+        .maybeSingle();
+      setCurrentUserId(profileData?.id ?? authId);
     };
 
     void loadCurrentUserContext();
