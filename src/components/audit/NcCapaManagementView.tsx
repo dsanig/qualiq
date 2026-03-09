@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2, Trash2, FileText, AlertTriangle, Users, Calendar, RefreshCw } from "lucide-react";
+import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2, Trash2, FileText, AlertTriangle, Users, Calendar, RefreshCw, Paperclip } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +54,7 @@ type IncidenciaRef = { id: string; title: string; status: string };
 type ReclamacionRef = { id: string; title: string; status: string };
 type CapaIncidenciaLink = { capa_plan_id: string; incidencia_id: string };
 type CapaNcLink = { capa_plan_id: string; non_conformity_id: string };
+type AttachmentInfo = { id?: string; file_name: string; object_path?: string; isNew?: boolean; file?: File };
 
 interface NcCapaManagementViewProps {
   searchQuery?: string;
@@ -137,6 +138,10 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [currentCapaPage, setCurrentCapaPage] = useState(1);
+  const [newNcAttachments, setNewNcAttachments] = useState<AttachmentInfo[]>([]);
+  const [existingNcAttachments, setExistingNcAttachments] = useState<AttachmentInfo[]>([]);
+  const [newActionAttachments, setNewActionAttachments] = useState<AttachmentInfo[]>([]);
+  const [existingActionAttachments, setExistingActionAttachments] = useState<AttachmentInfo[]>([]);
 
   const { toast } = useToast();
 
@@ -380,6 +385,123 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     return profileData?.company_id ?? null;
   };
 
+  const uploadNcAttachments = async (nonConformityId: string) => {
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    for (const att of newNcAttachments) {
+      if (!att.file) continue;
+      const { data: pData } = await supabase.from("profiles").select("company_id").eq("user_id", userId ?? "").maybeSingle();
+      const tenantPrefix = pData?.company_id ?? "unknown";
+      const path = `${tenantPrefix}/non_conformities/${nonConformityId}/${Date.now()}_${att.file.name}`;
+      const { error: uploadError } = await supabase.storage.from("documents").upload(path, att.file);
+      if (uploadError) {
+        toast({ title: "Error subiendo archivo", description: att.file.name, variant: "destructive" });
+        continue;
+      }
+      await (supabase as any).from("non_conformity_attachments").insert({
+        non_conformity_id: nonConformityId,
+        object_path: path,
+        file_name: att.file.name,
+        file_type: att.file.type || "application/octet-stream",
+        created_by: userId,
+      });
+    }
+  };
+
+  const uploadActionAttachments = async (actionId: string) => {
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    for (const att of newActionAttachments) {
+      if (!att.file) continue;
+      const { data: pData } = await supabase.from("profiles").select("company_id").eq("user_id", userId ?? "").maybeSingle();
+      const tenantPrefix = pData?.company_id ?? "unknown";
+      const path = `${tenantPrefix}/actions/${actionId}/${Date.now()}_${att.file.name}`;
+      const { error: uploadError } = await supabase.storage.from("documents").upload(path, att.file);
+      if (uploadError) {
+        toast({ title: "Error subiendo archivo", description: att.file.name, variant: "destructive" });
+        continue;
+      }
+      await (supabase as any).from("action_attachments").insert({
+        action_id: actionId,
+        object_path: path,
+        file_name: att.file.name,
+        created_by: userId,
+      });
+    }
+  };
+
+  const loadExistingNcAttachments = async (nonConformityId: string) => {
+    const { data } = await (supabase as any).from("non_conformity_attachments").select("id,file_name,object_path").eq("non_conformity_id", nonConformityId);
+    setExistingNcAttachments(Array.isArray(data) ? data.map((a: any) => ({ id: a.id, file_name: a.file_name ?? "archivo", object_path: a.object_path })) : []);
+  };
+
+  const loadExistingActionAttachments = async (actionId: string) => {
+    const { data } = await (supabase as any).from("action_attachments").select("id,file_name,object_path").eq("action_id", actionId);
+    setExistingActionAttachments(Array.isArray(data) ? data.map((a: any) => ({ id: a.id, file_name: a.file_name ?? "archivo", object_path: a.object_path })) : []);
+  };
+
+  const handleAddNcFiles = (files: FileList) => {
+    const items: AttachmentInfo[] = Array.from(files).map((f) => ({ file_name: f.name, isNew: true, file: f }));
+    setNewNcAttachments((prev) => [...prev, ...items]);
+  };
+
+  const handleAddActionFiles = (files: FileList) => {
+    const items: AttachmentInfo[] = Array.from(files).map((f) => ({ file_name: f.name, isNew: true, file: f }));
+    setNewActionAttachments((prev) => [...prev, ...items]);
+  };
+
+  const removeNcAttachment = async (index: number) => {
+    if (index < existingNcAttachments.length) {
+      const attachment = existingNcAttachments[index];
+      if (!attachment?.id || !canEditContent) return;
+      await (supabase as any).from("non_conformity_attachments").delete().eq("id", attachment.id);
+      setExistingNcAttachments((prev) => prev.filter((_, i) => i !== index));
+      return;
+    }
+    setNewNcAttachments((prev) => prev.filter((_, i) => i !== index - existingNcAttachments.length));
+  };
+
+  const removeActionAttachment = async (index: number) => {
+    if (index < existingActionAttachments.length) {
+      const attachment = existingActionAttachments[index];
+      if (!attachment?.id || !canEditContent) return;
+      await (supabase as any).from("action_attachments").delete().eq("id", attachment.id);
+      setExistingActionAttachments((prev) => prev.filter((_, i) => i !== index));
+      return;
+    }
+    setNewActionAttachments((prev) => prev.filter((_, i) => i !== index - existingActionAttachments.length));
+  };
+
+  const openAttachmentPicker = (onAddFiles: (files: FileList) => void) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.onchange = () => { if (input.files?.length) onAddFiles(input.files); };
+    input.click();
+  };
+
+  const renderAttachmentsBlock = ({ attachments, onAddFiles, onRemoveAttachment }: { attachments: AttachmentInfo[]; onAddFiles?: (files: FileList) => void; onRemoveAttachment?: (index: number) => void }) => (
+    <div>
+      <Label>Documentos adjuntos</Label>
+      <div className="mt-1 space-y-2">
+        {attachments.map((att, idx) => (
+          <div key={att.id ?? `${att.file_name}-${idx}`} className="flex items-center gap-2 text-sm border rounded px-2 py-1">
+            <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="truncate flex-1">{att.file_name}</span>
+            {onRemoveAttachment && (
+              <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => { void onRemoveAttachment(idx); }}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        ))}
+        {onAddFiles && (
+          <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => openAttachmentPicker(onAddFiles)}>
+            <Paperclip className="h-4 w-4 mr-1" />Adjuntar archivo
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   const createNc = async () => {
     if (!ncForm.title || !ncForm.description || !ncForm.severity || !ncForm.responsible_id || !ncForm.deadline) {
       toast({ title: "Error", description: "Título, descripción, severidad, responsable y fecha límite son obligatorios.", variant: "destructive" });
@@ -410,10 +532,13 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
+    if (data && newNcAttachments.length > 0) await uploadNcAttachments(data.id);
+
     toast({ title: "No conformidad creada" });
     logAction({ action: "create", entity_type: "non_conformity", entity_id: data?.id, entity_title: ncForm.title });
     setNewNcOpen(false);
     setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
+    setNewNcAttachments([]);
     await loadData();
   };
 
@@ -443,10 +568,14 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
+    if (newNcAttachments.length > 0) await uploadNcAttachments(editingNc.id);
+
     toast({ title: "No conformidad actualizada" });
     logAction({ action: "update", entity_type: "non_conformity", entity_id: editingNc.id, entity_title: ncForm.title });
     setEditNcOpen(false);
     setEditingNc(null);
+    setExistingNcAttachments([]);
+    setNewNcAttachments([]);
     await loadData();
   };
 
@@ -464,6 +593,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     await (supabase as any).from("actions").update({ non_conformity_id: null }).eq("non_conformity_id", deletingNcId);
     // Remove from capa_plan_non_conformities
     await (supabase as any).from("capa_plan_non_conformities").delete().eq("non_conformity_id", deletingNcId);
+    await (supabase as any).from("non_conformity_attachments").delete().eq("non_conformity_id", deletingNcId);
 
     const { error } = await (supabase as any).from("non_conformities").delete().eq("id", deletingNcId);
 
@@ -505,6 +635,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     setDeleteActionOpen(false);
     setDeletingActionId(null);
     setDeleteActionConfirmText("");
+    setExistingActionAttachments([]);
+    setNewActionAttachments([]);
     await loadData();
   };
 
@@ -591,10 +723,13 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
+    if (data && newActionAttachments.length > 0) await uploadActionAttachments(data.id);
+
     toast({ title: "Acción creada" });
     logAction({ action: "create", entity_type: "action", entity_id: data?.id, entity_title: actionForm.description.slice(0, 50) });
     setNewActionOpen(false);
     setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", start_date: "", due_date: "", status: "open" });
+    setNewActionAttachments([]);
     await loadData();
   };
 
@@ -619,10 +754,14 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       return;
     }
 
+    if (newActionAttachments.length > 0) await uploadActionAttachments(editingAction.id);
+
     toast({ title: "Acción actualizada" });
     logAction({ action: "update", entity_type: "action", entity_id: editingAction.id, entity_title: actionForm.description.slice(0, 50) });
     setEditActionOpen(false);
     setEditingAction(null);
+    setExistingActionAttachments([]);
+    setNewActionAttachments([]);
     await loadData();
   };
 
@@ -722,6 +861,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       audit_id: nc.audit_id ?? "",
       capa_plan_id: nc.capa_plan_id ?? "",
     });
+    setNewNcAttachments([]);
+    void loadExistingNcAttachments(nc.id);
     setEditNcOpen(true);
   };
 
@@ -737,6 +878,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       due_date: action.due_date ?? "",
       status: action.status,
     });
+    setNewActionAttachments([]);
+    void loadExistingActionAttachments(action.id);
     setEditActionOpen(true);
   };
 
@@ -1296,7 +1439,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       </Dialog>
 
       {/* New NC Dialog */}
-      <Dialog open={newNcOpen} onOpenChange={setNewNcOpen}>
+      <Dialog open={newNcOpen} onOpenChange={(open) => { setNewNcOpen(open); if (!open) setNewNcAttachments([]); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Nueva No Conformidad</DialogTitle>
@@ -1342,6 +1485,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               </Select>
             </div>
             <div><Label>Fecha límite *</Label><Input type="date" value={ncForm.deadline} onChange={(e) => setNcForm((p) => ({ ...p, deadline: e.target.value }))} /></div>
+            {renderAttachmentsBlock({ attachments: newNcAttachments, onAddFiles: handleAddNcFiles, onRemoveAttachment: canEditContent ? removeNcAttachment : undefined })}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewNcOpen(false)}>Cancelar</Button>
@@ -1351,7 +1495,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       </Dialog>
 
       {/* Edit NC Dialog - NO status field, status changes only via "Actualizar Estado" */}
-      <Dialog open={editNcOpen} onOpenChange={setEditNcOpen}>
+      <Dialog open={editNcOpen} onOpenChange={(open) => { setEditNcOpen(open); if (!open) { setEditingNc(null); setExistingNcAttachments([]); setNewNcAttachments([]); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar No Conformidad</DialogTitle>
@@ -1397,6 +1541,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               </Select>
             </div>
             <div><Label>Fecha límite *</Label><Input type="date" value={ncForm.deadline} onChange={(e) => setNcForm((p) => ({ ...p, deadline: e.target.value }))} /></div>
+            {renderAttachmentsBlock({ attachments: [...existingNcAttachments, ...newNcAttachments], onAddFiles: canEditContent ? handleAddNcFiles : undefined, onRemoveAttachment: canEditContent ? removeNcAttachment : undefined })}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditNcOpen(false)}>Cancelar</Button>
@@ -1406,7 +1551,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       </Dialog>
 
       {/* New Action Dialog */}
-      <Dialog open={newActionOpen} onOpenChange={setNewActionOpen}>
+      <Dialog open={newActionOpen} onOpenChange={(open) => { setNewActionOpen(open); if (!open) setNewActionAttachments([]); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Nueva Acción Correctiva</DialogTitle>
@@ -1449,6 +1594,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             </div>
             <div><Label>Fecha de Inicio</Label><Input type="date" value={actionForm.start_date} onChange={(e) => setActionForm((p) => ({ ...p, start_date: e.target.value }))} /></div>
             <div><Label>Fecha Límite *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
+            {renderAttachmentsBlock({ attachments: newActionAttachments, onAddFiles: handleAddActionFiles, onRemoveAttachment: canEditContent ? removeActionAttachment : undefined })}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewActionOpen(false)}>Cancelar</Button>
@@ -1458,7 +1604,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       </Dialog>
 
       {/* Edit Action Dialog - NO status field */}
-      <Dialog open={editActionOpen} onOpenChange={setEditActionOpen}>
+      <Dialog open={editActionOpen} onOpenChange={(open) => { setEditActionOpen(open); if (!open) { setEditingAction(null); setExistingActionAttachments([]); setNewActionAttachments([]); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Acción Correctiva</DialogTitle>
@@ -1501,6 +1647,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
             </div>
             <div><Label>Fecha de Inicio</Label><Input type="date" value={actionForm.start_date} onChange={(e) => setActionForm((p) => ({ ...p, start_date: e.target.value }))} /></div>
             <div><Label>Fecha Límite *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
+            {renderAttachmentsBlock({ attachments: [...existingActionAttachments, ...newActionAttachments], onAddFiles: canEditContent ? handleAddActionFiles : undefined, onRemoveAttachment: canEditContent ? removeActionAttachment : undefined })}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditActionOpen(false)}>Cancelar</Button>
