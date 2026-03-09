@@ -276,6 +276,8 @@ const Index = () => {
         );
       case "audits":
         return <AuditManagementView searchQuery={activeSearchQuery} />;
+      case "nc-capa":
+        return <NcCapaManagementView searchQuery={activeSearchQuery} />;
       case "chatbot":
         return <ChatbotView />;
       case "training":
