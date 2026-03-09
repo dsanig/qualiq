@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { ActionConfirmDialog } from "./ActionConfirmDialog";
 import { DocumentActionsMenu } from "./DocumentActionsMenu";
 import { DocumentResponsibilities } from "./DocumentResponsibilities";
 import { DocumentSignatureStatusDialog } from "./DocumentSignatureStatusDialog";
