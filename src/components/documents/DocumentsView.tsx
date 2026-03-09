@@ -33,7 +33,6 @@ import { DocumentPendingActions } from "./DocumentPendingActions";
 import { ShareDocumentDialog } from "./ShareDocumentDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -55,6 +54,7 @@ import { debugFileTypeMapping, fileTypeForDb, getFileExtension, runFileTypeRunti
 import type { FiltersState } from "@/components/filters/FilterModal";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { matchesNormalizedQuery } from "@/utils/search";
+import { verifySignatureConfirmation } from "@/lib/signatureConfirmation";
 
 type DocumentTypology = "Proceso" | "PNT" | "Documento" | "Normativa" | "Otro";
 
@@ -1873,47 +1873,6 @@ export function DocumentsView({
   };
 
 
-  const getSignatureConfirmationErrorMessage = async (error: unknown) => {
-    if (error instanceof FunctionsHttpError) {
-      const response = error.context;
-      let parsedBody: unknown = null;
-      const rawBody = await response.clone().text();
-
-      if (rawBody) {
-        try {
-          parsedBody = JSON.parse(rawBody);
-        } catch {
-          parsedBody = null;
-        }
-      }
-
-      const backendError =
-        parsedBody && typeof parsedBody === "object" && "error" in parsedBody
-          ? (parsedBody as { error?: { code?: string; message?: string } | string }).error
-          : null;
-
-      const backendCode =
-        backendError && typeof backendError === "object" && "code" in backendError
-          ? backendError.code
-          : null;
-
-      if (backendCode === "INVALID_CONFIRMATION_TEXT") return "Debe escribir exactamente FIRMAR.";
-      if (backendCode === "PASSWORD_REQUIRED") return "Debe introducir su contraseña actual.";
-      if (backendCode === "PASSWORD_INVALID") return "La contraseña introducida no es correcta.";
-      if (backendCode === "AUTH_USER_UNAVAILABLE" || backendCode === "AUTH_CONTEXT_MISSING") {
-        return "No se pudo verificar la identidad del usuario actual.";
-      }
-
-      if (backendError && typeof backendError === "object" && typeof backendError.message === "string") {
-        return backendError.message;
-      }
-
-      return `No se pudo validar la confirmación de firma (HTTP ${response.status}).`;
-    }
-
-    return "No se pudo validar la confirmación de firma.";
-  };
-
   const handleConfirmSignature = async () => {
     if (!selectedDocument || !user || !pendingSignMethod) return;
 
@@ -1934,15 +1893,12 @@ export function DocumentsView({
     setIsConfirmingSignature(true);
     setSignConfirmationError(null);
 
-    const { error: verifyError } = await supabase.functions.invoke("verify-signature-confirmation", {
-      body: {
-        confirmation_text: signConfirmationText,
-        password: signConfirmationPassword,
-      },
+    const errorMessage = await verifySignatureConfirmation({
+      confirmationText: signConfirmationText,
+      password: signConfirmationPassword,
     });
 
-    if (verifyError) {
-      const errorMessage = await getSignatureConfirmationErrorMessage(verifyError);
+    if (errorMessage) {
       setSignConfirmationError(errorMessage);
       setIsConfirmingSignature(false);
       await logAction({
