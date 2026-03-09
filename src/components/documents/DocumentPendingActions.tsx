@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ActionConfirmDialog } from "./ActionConfirmDialog";
+import { verifySignatureConfirmation } from "@/lib/signatureConfirmation";
 
 const statusLabels: Record<string, string> = {
   draft: "Borrador",
@@ -278,62 +278,18 @@ export function DocumentPendingActions({ documentId, onActionCompleted, compact 
     setConfirmNextStatus(nextStatus);
   };
 
-  const getSignatureConfirmationErrorMessage = async (error: unknown) => {
-    if (error instanceof FunctionsHttpError) {
-      const response = error.context;
-      let parsedBody: unknown = null;
-      const rawBody = await response.clone().text();
-
-      if (rawBody) {
-        try {
-          parsedBody = JSON.parse(rawBody);
-        } catch {
-          parsedBody = null;
-        }
-      }
-
-      const backendError =
-        parsedBody && typeof parsedBody === "object" && "error" in parsedBody
-          ? (parsedBody as { error?: { code?: string; message?: string } | string }).error
-          : null;
-
-      const backendCode =
-        backendError && typeof backendError === "object" && "code" in backendError
-          ? backendError.code
-          : null;
-
-      if (backendCode === "INVALID_CONFIRMATION_TEXT") return "Debe escribir exactamente FIRMAR.";
-      if (backendCode === "PASSWORD_REQUIRED") return "Debe introducir su contraseña actual.";
-      if (backendCode === "PASSWORD_INVALID") return "La contraseña introducida no es correcta.";
-      if (backendCode === "AUTH_USER_UNAVAILABLE" || backendCode === "AUTH_CONTEXT_MISSING") {
-        return "No se pudo verificar la identidad del usuario actual.";
-      }
-
-      if (backendError && typeof backendError === "object" && typeof backendError.message === "string") {
-        return backendError.message;
-      }
-
-      return `No se pudo validar la confirmación de firma (HTTP ${response.status}).`;
-    }
-
-    return "No se pudo validar la confirmación de firma.";
-  };
-
   const handleDialogConfirm = async ({ comment, confirmationText, password }: { comment?: string; confirmationText: string; password?: string }) => {
     if (!confirmAction) return;
     setIsProcessing(true);
     let shouldCloseDialog = true;
     try {
       if (confirmType === "complete" && confirmAction.action_type === "firma") {
-        const { error: verifyError } = await supabase.functions.invoke("verify-signature-confirmation", {
-          body: {
-            confirmation_text: confirmationText,
-            password,
-          },
+        const errorMessage = await verifySignatureConfirmation({
+          confirmationText,
+          password: password ?? "",
         });
 
-        if (verifyError) {
-          const errorMessage = await getSignatureConfirmationErrorMessage(verifyError);
+        if (errorMessage) {
           shouldCloseDialog = false;
           throw new Error(errorMessage);
         }
