@@ -710,9 +710,16 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               <CardTitle>{selectedCapaPlan.title || "Plan CAPA"}</CardTitle>
               <div className="flex gap-2">
                 {canEditContent && (
-                  <Button size="sm" variant="outline" onClick={() => openEditCapa(selectedCapaPlan)}>
-                    <Pencil className="mr-1 h-4 w-4" />Editar
-                  </Button>
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => openEditCapa(selectedCapaPlan)}>
+                      <Pencil className="mr-1 h-4 w-4" />Editar
+                    </Button>
+                    {canManageCompany && (
+                      <Button size="sm" variant="destructive" onClick={() => openDeleteCapa(selectedCapaPlan.id)}>
+                        <Trash2 className="mr-1 h-4 w-4" />Eliminar
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </CardHeader>
