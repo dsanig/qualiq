@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle, Clock, Filter, Plus, Search, Pencil, X, Calen
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { StatusChangeDialog } from "@/components/shared/StatusChangeDialog";
+import { ActionConfirmDialog } from "@/components/documents/ActionConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
