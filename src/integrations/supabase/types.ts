@@ -1188,6 +1188,44 @@ export type Database = {
           },
         ]
       }
+      non_conformity_attachments: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          created_by: string | null
+          file_name: string | null
+          id: string
+          non_conformity_id: string
+          object_path: string
+        }
+        Insert: {
+          bucket_id?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string | null
+          id?: string
+          non_conformity_id: string
+          object_path: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string | null
+          id?: string
+          non_conformity_id?: string
+          object_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "non_conformity_attachments_non_conformity_id_fkey"
+            columns: ["non_conformity_id"]
+            isOneToOne: false
+            referencedRelation: "non_conformities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
