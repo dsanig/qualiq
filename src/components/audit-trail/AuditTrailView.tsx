@@ -5,7 +5,7 @@ import {
   Settings, Building2, GraduationCap, TrendingUp, FileWarning,
   LogIn, LogOut, Key, Eye, Download, Trash2
 } from "lucide-react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
