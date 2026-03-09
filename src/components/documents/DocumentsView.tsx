@@ -298,7 +298,7 @@ export function DocumentsView({
       .eq("user_id", payload.signed_by)
       .eq("action_type", "firma")
       .eq("status", "pending");
-  }, [user?.email]);
+  }, []);
 
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -315,7 +315,6 @@ export function DocumentsView({
   const [isManualSignOpen, setIsManualSignOpen] = useState(false);
   const [isSignConfirmationOpen, setIsSignConfirmationOpen] = useState(false);
   const [signConfirmationText, setSignConfirmationText] = useState("");
-  const [signConfirmationUserId, setSignConfirmationUserId] = useState("");
   const [signConfirmationPassword, setSignConfirmationPassword] = useState("");
   const [signConfirmationError, setSignConfirmationError] = useState<string | null>(null);
   const [isConfirmingSignature, setIsConfirmingSignature] = useState(false);
@@ -1746,7 +1745,6 @@ export function DocumentsView({
 
   const resetSignatureConfirmation = useCallback(() => {
     setSignConfirmationText("");
-    setSignConfirmationUserId("");
     setSignConfirmationPassword("");
     setSignConfirmationError(null);
     setPendingSignMethod(null);
@@ -1758,11 +1756,10 @@ export function DocumentsView({
     setPendingSignMethod(method);
     setPendingSignedFile(signedFile);
     setSignConfirmationText("");
-    setSignConfirmationUserId(user?.email ?? "");
     setSignConfirmationPassword("");
     setSignConfirmationError(null);
     setIsSignConfirmationOpen(true);
-  }, [user?.email]);
+  }, []);
 
   const canPerformAction = useCallback(async (userId: string, documentId: string, actionType: string) => {
     // No superadmin bypass — only assigned responsible users can perform actions
@@ -1901,8 +1898,6 @@ export function DocumentsView({
           : null;
 
       if (backendCode === "INVALID_CONFIRMATION_TEXT") return "Debe escribir exactamente FIRMAR.";
-      if (backendCode === "USER_IDENTIFIER_REQUIRED") return "Debe introducir su ID de usuario.";
-      if (backendCode === "USER_IDENTIFIER_MISMATCH") return "El ID de usuario no coincide con el usuario autenticado.";
       if (backendCode === "PASSWORD_REQUIRED") return "Debe introducir su contraseña actual.";
       if (backendCode === "PASSWORD_INVALID") return "La contraseña introducida no es correcta.";
       if (backendCode === "AUTH_USER_UNAVAILABLE" || backendCode === "AUTH_CONTEXT_MISSING") {
@@ -1927,11 +1922,6 @@ export function DocumentsView({
       return;
     }
 
-    if (!signConfirmationUserId.trim()) {
-      setSignConfirmationError("Debes introducir tu ID de usuario.");
-      return;
-    }
-
     if (!signConfirmationPassword) {
       setSignConfirmationError("Debes introducir tu contraseña actual.");
       return;
@@ -1947,9 +1937,7 @@ export function DocumentsView({
     const { error: verifyError } = await supabase.functions.invoke("verify-signature-confirmation", {
       body: {
         confirmation_text: signConfirmationText,
-        user_identifier: signConfirmationUserId.trim(),
         password: signConfirmationPassword,
-        document_id: selectedDocument.id,
       },
     });
 
@@ -2510,9 +2498,9 @@ export function DocumentsView({
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Confirmar Firma</DialogTitle>
+            <DialogTitle>Confirmar firma</DialogTitle>
             <DialogDescription>
-              Para firmar este documento, escriba exactamente FIRMAR e introduzca su ID de usuario y contraseña.
+              Para firmar este documento, escriba FIRMAR y confirme su contraseña.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -2531,20 +2519,7 @@ export function DocumentsView({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signature-confirmation-user-id">ID de usuario</Label>
-              <Input
-                id="signature-confirmation-user-id"
-                value={signConfirmationUserId}
-                onChange={(event) => {
-                  setSignConfirmationUserId(event.target.value);
-                  if (signConfirmationError) setSignConfirmationError(null);
-                }}
-                placeholder="Introduce tu email corporativo"
-                autoComplete="username"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="signature-confirmation-password">Contraseña</Label>
+              <Label htmlFor="signature-confirmation-password">Contraseña actual</Label>
               <Input
                 id="signature-confirmation-password"
                 type="password"
@@ -2577,12 +2552,11 @@ export function DocumentsView({
               disabled={
                 isSignatureSubmitting ||
                 isConfirmingSignature ||
-                !signConfirmationUserId.trim() ||
                 !signConfirmationPassword ||
                 signConfirmationText !== "FIRMAR"
               }
             >
-              {isConfirmingSignature || isSignatureSubmitting ? "Firmando..." : "Firmar"}
+              {isConfirmingSignature || isSignatureSubmitting ? "Firmando..." : "Firmar documento"}
             </Button>
           </DialogFooter>
         </DialogContent>
