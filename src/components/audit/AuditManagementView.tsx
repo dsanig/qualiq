@@ -87,10 +87,15 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [editingAction, setEditingAction] = useState<ActionItem | null>(null);
   const [editingCapa, setEditingCapa] = useState<CapaPlan | null>(null);
   const [editingAudit, setEditingAudit] = useState<Audit | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null)).catch(() => setCurrentUserId(null));
+  }, []);
 
   const normalizeText = (value: string | null | undefined) =>
     (value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
