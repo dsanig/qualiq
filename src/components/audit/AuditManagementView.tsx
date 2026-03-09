@@ -927,8 +927,20 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       <Dialog open={newAuditOpen} onOpenChange={setNewAuditOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Nueva auditoría</DialogTitle></DialogHeader>
-          {renderAuditFields()}
-          <DialogFooter><Button onClick={createAudit} disabled={!auditForm.title}>Crear</Button></DialogFooter>
+          {renderAuditFields({ readOnly: false })}
+          <DialogFooter>
+            <Button
+              onClick={createAudit}
+              disabled={
+                !auditForm.title.trim() ||
+                !auditForm.auditor_id ||
+                !auditForm.responsible_id ||
+                (auditForm.audit_type === "externa" && !auditForm.external_entity_id.trim())
+              }
+            >
+              Crear
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -936,7 +948,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       <Dialog open={editAuditOpen} onOpenChange={(o) => { setEditAuditOpen(o); if (!o) setEditingAudit(null); }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Editar auditoría</DialogTitle></DialogHeader>
-          {renderAuditFields()}
+          {renderAuditFields({ readOnly: !canEditEditingAudit })}
           {/* Existing attachments */}
           {editingAudit && (
             <div>
@@ -947,13 +959,31 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
               {auditAttachments.filter((a) => a.audit_id === editingAudit.id).map((att) => (
                 <div key={att.id} className="flex items-center justify-between rounded border p-2 mt-1">
                   <span className="text-sm flex items-center gap-1"><FileText className="h-3 w-3" />{att.file_name ?? att.object_path}</span>
-                  <button onClick={() => deleteAuditAttachment(att)} className="text-destructive hover:text-destructive/80"><Trash2 className="h-4 w-4" /></button>
+                  {canEditEditingAudit && (
+                    <button onClick={() => deleteAuditAttachment(att)} className="text-destructive hover:text-destructive/80">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           )}
           <DialogFooter>
-            {canEditContent ? <Button onClick={updateAudit} disabled={!auditForm.title}>Guardar cambios</Button> : <p className="text-sm text-muted-foreground">Solo lectura</p>}
+            {canEditEditingAudit ? (
+              <Button
+                onClick={updateAudit}
+                disabled={
+                  !auditForm.title.trim() ||
+                  !auditForm.auditor_id ||
+                  !auditForm.responsible_id ||
+                  (auditForm.audit_type === "externa" && !auditForm.external_entity_id.trim())
+                }
+              >
+                Guardar cambios
+              </Button>
+            ) : (
+              <p className="text-sm text-muted-foreground">Solo lectura</p>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
