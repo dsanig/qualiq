@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2, Trash2, FileText, AlertTriangle, Users, Calendar } from "lucide-react";
+import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2, Trash2, FileText, AlertTriangle, Users, Calendar, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +44,7 @@ type ActionItem = {
   action_type: "corrective" | "preventive" | "immediate";
   description: string;
   responsible_id: string | null;
+  start_date: string | null;
   due_date: string | null;
   status: string;
 };
@@ -101,6 +102,22 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   const [deleteCapaImpact, setDeleteCapaImpact] = useState<{ ncs: number; actions: number; links: number } | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
+  // Delete NC/Action states
+  const [deleteNcOpen, setDeleteNcOpen] = useState(false);
+  const [deletingNcId, setDeletingNcId] = useState<string | null>(null);
+  const [deleteNcConfirmText, setDeleteNcConfirmText] = useState("");
+  const [deleteActionOpen, setDeleteActionOpen] = useState(false);
+  const [deletingActionId, setDeletingActionId] = useState<string | null>(null);
+  const [deleteActionConfirmText, setDeleteActionConfirmText] = useState("");
+
+  // Status update states
+  const [updateNcStatusOpen, setUpdateNcStatusOpen] = useState(false);
+  const [updatingNcStatus, setUpdatingNcStatus] = useState<NonConformity | null>(null);
+  const [newNcStatus, setNewNcStatus] = useState("");
+  const [updateActionStatusOpen, setUpdateActionStatusOpen] = useState(false);
+  const [updatingActionStatus, setUpdatingActionStatus] = useState<ActionItem | null>(null);
+  const [newActionStatus, setNewActionStatus] = useState("");
+
   // Forms
   const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "", audit_id: "" });
   const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
@@ -110,6 +127,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     action_type: "corrective" as "corrective" | "preventive" | "immediate",
     description: "",
     responsible_id: "",
+    start_date: "",
     due_date: "",
     status: "open",
   });
@@ -139,7 +157,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   const selectedCapaPlan = useMemo(() => capaPlans.find((p) => p.id === selectedCapaPlanId) ?? null, [capaPlans, selectedCapaPlanId]);
   
-  // All NCs (not filtered by CAPA)
   const allNcsFiltered = useMemo(() => {
     if (!normalizedQuery) return nonConformities;
     return nonConformities.filter((nc) => {
@@ -148,7 +165,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     });
   }, [nonConformities, normalizedQuery]);
 
-  // All Actions (not filtered by CAPA)
   const allActionsFiltered = useMemo(() => {
     if (!normalizedQuery) return actions;
     return actions.filter((action) => {
@@ -166,7 +182,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       const [{ data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: auditsData }, { data: incData }, { data: recData }, { data: linksData }, { data: capaNcData }] = await Promise.all([
         (supabase as any).from("capa_plans").select("id,audit_id,company_id,title,description,responsible_id").order("created_at", { ascending: false }),
         (supabase as any).from("non_conformities").select("id,capa_plan_id,audit_id,company_id,title,description,severity,root_cause,status,deadline,responsible_id"),
-        (supabase as any).from("actions").select("id,capa_plan_id,company_id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
+        (supabase as any).from("actions").select("id,capa_plan_id,company_id,non_conformity_id,action_type,description,responsible_id,start_date,due_date,status"),
         (supabase as any).from("profiles").select("id,user_id,company_id,full_name,email"),
         (supabase as any).from("audits").select("id,title"),
         (supabase as any).from("incidencias").select("id,title,status"),
@@ -372,10 +388,10 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         audit_id: ncForm.audit_id || null,
         company_id: companyId,
         title: ncForm.title,
-        description: ncForm.description || null,
-        severity: ncForm.severity || null,
+        description: ncForm.description,
+        severity: ncForm.severity,
         root_cause: ncForm.root_cause || null,
-        status: ncForm.status,
+        status: "open",
         deadline: ncForm.deadline,
         responsible_id: ncForm.responsible_id,
       })
@@ -405,10 +421,9 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       .from("non_conformities")
       .update({
         title: ncForm.title,
-        description: ncForm.description || null,
-        severity: ncForm.severity || null,
+        description: ncForm.description,
+        severity: ncForm.severity,
         root_cause: ncForm.root_cause || null,
-        status: ncForm.status,
         deadline: ncForm.deadline,
         responsible_id: ncForm.responsible_id,
         audit_id: ncForm.audit_id || null,
@@ -428,9 +443,121 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     await loadData();
   };
 
+  // Delete NC
+  const openDeleteNc = (ncId: string) => {
+    setDeletingNcId(ncId);
+    setDeleteNcConfirmText("");
+    setDeleteNcOpen(true);
+  };
+
+  const deleteNc = async () => {
+    if (!deletingNcId) return;
+
+    // Remove related actions' NC reference
+    await (supabase as any).from("actions").update({ non_conformity_id: null }).eq("non_conformity_id", deletingNcId);
+    // Remove from capa_plan_non_conformities
+    await (supabase as any).from("capa_plan_non_conformities").delete().eq("non_conformity_id", deletingNcId);
+
+    const { error } = await (supabase as any).from("non_conformities").delete().eq("id", deletingNcId);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "No conformidad eliminada" });
+      logAction({ action: "delete", entity_type: "non_conformity", entity_id: deletingNcId });
+    }
+
+    setDeleteNcOpen(false);
+    setDeletingNcId(null);
+    setDeleteNcConfirmText("");
+    await loadData();
+  };
+
+  // Delete Action
+  const openDeleteAction = (actionId: string) => {
+    setDeletingActionId(actionId);
+    setDeleteActionConfirmText("");
+    setDeleteActionOpen(true);
+  };
+
+  const deleteAction = async () => {
+    if (!deletingActionId) return;
+
+    // Remove related attachments
+    await (supabase as any).from("action_attachments").delete().eq("action_id", deletingActionId);
+
+    const { error } = await (supabase as any).from("actions").delete().eq("id", deletingActionId);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Acción eliminada" });
+      logAction({ action: "delete", entity_type: "action", entity_id: deletingActionId });
+    }
+
+    setDeleteActionOpen(false);
+    setDeletingActionId(null);
+    setDeleteActionConfirmText("");
+    await loadData();
+  };
+
+  // Update NC Status (only responsible)
+  const openUpdateNcStatus = (nc: NonConformity) => {
+    setUpdatingNcStatus(nc);
+    setNewNcStatus(nc.status);
+    setUpdateNcStatusOpen(true);
+  };
+
+  const saveNcStatus = async () => {
+    if (!updatingNcStatus) return;
+
+    const { error } = await (supabase as any)
+      .from("non_conformities")
+      .update({ status: newNcStatus })
+      .eq("id", updatingNcStatus.id);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Estado actualizado" });
+    logAction({ action: "update", entity_type: "non_conformity", entity_id: updatingNcStatus.id, entity_title: `Estado → ${statusLabel(newNcStatus)}` });
+    setUpdateNcStatusOpen(false);
+    setUpdatingNcStatus(null);
+    await loadData();
+  };
+
+  // Update Action Status (only responsible)
+  const openUpdateActionStatus = (action: ActionItem) => {
+    setUpdatingActionStatus(action);
+    setNewActionStatus(action.status);
+    setUpdateActionStatusOpen(true);
+  };
+
+  const saveActionStatus = async () => {
+    if (!updatingActionStatus) return;
+
+    const { error } = await (supabase as any)
+      .from("actions")
+      .update({ status: newActionStatus })
+      .eq("id", updatingActionStatus.id);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Estado actualizado" });
+    logAction({ action: "update", entity_type: "action", entity_id: updatingActionStatus.id, entity_title: `Estado → ${statusLabel(newActionStatus)}` });
+    setUpdateActionStatusOpen(false);
+    setUpdatingActionStatus(null);
+    await loadData();
+  };
+
   const createAction = async () => {
     if (!actionForm.responsible_id || !actionForm.due_date) {
-      toast({ title: "Error", description: "Responsable y fecha son obligatorios.", variant: "destructive" });
+      toast({ title: "Error", description: "Responsable y fecha límite son obligatorios.", variant: "destructive" });
       return;
     }
 
@@ -445,8 +572,9 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         action_type: actionForm.action_type,
         description: actionForm.description,
         responsible_id: actionForm.responsible_id,
+        start_date: actionForm.start_date || null,
         due_date: actionForm.due_date,
-        status: actionForm.status,
+        status: "open",
       })
       .select("id")
       .single();
@@ -459,17 +587,12 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     toast({ title: "Acción creada" });
     logAction({ action: "create", entity_type: "action", entity_id: data?.id, entity_title: actionForm.description.slice(0, 50) });
     setNewActionOpen(false);
-    setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" });
+    setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", start_date: "", due_date: "", status: "open" });
     await loadData();
   };
 
   const updateAction = async () => {
     if (!editingAction) return;
-
-    if (editingAction.responsible_id !== currentUserId) {
-      toast({ title: "Sin permisos", description: "Solo el responsable puede modificar esta acción.", variant: "destructive" });
-      return;
-    }
 
     const { error } = await (supabase as any)
       .from("actions")
@@ -479,8 +602,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         action_type: actionForm.action_type,
         description: actionForm.description,
         responsible_id: actionForm.responsible_id,
+        start_date: actionForm.start_date || null,
         due_date: actionForm.due_date,
-        status: actionForm.status,
       })
       .eq("id", editingAction.id);
 
@@ -498,16 +621,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   const linkIncidencia = async (incidenciaId: string) => {
     if (!selectedCapaPlanId) return;
-
-    const { error } = await (supabase as any)
-      .from("incidencia_capa_plans")
-      .insert({ incidencia_id: incidenciaId, capa_plan_id: selectedCapaPlanId });
-
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      return;
-    }
-
+    const { error } = await (supabase as any).from("incidencia_capa_plans").insert({ incidencia_id: incidenciaId, capa_plan_id: selectedCapaPlanId });
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Incidencia vinculada" });
     setLinkIncidenciaOpen(false);
     await loadData();
@@ -515,18 +630,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   const unlinkIncidencia = async (incidenciaId: string) => {
     if (!selectedCapaPlanId) return;
-
-    const { error } = await (supabase as any)
-      .from("incidencia_capa_plans")
-      .delete()
-      .eq("incidencia_id", incidenciaId)
-      .eq("capa_plan_id", selectedCapaPlanId);
-
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      return;
-    }
-
+    const { error } = await (supabase as any).from("incidencia_capa_plans").delete().eq("incidencia_id", incidenciaId).eq("capa_plan_id", selectedCapaPlanId);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Incidencia desvinculada" });
     await loadData();
   };
@@ -554,16 +659,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   const linkNc = async (ncId: string) => {
     if (!selectedCapaPlanId) return;
-
-    const { error } = await (supabase as any)
-      .from("capa_plan_non_conformities")
-      .insert({ non_conformity_id: ncId, capa_plan_id: selectedCapaPlanId });
-
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      return;
-    }
-
+    const { error } = await (supabase as any).from("capa_plan_non_conformities").insert({ non_conformity_id: ncId, capa_plan_id: selectedCapaPlanId });
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "No conformidad vinculada" });
     setLinkNcOpen(false);
     await loadData();
@@ -571,18 +668,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   const unlinkNc = async (ncId: string) => {
     if (!selectedCapaPlanId) return;
-
-    const { error } = await (supabase as any)
-      .from("capa_plan_non_conformities")
-      .delete()
-      .eq("non_conformity_id", ncId)
-      .eq("capa_plan_id", selectedCapaPlanId);
-
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      return;
-    }
-
+    const { error } = await (supabase as any).from("capa_plan_non_conformities").delete().eq("non_conformity_id", ncId).eq("capa_plan_id", selectedCapaPlanId);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: "No conformidad desvinculada" });
     await loadData();
   };
@@ -639,6 +726,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
       action_type: action.action_type,
       description: action.description,
       responsible_id: action.responsible_id ?? "",
+      start_date: action.start_date ?? "",
       due_date: action.due_date ?? "",
       status: action.status,
     });
@@ -656,13 +744,11 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     return { ncs: ncs.length, openNcs, actions: allActions.length, openActions };
   };
 
-  // Get NCs for a specific CAPA plan
   const getNcsForCapaPlan = (capaId: string) => {
     const linkedByJoin = capaNcLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.non_conformity_id);
     return nonConformities.filter((nc) => nc.capa_plan_id === capaId || linkedByJoin.includes(nc.id));
   };
 
-  // Get Actions for a specific CAPA plan
   const getActionsForCapaPlan = (capaId: string) => {
     const relatedNcs = getNcsForCapaPlan(capaId);
     const ncIds = relatedNcs.map((nc) => nc.id);
@@ -717,12 +803,13 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                         <TableHead>Fecha límite</TableHead>
                         <TableHead>Origen</TableHead>
                         <TableHead>Plan CAPA</TableHead>
-                        <TableHead className="w-[80px]"></TableHead>
+                        <TableHead className="w-[150px]">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {allNcsFiltered.map((nc) => {
                         const ncActs = actions.filter((a) => a.non_conformity_id === nc.id);
+                        const isResponsible = nc.responsible_id === currentUserId;
                         return (
                           <TableRow key={nc.id}>
                             <TableCell>
@@ -774,11 +861,23 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                               )}
                             </TableCell>
                             <TableCell>
-                              {canEditContent && (
-                                <Button size="sm" variant="ghost" onClick={() => openEditNc(nc)}>
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              )}
+                              <div className="flex items-center gap-1">
+                                {isResponsible && (
+                                  <Button size="sm" variant="outline" onClick={() => openUpdateNcStatus(nc)} title="Actualizar Estado">
+                                    <RefreshCw className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {canEditContent && (
+                                  <Button size="sm" variant="ghost" onClick={() => openEditNc(nc)} title="Editar">
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {canManageCompany && (
+                                  <Button size="sm" variant="ghost" onClick={() => openDeleteNc(nc.id)} title="Eliminar" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -800,7 +899,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                 Todas las Acciones Correctivas
               </CardTitle>
               {canEditContent && (
-                <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
+                <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", start_date: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
                   <Plus className="mr-1 h-4 w-4" />Nueva Acción
                 </Button>
               )}
@@ -819,69 +918,93 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                         <TableHead>Tipo</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Responsable</TableHead>
-                        <TableHead>Vencimiento</TableHead>
+                        <TableHead>Fecha Inicio</TableHead>
+                        <TableHead>Fecha Límite</TableHead>
                         <TableHead>NC Origen</TableHead>
                         <TableHead>Plan CAPA</TableHead>
-                        <TableHead className="w-[80px]"></TableHead>
+                        <TableHead className="w-[150px]">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {allActionsFiltered.map((action) => (
-                        <TableRow key={action.id}>
-                          <TableCell>
-                            <p className="font-medium max-w-xs truncate">{action.description}</p>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{actionTypeLabel(action.action_type)}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={action.status === "closed" ? "secondary" : action.status === "in_progress" ? "default" : "outline"}>
-                              {statusLabel(action.status)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Users className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">{getUserName(action.responsible_id) || "Sin asignar"}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {action.due_date ? (
-                              <span className={`flex items-center gap-1 text-sm ${isOverdue(action.due_date) && action.status !== "closed" ? "text-destructive" : ""}`}>
-                                <Calendar className="h-3 w-3" />
-                                {action.due_date}
-                                {isOverdue(action.due_date) && action.status !== "closed" && <AlertCircle className="h-3 w-3" />}
-                              </span>
-                            ) : "—"}
-                          </TableCell>
-                          <TableCell>
-                            {action.non_conformity_id ? (
-                              <Badge variant="outline" className="text-xs">
-                                <ClipboardList className="h-3 w-3 mr-1" />
-                                {getNcTitle(action.non_conformity_id)?.slice(0, 15) || "NC"}
+                      {allActionsFiltered.map((action) => {
+                        const isResponsible = action.responsible_id === currentUserId;
+                        return (
+                          <TableRow key={action.id}>
+                            <TableCell>
+                              <p className="font-medium max-w-xs truncate">{action.description}</p>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{actionTypeLabel(action.action_type)}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={action.status === "closed" ? "secondary" : action.status === "in_progress" ? "default" : "outline"}>
+                                {statusLabel(action.status)}
                               </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {action.capa_plan_id ? (
-                              <Badge variant="secondary" className="text-xs">
-                                {getCapaPlanTitle(action.capa_plan_id)?.slice(0, 15) || "Plan CAPA"}
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {action.responsible_id === currentUserId && (
-                              <Button size="sm" variant="ghost" onClick={() => openEditAction(action)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-sm">{getUserName(action.responsible_id) || "Sin asignar"}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {action.start_date ? (
+                                <span className="flex items-center gap-1 text-sm">
+                                  <Calendar className="h-3 w-3" />
+                                  {action.start_date}
+                                </span>
+                              ) : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {action.due_date ? (
+                                <span className={`flex items-center gap-1 text-sm ${isOverdue(action.due_date) && action.status !== "closed" ? "text-destructive" : ""}`}>
+                                  <Calendar className="h-3 w-3" />
+                                  {action.due_date}
+                                  {isOverdue(action.due_date) && action.status !== "closed" && <AlertCircle className="h-3 w-3" />}
+                                </span>
+                              ) : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {action.non_conformity_id ? (
+                                <Badge variant="outline" className="text-xs">
+                                  <ClipboardList className="h-3 w-3 mr-1" />
+                                  {getNcTitle(action.non_conformity_id)?.slice(0, 15) || "NC"}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {action.capa_plan_id ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  {getCapaPlanTitle(action.capa_plan_id)?.slice(0, 15) || "Plan CAPA"}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                {isResponsible && (
+                                  <Button size="sm" variant="outline" onClick={() => openUpdateActionStatus(action)} title="Actualizar Estado">
+                                    <RefreshCw className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {canEditContent && (
+                                  <Button size="sm" variant="ghost" onClick={() => openEditAction(action)} title="Editar">
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {canManageCompany && (
+                                  <Button size="sm" variant="ghost" onClick={() => openDeleteAction(action.id)} title="Eliminar" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -1220,7 +1343,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         </DialogContent>
       </Dialog>
 
-      {/* Edit NC Dialog */}
+      {/* Edit NC Dialog - NO status field, status changes only via "Actualizar Estado" */}
       <Dialog open={editNcOpen} onOpenChange={setEditNcOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1267,13 +1390,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
               </Select>
             </div>
             <div><Label>Fecha límite *</Label><Input type="date" value={ncForm.deadline} onChange={(e) => setNcForm((p) => ({ ...p, deadline: e.target.value }))} /></div>
-            <div>
-              <Label>Estado</Label>
-              <Select value={ncForm.status} onValueChange={(v) => setNcForm((p) => ({ ...p, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditNcOpen(false)}>Cancelar</Button>
@@ -1324,7 +1440,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                 <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div><Label>Fecha vencimiento *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
+            <div><Label>Fecha de Inicio</Label><Input type="date" value={actionForm.start_date} onChange={(e) => setActionForm((p) => ({ ...p, start_date: e.target.value }))} /></div>
+            <div><Label>Fecha Límite *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewActionOpen(false)}>Cancelar</Button>
@@ -1333,7 +1450,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         </DialogContent>
       </Dialog>
 
-      {/* Edit Action Dialog */}
+      {/* Edit Action Dialog - NO status field */}
       <Dialog open={editActionOpen} onOpenChange={setEditActionOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1375,18 +1492,58 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                 <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div><Label>Fecha vencimiento *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
+            <div><Label>Fecha de Inicio</Label><Input type="date" value={actionForm.start_date} onChange={(e) => setActionForm((p) => ({ ...p, start_date: e.target.value }))} /></div>
+            <div><Label>Fecha Límite *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditActionOpen(false)}>Cancelar</Button>
+            <Button onClick={updateAction}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update NC Status Dialog */}
+      <Dialog open={updateNcStatusOpen} onOpenChange={setUpdateNcStatusOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Actualizar Estado — NC</DialogTitle>
+            <DialogDescription>{updatingNcStatus?.title}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
             <div>
-              <Label>Estado</Label>
-              <Select value={actionForm.status} onValueChange={(v) => setActionForm((p) => ({ ...p, status: v }))}>
+              <Label>Nuevo estado</Label>
+              <Select value={newNcStatus} onValueChange={setNewNcStatus}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditActionOpen(false)}>Cancelar</Button>
-            <Button onClick={updateAction}>Guardar</Button>
+            <Button variant="outline" onClick={() => setUpdateNcStatusOpen(false)}>Cancelar</Button>
+            <Button onClick={saveNcStatus}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Action Status Dialog */}
+      <Dialog open={updateActionStatusOpen} onOpenChange={setUpdateActionStatusOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Actualizar Estado — Acción</DialogTitle>
+            <DialogDescription>{updatingActionStatus?.description?.slice(0, 80)}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Nuevo estado</Label>
+              <Select value={newActionStatus} onValueChange={setNewActionStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUpdateActionStatusOpen(false)}>Cancelar</Button>
+            <Button onClick={saveActionStatus}>Guardar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1483,6 +1640,66 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           <DialogFooter>
             <Button variant="outline" onClick={() => { setDeleteCapaOpen(false); setDeleteConfirmText(""); }}>Cancelar</Button>
             <Button variant="destructive" onClick={deleteCapaPlan} disabled={deleteConfirmText !== "ELIMINAR"}>
+              <Trash2 className="mr-1 h-4 w-4" />Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete NC Confirmation Dialog */}
+      <Dialog open={deleteNcOpen} onOpenChange={(open) => { setDeleteNcOpen(open); if (!open) setDeleteNcConfirmText(""); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar No Conformidad</DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará la no conformidad y desvinculará las acciones correctivas asociadas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-destructive font-medium">⚠️ Esta acción no se puede deshacer.</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Escribe <span className="font-bold">ELIMINAR</span> para confirmar</Label>
+            <Input
+              value={deleteNcConfirmText}
+              onChange={(e) => setDeleteNcConfirmText(e.target.value)}
+              placeholder="ELIMINAR"
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteNcOpen(false); setDeleteNcConfirmText(""); }}>Cancelar</Button>
+            <Button variant="destructive" onClick={deleteNc} disabled={deleteNcConfirmText !== "ELIMINAR"}>
+              <Trash2 className="mr-1 h-4 w-4" />Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Action Confirmation Dialog */}
+      <Dialog open={deleteActionOpen} onOpenChange={(open) => { setDeleteActionOpen(open); if (!open) setDeleteActionConfirmText(""); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Acción Correctiva</DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará permanentemente la acción correctiva seleccionada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-destructive font-medium">⚠️ Esta acción no se puede deshacer.</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Escribe <span className="font-bold">ELIMINAR</span> para confirmar</Label>
+            <Input
+              value={deleteActionConfirmText}
+              onChange={(e) => setDeleteActionConfirmText(e.target.value)}
+              placeholder="ELIMINAR"
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteActionOpen(false); setDeleteActionConfirmText(""); }}>Cancelar</Button>
+            <Button variant="destructive" onClick={deleteAction} disabled={deleteActionConfirmText !== "ELIMINAR"}>
               <Trash2 className="mr-1 h-4 w-4" />Eliminar
             </Button>
           </DialogFooter>
