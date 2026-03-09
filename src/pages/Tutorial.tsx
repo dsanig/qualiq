@@ -123,9 +123,9 @@ export default function Tutorial() {
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-10">
         {/* Intro */}
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold text-foreground">¿Qué es iQ?</h2>
+          <h2 className="text-2xl font-bold text-foreground">¿Qué es QualiQ?</h2>
           <p className="text-muted-foreground leading-relaxed">
-            iQ es una plataforma integral de gestión de calidad diseñada para empresas que necesitan cumplir con normativas regulatorias (ISO 9001, ISO 13485, GMP, 21 CFR Part 11, entre otras). Centraliza la gestión documental, el seguimiento de incidencias y reclamaciones, la planificación de auditorías y la formación del personal en un único entorno digital seguro y trazable.
+            QualiQ es una plataforma integral de gestión de calidad diseñada para empresas que necesitan cumplir con normativas regulatorias (ISO 9001, ISO 13485, GMP, 21 CFR Part 11, entre otras). Centraliza la gestión documental, el seguimiento de incidencias y reclamaciones, la planificación de auditorías y la formación del personal en un único entorno digital seguro y trazable.
           </p>
         </section>
 
