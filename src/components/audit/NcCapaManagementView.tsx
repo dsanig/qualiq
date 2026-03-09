@@ -585,11 +585,14 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   // Count stats for a CAPA plan
   const getCapaStats = (capaId: string) => {
-    const ncs = nonConformities.filter((nc) => nc.capa_plan_id === capaId);
-    const ncActions = actions.filter((a) => ncs.some((nc) => nc.id === a.non_conformity_id));
+    const linkedByJoin = capaNcLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.non_conformity_id);
+    const ncs = nonConformities.filter((nc) => nc.capa_plan_id === capaId || linkedByJoin.includes(nc.id));
+    const ncActions = actions.filter((a) => (a.non_conformity_id ? ncs.some((nc) => nc.id === a.non_conformity_id) : false));
+    const directActions = actions.filter((a) => a.capa_plan_id === capaId);
+    const allActions = [...ncActions, ...directActions.filter((a) => !ncActions.some((nca) => nca.id === a.id))];
     const openNcs = ncs.filter((nc) => nc.status === "open" || nc.status === "in_progress").length;
-    const openActions = ncActions.filter((a) => a.status === "open" || a.status === "in_progress").length;
-    return { ncs: ncs.length, openNcs, actions: ncActions.length, openActions };
+    const openActions = allActions.filter((a) => a.status === "open" || a.status === "in_progress").length;
+    return { ncs: ncs.length, openNcs, actions: allActions.length, openActions };
   };
 
   return (
