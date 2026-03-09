@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { NotificationsDropdown } from "@/components/notifications/NotificationsDropdown";
 import { CompanySwitcher } from "./CompanySwitcher";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
