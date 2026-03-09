@@ -387,90 +387,54 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
 
   const uploadNcAttachments = async (nonConformityId: string) => {
     const userId = (await supabase.auth.getUser()).data.user?.id;
-    const { data: pData } = await supabase.from("profiles").select("company_id").eq("user_id", userId ?? "").maybeSingle();
-    const tenantPrefix = pData?.company_id ?? "unknown";
-
     for (const att of newNcAttachments) {
       if (!att.file) continue;
+      const { data: pData } = await supabase.from("profiles").select("company_id").eq("user_id", userId ?? "").maybeSingle();
+      const tenantPrefix = pData?.company_id ?? "unknown";
       const path = `${tenantPrefix}/non_conformities/${nonConformityId}/${Date.now()}_${att.file.name}`;
       const { error: uploadError } = await supabase.storage.from("documents").upload(path, att.file);
       if (uploadError) {
         toast({ title: "Error subiendo archivo", description: att.file.name, variant: "destructive" });
         continue;
       }
-
-      const { error: insertError } = await (supabase as any).from("non_conformity_attachments").insert({
+      await (supabase as any).from("non_conformity_attachments").insert({
         non_conformity_id: nonConformityId,
         object_path: path,
         file_name: att.file.name,
         file_type: att.file.type || "application/octet-stream",
         created_by: userId,
       });
-
-      if (insertError) {
-        await supabase.storage.from("documents").remove([path]);
-        toast({ title: "Error guardando adjunto", description: `${att.file.name}: ${insertError.message}`, variant: "destructive" });
-      }
     }
   };
 
   const uploadActionAttachments = async (actionId: string) => {
     const userId = (await supabase.auth.getUser()).data.user?.id;
-    const { data: pData } = await supabase.from("profiles").select("company_id").eq("user_id", userId ?? "").maybeSingle();
-    const tenantPrefix = pData?.company_id ?? "unknown";
-
     for (const att of newActionAttachments) {
       if (!att.file) continue;
+      const { data: pData } = await supabase.from("profiles").select("company_id").eq("user_id", userId ?? "").maybeSingle();
+      const tenantPrefix = pData?.company_id ?? "unknown";
       const path = `${tenantPrefix}/actions/${actionId}/${Date.now()}_${att.file.name}`;
       const { error: uploadError } = await supabase.storage.from("documents").upload(path, att.file);
       if (uploadError) {
         toast({ title: "Error subiendo archivo", description: att.file.name, variant: "destructive" });
         continue;
       }
-
-      const { error: insertError } = await (supabase as any).from("action_attachments").insert({
+      await (supabase as any).from("action_attachments").insert({
         action_id: actionId,
         object_path: path,
         file_name: att.file.name,
         created_by: userId,
       });
-
-      if (insertError) {
-        await supabase.storage.from("documents").remove([path]);
-        toast({ title: "Error guardando adjunto", description: `${att.file.name}: ${insertError.message}`, variant: "destructive" });
-      }
     }
   };
 
   const loadExistingNcAttachments = async (nonConformityId: string) => {
-    const { data, error } = await (supabase as any)
-      .from("non_conformity_attachments")
-      .select("id,file_name,object_path")
-      .eq("non_conformity_id", nonConformityId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      toast({ title: "Error cargando adjuntos", description: error.message, variant: "destructive" });
-      setExistingNcAttachments([]);
-      return;
-    }
-
+    const { data } = await (supabase as any).from("non_conformity_attachments").select("id,file_name,object_path").eq("non_conformity_id", nonConformityId);
     setExistingNcAttachments(Array.isArray(data) ? data.map((a: any) => ({ id: a.id, file_name: a.file_name ?? "archivo", object_path: a.object_path })) : []);
   };
 
   const loadExistingActionAttachments = async (actionId: string) => {
-    const { data, error } = await (supabase as any)
-      .from("action_attachments")
-      .select("id,file_name,object_path")
-      .eq("action_id", actionId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      toast({ title: "Error cargando adjuntos", description: error.message, variant: "destructive" });
-      setExistingActionAttachments([]);
-      return;
-    }
-
+    const { data } = await (supabase as any).from("action_attachments").select("id,file_name,object_path").eq("action_id", actionId);
     setExistingActionAttachments(Array.isArray(data) ? data.map((a: any) => ({ id: a.id, file_name: a.file_name ?? "archivo", object_path: a.object_path })) : []);
   };
 
@@ -488,7 +452,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     if (index < existingNcAttachments.length) {
       const attachment = existingNcAttachments[index];
       if (!attachment?.id || !canEditContent) return;
-      if (attachment.object_path) await supabase.storage.from("documents").remove([attachment.object_path]);
       await (supabase as any).from("non_conformity_attachments").delete().eq("id", attachment.id);
       setExistingNcAttachments((prev) => prev.filter((_, i) => i !== index));
       return;
@@ -500,7 +463,6 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     if (index < existingActionAttachments.length) {
       const attachment = existingActionAttachments[index];
       if (!attachment?.id || !canEditContent) return;
-      if (attachment.object_path) await supabase.storage.from("documents").remove([attachment.object_path]);
       await (supabase as any).from("action_attachments").delete().eq("id", attachment.id);
       setExistingActionAttachments((prev) => prev.filter((_, i) => i !== index));
       return;
