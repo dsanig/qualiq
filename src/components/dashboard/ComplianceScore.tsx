@@ -63,7 +63,7 @@ export function ComplianceScore() {
     const [docsRes, incRes, actRes] = await Promise.all([
       (supabase as any).from("documents").select("id, title, code, status").neq("status", "approved"),
       (supabase as any).from("incidencias").select("id, title, status, deadline").neq("status", "closed"),
-      (supabase as any).from("actions").select("id, description, action_type, status, due_date").neq("status", "closed"),
+      (supabase as any).from("actions").select("id, title, description, action_type, status, due_date").neq("status", "closed"),
     ]);
 
     const statusLabels: Record<string, string> = {
@@ -101,7 +101,7 @@ export function ComplianceScore() {
     (actRes.data ?? []).forEach((a: any) => {
       items.push({
         id: a.id,
-        label: a.description || a.action_type,
+        label: a.title || a.description || a.action_type,
         status: statusLabels[a.status] ?? a.status,
         type: "action",
         deadline: a.due_date,

@@ -65,6 +65,7 @@ export type Database = {
           responsible_id: string | null
           start_date: string | null
           status: string
+          title: string
         }
         Insert: {
           action_type?: string
@@ -78,6 +79,7 @@ export type Database = {
           responsible_id?: string | null
           start_date?: string | null
           status?: string
+          title: string
         }
         Update: {
           action_type?: string
@@ -91,6 +93,7 @@ export type Database = {
           responsible_id?: string | null
           start_date?: string | null
           status?: string
+          title?: string
         }
         Relationships: [
           {

@@ -240,14 +240,14 @@ export function CalendarView({
       // 7. CAPA Actions (corrective/preventive actions)
       const { data: actions } = await supabase
         .from("actions")
-        .select("id, description, due_date, responsible_id, action_type, status");
+        .select("id, title, description, due_date, responsible_id, action_type, status");
       actions?.forEach((a) => {
         if (a.due_date && a.responsible_id) {
           const typeStr = a.action_type === "preventiva" ? "Acción Preventiva" : a.action_type === "correctiva" ? "Acción Correctiva" : "Acción CAPA";
           allEvents.push({
             id: `action-${a.id}`,
             sourceId: a.id,
-            title: `${typeStr}: ${a.description?.substring(0, 60) || "Sin descripción"}`,
+            title: `${typeStr}: ${a.title?.substring(0, 60) || a.description?.substring(0, 60) || "Sin título"}`,
             date: a.due_date,
             type: "capa_action",
             userId: a.responsible_id,

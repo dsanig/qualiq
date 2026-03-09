@@ -8,6 +8,7 @@ import { format } from "date-fns";
 
 interface PendingAction {
   id: string;
+  title: string;
   description: string;
   action_type: string;
   due_date: string | null;
@@ -93,7 +94,7 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
             if (ncIds.length > 0) {
               const { data: capaData } = await (supabase as any)
                 .from("actions")
-                .select("id, description, action_type, due_date, status, responsible_id")
+                .select("id, title, description, action_type, due_date, status, responsible_id")
                 .in("non_conformity_id", ncIds)
                 .in("status", ["open", "in_progress"])
                 .order("due_date", { ascending: true, nullsFirst: false })
@@ -103,7 +104,8 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                 .filter((a: any) => !a.responsible_id || a.responsible_id === user.id)
                 .map((a: any) => ({
                   id: a.id,
-                  description: a.description || "Acción CAPA",
+                  title: a.title || "Acción CAPA",
+                  description: a.description || "",
                   action_type: a.action_type,
                   due_date: a.due_date,
                   status: a.status,
@@ -424,7 +426,7 @@ export function PendingActions({ onViewAll, onNavigateToDocument, onNavigateToMo
                     action.isOverdue ? "text-destructive" : "text-muted-foreground"
                   )} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{action.description}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{action.title}</p>
                     {action.workflowHint && (
                       <p className={cn("text-xs mt-0.5", isWaiting ? "text-muted-foreground/70 italic" : "text-accent")}>
                         {action.workflowHint}
