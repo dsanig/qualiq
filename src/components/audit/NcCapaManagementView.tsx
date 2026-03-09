@@ -737,7 +737,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {nc.severity ? <Badge variant="outline">{nc.severity}</Badge> : "—"}
+                              {nc.severity ? <Badge variant="outline">{severityLevels.find(s => s.value === nc.severity)?.label ?? nc.severity}</Badge> : "—"}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1">
