@@ -295,6 +295,15 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   };
 
   const openEditAudit = (audit: Audit) => {
+    if (!currentUserId || (audit.auditor_id !== currentUserId && audit.responsible_id !== currentUserId)) {
+      toast({
+        title: "Sin permisos",
+        description: "Solo el auditor o el responsable asignado pueden editar esta auditoría.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setEditingAudit(audit);
     const participantUserIds = auditParticipants.filter((p) => p.audit_id === audit.id).map((p) => p.user_id);
     setAuditForm({
