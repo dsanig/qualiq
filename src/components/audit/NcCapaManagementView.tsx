@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, AlertCircle, Link2, Unlink } from "lucide-react";
+import { Plus, Pencil, AlertCircle, Link2, Unlink, ClipboardList, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuditLog } from "@/hooks/useAuditLog";
@@ -800,119 +801,183 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
           </Card>
         )}
 
-        {/* No Conformities */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>No Conformidades</CardTitle>
-            {canEditContent && (
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
-                  <Plus className="mr-1 h-4 w-4" />Nueva Acción
-                </Button>
-                <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: selectedCapaPlan?.audit_id ?? "", capa_plan_id: selectedCapaPlanId ?? "" }); setNewNcOpen(true); }}>
-                  <Plus className="mr-1 h-4 w-4" />Nueva NC
-                </Button>
-              </div>
-            )}
-          </CardHeader>
-          <CardContent>
-            {filteredNcs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hay no conformidades en este plan.</p>
-            ) : (
-              <div className="space-y-2">
-                {filteredNcs.map((nc) => {
-                  const ncActs = actions.filter((a) => a.non_conformity_id === nc.id);
-                  const openActions = ncActs.filter((a) => a.status !== "closed").length;
-                  const overdueActions = ncActs.filter((a) => a.status !== "closed" && isOverdue(a.due_date)).length;
-                  
-                  return (
-                    <button
-                      key={nc.id}
-                      onClick={() => setSelectedNcId(nc.id)}
-                      className={`w-full rounded border p-3 text-left ${selectedNcId === nc.id ? "border-primary bg-primary/5" : "border-border"}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{nc.title}</p>
-                        <Badge variant={nc.status === "closed" ? "secondary" : nc.status === "in_progress" ? "default" : "outline"}>
-                          {statusLabel(nc.status)}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                        <span>{ncActs.length} acción{ncActs.length !== 1 ? "es" : ""}</span>
-                        {openActions > 0 && <Badge variant="outline">{openActions} pendiente{openActions !== 1 ? "s" : ""}</Badge>}
-                        {overdueActions > 0 && <Badge variant="destructive">{overdueActions} vencida{overdueActions !== 1 ? "s" : ""}</Badge>}
-                        {nc.deadline && (
-                          <span className={isOverdue(nc.deadline) && nc.status !== "closed" ? "text-destructive" : ""}>
-                            Límite: {nc.deadline}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Actions for selected NC */}
-        {selectedNc && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Acciones CAPA</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">NC: {selectedNc.title}</p>
-              </div>
-              <div className="flex gap-2">
-                {canEditContent && (
-                  <>
-                    <Button size="sm" variant="outline" onClick={() => openEditNc(selectedNc)}>
-                      <Pencil className="mr-1 h-4 w-4" />Editar NC
-                    </Button>
-                    <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: selectedNcId!, capa_plan_id: selectedCapaPlanId ?? "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
-                      <Plus className="mr-1 h-4 w-4" />Nueva Acción
-                    </Button>
-                  </>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {ncActions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No hay acciones para esta NC.</p>
-              ) : (
-                <div className="space-y-2">
-                  {ncActions.map((action) => (
-                    <div key={action.id} className="border rounded p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">{actionTypeLabel(action.action_type)}</Badge>
-                          <Badge variant={action.status === "closed" ? "secondary" : action.status === "in_progress" ? "default" : "outline"}>
-                            {statusLabel(action.status)}
-                          </Badge>
-                        </div>
-                        {action.responsible_id === currentUserId && (
-                          <Button size="sm" variant="ghost" onClick={() => openEditAction(action)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                      <p className="mt-2 text-sm">{action.description}</p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <span>Responsable: {getUserName(action.responsible_id) || "—"}</span>
-                        {action.due_date && (
-                          <span className={isOverdue(action.due_date) && action.status !== "closed" ? "text-destructive flex items-center gap-1" : ""}>
-                            {isOverdue(action.due_date) && action.status !== "closed" && <AlertCircle className="h-3 w-3" />}
-                            Vence: {action.due_date}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+        {/* Tabs for NC and Actions separation */}
+        <Tabs defaultValue="ncs" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="ncs" className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              No Conformidades
+              {filteredNcs.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{filteredNcs.length}</Badge>
               )}
-            </CardContent>
-          </Card>
-        )}
+            </TabsTrigger>
+            <TabsTrigger value="actions" className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Acciones Correctivas
+              {capaActions.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{capaActions.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Tab: No Conformidades */}
+          <TabsContent value="ncs" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
+                  No Conformidades
+                </CardTitle>
+                {canEditContent && (
+                  <Button size="sm" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: selectedCapaPlan?.audit_id ?? "", capa_plan_id: selectedCapaPlanId ?? "" }); setNewNcOpen(true); }}>
+                    <Plus className="mr-1 h-4 w-4" />Nueva NC
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {filteredNcs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay no conformidades en este plan.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredNcs.map((nc) => {
+                      const ncActs = actions.filter((a) => a.non_conformity_id === nc.id);
+                      const openActions = ncActs.filter((a) => a.status !== "closed").length;
+                      const overdueActions = ncActs.filter((a) => a.status !== "closed" && isOverdue(a.due_date)).length;
+                      
+                      return (
+                        <button
+                          key={nc.id}
+                          onClick={() => setSelectedNcId(nc.id)}
+                          className={`w-full rounded border p-3 text-left transition-colors ${selectedNcId === nc.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium">{nc.title}</p>
+                            <Badge variant={nc.status === "closed" ? "secondary" : nc.status === "in_progress" ? "default" : "outline"}>
+                              {statusLabel(nc.status)}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                            <span>{ncActs.length} acción{ncActs.length !== 1 ? "es" : ""}</span>
+                            {openActions > 0 && <Badge variant="outline">{openActions} pendiente{openActions !== 1 ? "s" : ""}</Badge>}
+                            {overdueActions > 0 && <Badge variant="destructive">{overdueActions} vencida{overdueActions !== 1 ? "s" : ""}</Badge>}
+                            {nc.deadline && (
+                              <span className={isOverdue(nc.deadline) && nc.status !== "closed" ? "text-destructive" : ""}>
+                                Límite: {nc.deadline}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* NC Detail Card */}
+            {selectedNc && (
+              <Card className="border-l-4 border-l-primary">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">{selectedNc.title}</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {selectedNc.severity && <Badge variant="outline" className="mr-2">{selectedNc.severity}</Badge>}
+                      Responsable: {getUserName(selectedNc.responsible_id) || "Sin asignar"}
+                    </p>
+                  </div>
+                  {canEditContent && (
+                    <Button size="sm" variant="outline" onClick={() => openEditNc(selectedNc)}>
+                      <Pencil className="mr-1 h-4 w-4" />Editar
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {selectedNc.description && (
+                    <div>
+                      <p className="text-sm font-medium">Descripción</p>
+                      <p className="text-sm text-muted-foreground">{selectedNc.description}</p>
+                    </div>
+                  )}
+                  {selectedNc.root_cause && (
+                    <div>
+                      <p className="text-sm font-medium">Causa raíz</p>
+                      <p className="text-sm text-muted-foreground">{selectedNc.root_cause}</p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-4 text-sm">
+                    <span>Estado: <Badge variant={selectedNc.status === "closed" ? "secondary" : "default"}>{statusLabel(selectedNc.status)}</Badge></span>
+                    {selectedNc.deadline && (
+                      <span className={isOverdue(selectedNc.deadline) && selectedNc.status !== "closed" ? "text-destructive" : ""}>
+                        Fecha límite: {selectedNc.deadline}
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Tab: Acciones Correctivas */}
+          <TabsContent value="actions" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Acciones Correctivas
+                </CardTitle>
+                {canEditContent && (
+                  <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", capa_plan_id: selectedCapaPlanId ?? "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" }); setNewActionOpen(true); }}>
+                    <Plus className="mr-1 h-4 w-4" />Nueva Acción
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {capaActions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay acciones correctivas en este plan.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {capaActions.map((action) => {
+                      const relatedNc = nonConformities.find((nc) => nc.id === action.non_conformity_id);
+                      return (
+                        <div key={action.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{actionTypeLabel(action.action_type)}</Badge>
+                              <Badge variant={action.status === "closed" ? "secondary" : action.status === "in_progress" ? "default" : "outline"}>
+                                {statusLabel(action.status)}
+                              </Badge>
+                            </div>
+                            {action.responsible_id === currentUserId && (
+                              <Button size="sm" variant="ghost" onClick={() => openEditAction(action)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          <p className="mt-2 text-sm font-medium">{action.description}</p>
+                          <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            <span>Responsable: {getUserName(action.responsible_id) || "—"}</span>
+                            {action.due_date && (
+                              <span className={isOverdue(action.due_date) && action.status !== "closed" ? "text-destructive flex items-center gap-1" : ""}>
+                                {isOverdue(action.due_date) && action.status !== "closed" && <AlertCircle className="h-3 w-3" />}
+                                Vence: {action.due_date}
+                              </span>
+                            )}
+                            {relatedNc && (
+                              <span className="flex items-center gap-1">
+                                <ClipboardList className="h-3 w-3" />
+                                NC: {relatedNc.title}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* New CAPA Dialog */}
