@@ -281,17 +281,33 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     await loadData();
   };
 
+  const getCurrentCompanyId = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return null;
+
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("company_id")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+
+    return profileData?.company_id ?? null;
+  };
+
   const createNc = async () => {
-    if (!selectedCapaPlanId) return;
     if (!ncForm.responsible_id || !ncForm.deadline) {
       toast({ title: "Error", description: "Responsable y fecha límite son obligatorios.", variant: "destructive" });
       return;
     }
 
+    const companyId = await getCurrentCompanyId();
+
     const { data, error } = await (supabase as any)
       .from("non_conformities")
       .insert({
-        capa_plan_id: selectedCapaPlanId,
+        capa_plan_id: ncForm.capa_plan_id || selectedCapaPlanId || null,
+        audit_id: ncForm.audit_id || selectedCapaPlan?.audit_id || null,
+        company_id: companyId,
         title: ncForm.title,
         description: ncForm.description || null,
         severity: ncForm.severity || null,
@@ -311,7 +327,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     toast({ title: "No conformidad creada" });
     logAction({ action: "create", entity_type: "non_conformity", entity_id: data?.id, entity_title: ncForm.title });
     setNewNcOpen(false);
-    setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
+    setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "", audit_id: "", capa_plan_id: "" });
     await loadData();
   };
 
@@ -332,6 +348,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
         status: ncForm.status,
         deadline: ncForm.deadline,
         responsible_id: ncForm.responsible_id,
+        audit_id: ncForm.audit_id || null,
+        capa_plan_id: ncForm.capa_plan_id || null,
       })
       .eq("id", editingNc.id);
 
@@ -348,16 +366,19 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
   };
 
   const createAction = async () => {
-    if (!selectedNcId) return;
     if (!actionForm.responsible_id || !actionForm.due_date) {
       toast({ title: "Error", description: "Responsable y fecha son obligatorios.", variant: "destructive" });
       return;
     }
 
+    const companyId = await getCurrentCompanyId();
+
     const { data, error } = await (supabase as any)
       .from("actions")
       .insert({
-        non_conformity_id: selectedNcId,
+        non_conformity_id: actionForm.non_conformity_id || selectedNcId || null,
+        capa_plan_id: actionForm.capa_plan_id || selectedCapaPlanId || null,
+        company_id: companyId,
         action_type: actionForm.action_type,
         description: actionForm.description,
         responsible_id: actionForm.responsible_id,
@@ -375,7 +396,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     toast({ title: "Acción creada" });
     logAction({ action: "create", entity_type: "action", entity_id: data?.id, entity_title: actionForm.description.slice(0, 50) });
     setNewActionOpen(false);
-    setActionForm({ non_conformity_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" });
+    setActionForm({ non_conformity_id: "", capa_plan_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open" });
     await loadData();
   };
 
@@ -391,6 +412,8 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
     const { error } = await (supabase as any)
       .from("actions")
       .update({
+        non_conformity_id: actionForm.non_conformity_id || null,
+        capa_plan_id: actionForm.capa_plan_id || null,
         action_type: actionForm.action_type,
         description: actionForm.description,
         responsible_id: actionForm.responsible_id,
