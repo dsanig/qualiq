@@ -68,7 +68,7 @@ export function Header({ title, subtitle, searchQuery, onSearchChange, onSearchS
 
         {/* Actions */}
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
+          <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => navigate("/tutorial")}>
             <HelpCircle className="w-5 h-5" />
           </Button>
           <NotificationsDropdown />
