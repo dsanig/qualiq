@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Paperclip, Pencil, AlertCircle, X, Trash2, Upload, FileText } from "lucide-react";
+import { Plus, Paperclip, Pencil, Trash2, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,38 +21,18 @@ type Audit = {
 };
 type AuditAttachment = { id: string; audit_id: string; file_name: string | null; object_path: string; file_type: string | null };
 type AuditParticipant = { id: string; audit_id: string; user_id: string };
-type CapaPlan = { id: string; audit_id: string; title: string | null; description: string | null; responsible_id: string | null };
-type NonConformity = { id: string; capa_plan_id: string; title: string; description: string | null; severity: string | null; root_cause: string | null; status: string; deadline: string | null; responsible_id: string | null };
-type ActionItem = { id: string; non_conformity_id: string; action_type: "corrective" | "preventive" | "immediate"; description: string; responsible_id: string | null; due_date: string | null; status: string };
 type Profile = { id: string; full_name: string | null; email: string | null };
-type IncidenciaRef = { id: string; title: string; status: string };
-type CapaIncidenciaLink = { capa_plan_id: string; incidencia_id: string };
 
 interface AuditManagementViewProps {
   searchQuery?: string;
 }
 
-const actionStatus = ["open", "in_progress", "closed"] as const;
-const actionTypes = [
-  { value: "immediate", label: "Inmediata" },
-  { value: "corrective", label: "Correctiva" },
-  { value: "preventive", label: "Preventiva" },
-] as const;
-
 export function AuditManagementView({ searchQuery = "" }: AuditManagementViewProps) {
   const [audits, setAudits] = useState<Audit[]>([]);
   const [auditAttachments, setAuditAttachments] = useState<AuditAttachment[]>([]);
   const [auditParticipants, setAuditParticipants] = useState<AuditParticipant[]>([]);
-  const [capaPlans, setCapaPlans] = useState<CapaPlan[]>([]);
-  const [nonConformities, setNonConformities] = useState<NonConformity[]>([]);
-  const [actions, setActions] = useState<ActionItem[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
-  const [incidencias, setIncidencias] = useState<IncidenciaRef[]>([]);
-  const [capaIncidenciaLinks, setCapaIncidenciaLinks] = useState<CapaIncidenciaLink[]>([]);
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
-  const [selectedCapaPlanId, setSelectedCapaPlanId] = useState<string | null>(null);
-  const [linkIncidenciaOpen, setLinkIncidenciaOpen] = useState(false);
-  const [linkingCapaPlanId, setLinkingCapaPlanId] = useState<string | null>(null);
   const { canEditContent, canManageCompany } = usePermissions();
   const { logAction } = useAuditLog();
 
@@ -63,12 +43,6 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const [deletingAuditId, setDeletingAuditId] = useState<string | null>(null);
   const [auditLinkedInfo, setAuditLinkedInfo] = useState<string[]>([]);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [newCapaOpen, setNewCapaOpen] = useState(false);
-  const [newNcOpen, setNewNcOpen] = useState(false);
-  const [newActionOpen, setNewActionOpen] = useState(false);
-  const [editCapaOpen, setEditCapaOpen] = useState(false);
-  const [editNcOpen, setEditNcOpen] = useState(false);
-  const [editActionOpen, setEditActionOpen] = useState(false);
 
   // Forms
   const [auditForm, setAuditForm] = useState({
@@ -78,15 +52,6 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     audit_type: "interna" as "interna" | "externa", external_entity_id: "",
   });
   const [auditFiles, setAuditFiles] = useState<FileList | null>(null);
-  const [capaForm, setCapaForm] = useState({ title: "", description: "", responsible_id: "" });
-  const [ncForm, setNcForm] = useState({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
-  const [actionForm, setActionForm] = useState({
-    non_conformity_id: "", action_type: "corrective" as "corrective" | "preventive" | "immediate",
-    description: "", responsible_id: "", due_date: "", status: "open", file: null as File | null,
-  });
-  const [editingNc, setEditingNc] = useState<NonConformity | null>(null);
-  const [editingAction, setEditingAction] = useState<ActionItem | null>(null);
-  const [editingCapa, setEditingCapa] = useState<CapaPlan | null>(null);
   const [editingAudit, setEditingAudit] = useState<Audit | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -103,41 +68,19 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const normalizedQuery = useMemo(() => normalizeText(searchQuery), [searchQuery]);
 
-  const auditCapaPlans = useMemo(() => capaPlans.filter((p) => p.audit_id === selectedAuditId), [capaPlans, selectedAuditId]);
-  const selectedCapaPlan = useMemo(() => capaPlans.find((p) => p.id === selectedCapaPlanId) ?? null, [capaPlans, selectedCapaPlanId]);
-  const filteredNcs = useMemo(() => nonConformities.filter((nc) => nc.capa_plan_id === selectedCapaPlanId), [nonConformities, selectedCapaPlanId]);
-
-  useEffect(() => {
-    if (auditCapaPlans.length > 0) {
-      setSelectedCapaPlanId(auditCapaPlans[0].id);
-    } else {
-      setSelectedCapaPlanId(null);
-    }
-  }, [selectedAuditId, auditCapaPlans.length]);
-
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [{ data: auditsData }, { data: attachData }, { data: participantsData }, { data: capaData }, { data: ncData }, { data: actionData }, { data: usersData }, { data: incData }, { data: linksData }] = await Promise.all([
+      const [{ data: auditsData }, { data: attachData }, { data: participantsData }, { data: usersData }] = await Promise.all([
         (supabase as any).from("audits").select("id,title,description,audit_date,auditor_id,responsible_id,observations,findings,conclusions,status,audit_type,external_entity_id").order("created_at", { ascending: false }),
         (supabase as any).from("audit_attachments").select("id,audit_id,file_name,object_path,file_type"),
         (supabase as any).from("audit_participants").select("id,audit_id,user_id"),
-        (supabase as any).from("capa_plans").select("id,audit_id,title,description,responsible_id"),
-        (supabase as any).from("non_conformities").select("id,capa_plan_id,title,description,severity,root_cause,status,deadline,responsible_id"),
-        (supabase as any).from("actions").select("id,non_conformity_id,action_type,description,responsible_id,due_date,status"),
         (supabase as any).from("profiles").select("id,full_name,email"),
-        (supabase as any).from("incidencias").select("id,title,status"),
-        (supabase as any).from("incidencia_capa_plans").select("incidencia_id,capa_plan_id"),
       ]);
       setAudits((auditsData ?? []) as Audit[]);
       setAuditAttachments((attachData ?? []) as AuditAttachment[]);
       setAuditParticipants((participantsData ?? []) as AuditParticipant[]);
-      setCapaPlans((capaData ?? []) as CapaPlan[]);
-      setNonConformities((ncData ?? []) as NonConformity[]);
-      setActions((actionData ?? []) as ActionItem[]);
       setUsers((usersData ?? []) as Profile[]);
-      setIncidencias((incData ?? []) as IncidenciaRef[]);
-      setCapaIncidenciaLinks((linksData ?? []) as CapaIncidenciaLink[]);
       if (!selectedAuditId && auditsData?.[0]?.id) setSelectedAuditId(auditsData[0].id);
     } finally {
       setIsLoading(false);
@@ -175,17 +118,14 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   const auditsFiltered = useMemo(() => {
     if (!normalizedQuery) return audits;
     return audits.filter((audit) => {
-      const relatedCapa = capaPlans.filter((plan) => plan.audit_id === audit.id);
       const searchFields = [
         audit.title, audit.description, audit.audit_date, audit.observations,
         audit.findings, audit.conclusions, audit.status,
         getUserName(audit.auditor_id),
-        ...relatedCapa.map((plan) => plan.title),
-        ...relatedCapa.map((plan) => plan.description),
       ];
       return searchFields.some((field) => normalizeText(field).includes(normalizedQuery));
     });
-  }, [audits, capaPlans, normalizedQuery, users]);
+  }, [audits, normalizedQuery, users]);
 
   const auditsSorted = useMemo(() => {
     return [...auditsFiltered].sort((left, right) => {
@@ -236,28 +176,16 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
     const callerIsAssignee = user.id === auditForm.auditor_id || user.id === auditForm.responsible_id;
 
     if ((auditFiles?.length ?? 0) > 0 && !callerIsAssignee) {
-      toast({
-        title: "Sin permisos",
-        description: "Solo el auditor o el responsable pueden adjuntar documentos a la auditoría.",
-        variant: "destructive",
-      });
+      toast({ title: "Sin permisos", description: "Solo el auditor o el responsable pueden adjuntar documentos.", variant: "destructive" });
       return;
     }
 
     if (auditForm.participant_ids.length > 0 && !callerIsAssignee) {
-      toast({
-        title: "Sin permisos",
-        description: "Solo el auditor o el responsable pueden gestionar los participantes.",
-        variant: "destructive",
-      });
+      toast({ title: "Sin permisos", description: "Solo el auditor o el responsable pueden gestionar los participantes.", variant: "destructive" });
       return;
     }
 
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("company_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", user.id).maybeSingle();
 
     const { data, error } = await (supabase as any)
       .from("audits")
@@ -317,28 +245,17 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
     const callerIsAssigneeAfter = user.id === auditForm.auditor_id || user.id === auditForm.responsible_id;
 
-    const existingParticipantIds = auditParticipants
-      .filter((p) => p.audit_id === editingAudit.id)
-      .map((p) => p.user_id)
-      .sort();
+    const existingParticipantIds = auditParticipants.filter((p) => p.audit_id === editingAudit.id).map((p) => p.user_id).sort();
     const nextParticipantIds = [...auditForm.participant_ids].sort();
     const participantsChanged = existingParticipantIds.join(",") !== nextParticipantIds.join(",");
 
     if ((auditFiles?.length ?? 0) > 0 && !callerIsAssigneeAfter) {
-      toast({
-        title: "Sin permisos",
-        description: "Solo el auditor o el responsable pueden adjuntar documentos a la auditoría.",
-        variant: "destructive",
-      });
+      toast({ title: "Sin permisos", description: "Solo el auditor o el responsable pueden adjuntar documentos.", variant: "destructive" });
       return;
     }
 
     if (participantsChanged && !callerIsAssigneeAfter) {
-      toast({
-        title: "Sin permisos",
-        description: "Solo el auditor o el responsable pueden gestionar los participantes.",
-        variant: "destructive",
-      });
+      toast({ title: "Sin permisos", description: "Solo el auditor o el responsable pueden gestionar los participantes.", variant: "destructive" });
       return;
     }
 
@@ -375,267 +292,120 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
   };
 
   const deleteAudit = async (auditId: string) => {
-    // Delete attachments from storage first
     const attachments = auditAttachments.filter((a) => a.audit_id === auditId);
-    if (attachments.length > 0) {
-      await supabase.storage.from("documents").remove(attachments.map((a) => a.object_path));
+    for (const att of attachments) {
+      await supabase.storage.from(att.object_path.split("/")[0] || "documents").remove([att.object_path]);
     }
+
+    await (supabase as any).from("audit_attachments").delete().eq("audit_id", auditId);
+    await (supabase as any).from("audit_participants").delete().eq("audit_id", auditId);
+    
+    // Unlink incidencias
+    await (supabase as any).from("incidencias").update({ audit_id: null }).eq("audit_id", auditId);
+
     const { error } = await (supabase as any).from("audits").delete().eq("id", auditId);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
     toast({ title: "Auditoría eliminada" });
     logAction({ action: "delete", entity_type: "audit", entity_id: auditId });
-    if (selectedAuditId === auditId) setSelectedAuditId(null);
+    setDeletingAuditId(null);
+    setSelectedAuditId(null);
     await loadData();
   };
 
   const uploadAuditAttachments = async (auditId: string, files: FileList) => {
-    const user = (await supabase.auth.getUser()).data.user;
-    const { data: pData } = await supabase.from("profiles").select("company_id").eq("user_id", user?.id ?? "").maybeSingle();
-    const tenantPrefix = pData?.company_id ?? "unknown";
     for (const file of Array.from(files)) {
       const ext = file.name.split(".").pop();
-      const filePath = `${tenantPrefix}/audits/${auditId}/${crypto.randomUUID()}.${ext}`;
-      const upload = await supabase.storage.from("documents").upload(filePath, file, { upsert: false });
-      if (!upload.error) {
-        await (supabase as any).from("audit_attachments").insert({
-          audit_id: auditId, bucket_id: "documents", object_path: filePath,
-          file_name: file.name, file_type: file.type, created_by: user?.id,
-        });
-      }
+      const path = `audits/${auditId}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
+      if (uploadError) continue;
+      await (supabase as any).from("audit_attachments").insert({
+        audit_id: auditId,
+        object_path: path,
+        file_name: file.name,
+        file_type: file.type,
+        created_by: currentUserId,
+      });
     }
+    setAuditFiles(null);
   };
 
-  const deleteAuditAttachment = async (attachment: AuditAttachment) => {
-    await supabase.storage.from("documents").remove([attachment.object_path]);
-    await (supabase as any).from("audit_attachments").delete().eq("id", attachment.id);
+  const deleteAuditAttachment = async (att: AuditAttachment) => {
+    await supabase.storage.from("documents").remove([att.object_path]);
+    await (supabase as any).from("audit_attachments").delete().eq("id", att.id);
     toast({ title: "Adjunto eliminado" });
-    logAction({ action: "delete_attachment", entity_type: "audit", entity_id: attachment.audit_id, details: { file_name: attachment.file_name } });
     await loadData();
   };
 
-  const downloadAttachment = async (attachment: AuditAttachment) => {
-    const { data } = await supabase.storage.from("documents").createSignedUrl(attachment.object_path, 300);
-    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
-  };
-  const syncParticipants = async (auditId: string, userIds: string[]) => {
-    // Delete existing participants
-    await (supabase as any).from("audit_participants").delete().eq("audit_id", auditId);
-    // Insert new ones
-    if (userIds.length > 0) {
-      await (supabase as any).from("audit_participants").insert(
-        userIds.map((uid) => ({ audit_id: auditId, user_id: uid }))
-      );
+  const downloadAttachment = async (att: AuditAttachment) => {
+    const { data, error } = await supabase.storage.from("documents").download(att.object_path);
+    if (error || !data) {
+      toast({ title: "Error", description: "No se pudo descargar el archivo.", variant: "destructive" });
+      return;
     }
+    const url = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = att.file_name ?? att.object_path.split("/").pop() ?? "file";
+    a.click();
+    URL.revokeObjectURL(url);
   };
+
+  const syncParticipants = async (auditId: string, userIds: string[]) => {
+    await (supabase as any).from("audit_participants").delete().eq("audit_id", auditId);
+    if (userIds.length === 0) return;
+    await (supabase as any).from("audit_participants").insert(userIds.map((uid) => ({ audit_id: auditId, user_id: uid })));
+  };
+
   const resetAuditForm = () => {
-    setAuditForm({ title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "", observations: "", findings: "", conclusions: "", status: "open", participant_ids: [], audit_type: "interna", external_entity_id: "" });
+    setAuditForm({
+      title: "", description: "", audit_date: "", auditor_id: "", responsible_id: "",
+      observations: "", findings: "", conclusions: "", status: "open",
+      participant_ids: [],
+      audit_type: "interna", external_entity_id: "",
+    });
     setAuditFiles(null);
   };
 
   const openEditAudit = (audit: Audit) => {
-    if (!currentUserId || (audit.auditor_id !== currentUserId && audit.responsible_id !== currentUserId)) {
-      toast({
-        title: "Sin permisos",
-        description: "Solo el auditor o el responsable asignado pueden editar esta auditoría.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setEditingAudit(audit);
-    const participantUserIds = auditParticipants.filter((p) => p.audit_id === audit.id).map((p) => p.user_id);
+    const participantIds = auditParticipants.filter((p) => p.audit_id === audit.id).map((p) => p.user_id);
     setAuditForm({
-      title: audit.title, description: audit.description ?? "", audit_date: audit.audit_date ?? "",
-      auditor_id: audit.auditor_id ?? "", responsible_id: audit.responsible_id ?? "",
-      observations: audit.observations ?? "", findings: audit.findings ?? "",
-      conclusions: audit.conclusions ?? "", status: audit.status ?? "open",
-      participant_ids: participantUserIds,
+      title: audit.title,
+      description: audit.description ?? "",
+      audit_date: audit.audit_date ?? "",
+      auditor_id: audit.auditor_id ?? "",
+      responsible_id: audit.responsible_id ?? "",
+      observations: audit.observations ?? "",
+      findings: audit.findings ?? "",
+      conclusions: audit.conclusions ?? "",
+      status: audit.status,
+      participant_ids: participantIds,
       audit_type: (audit.audit_type as "interna" | "externa") ?? "interna",
       external_entity_id: audit.external_entity_id ?? "",
     });
-    setAuditFiles(null);
+    setEditingAudit(audit);
     setEditAuditOpen(true);
   };
 
-  const createCapaPlan = async () => {
-    if (!selectedAuditId) return;
-    const { error } = await (supabase as any).from("capa_plans").insert({
-      audit_id: selectedAuditId, title: capaForm.title || null,
-      description: capaForm.description || null, responsible_id: capaForm.responsible_id || null,
-    });
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Plan CAPA creado" });
-    logAction({ action: "create", entity_type: "capa_plan", entity_id: selectedAuditId, entity_title: capaForm.title });
-    setNewCapaOpen(false);
-    setCapaForm({ title: "", description: "", responsible_id: "" });
-    await loadData();
-  };
-
-  const updateCapaPlan = async () => {
-    if (!editingCapa) return;
-    const { error } = await (supabase as any).from("capa_plans").update({
-      title: capaForm.title || null, description: capaForm.description || null,
-      responsible_id: capaForm.responsible_id || null,
-    }).eq("id", editingCapa.id);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Plan CAPA actualizado" });
-    logAction({ action: "update", entity_type: "capa_plan", entity_id: editingCapa.id, entity_title: capaForm.title });
-    setEditCapaOpen(false);
-    setEditingCapa(null);
-    await loadData();
-  };
-
-  const createNonConformity = async () => {
-    if (!selectedCapaPlanId || !ncForm.deadline || !ncForm.responsible_id) {
-      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
-    }
-    const { data, error } = await (supabase as any).from("non_conformities").insert({
-      capa_plan_id: selectedCapaPlanId, title: ncForm.title, description: ncForm.description || null,
-      severity: ncForm.severity || null, root_cause: ncForm.root_cause || null, status: ncForm.status, deadline: ncForm.deadline,
-      responsible_id: ncForm.responsible_id,
-    }).select("id").single();
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    await (supabase as any).from("actions").insert({
-      non_conformity_id: data.id, action_type: "corrective", description: "Acción correctiva inicial", status: "open",
-    });
-    toast({ title: "No conformidad creada" });
-    logAction({ action: "create", entity_type: "non_conformity", entity_id: data?.id, entity_title: ncForm.title, details: { severity: ncForm.severity, capa_plan_id: selectedCapaPlanId } });
-    setNewNcOpen(false);
-    setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" });
-    await loadData();
-  };
-
-  const updateNonConformity = async () => {
-    if (!editingNc) return;
-    if (!ncForm.deadline || !ncForm.responsible_id) {
-      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
-    }
-    const { error } = await (supabase as any).from("non_conformities").update({
-      title: ncForm.title, description: ncForm.description || null, severity: ncForm.severity || null,
-      root_cause: ncForm.root_cause || null, status: ncForm.status, deadline: ncForm.deadline,
-      responsible_id: ncForm.responsible_id,
-    }).eq("id", editingNc.id);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "No conformidad actualizada" });
-    logAction({ action: "update", entity_type: "non_conformity", entity_id: editingNc.id, entity_title: ncForm.title, details: { severity: ncForm.severity, status: ncForm.status } });
-    setEditNcOpen(false); setEditingNc(null);
-    await loadData();
-  };
-
-  const createAction = async () => {
-    if (!actionForm.responsible_id || !actionForm.due_date) {
-      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
-    }
-    const { data, error } = await (supabase as any).from("actions").insert({
-      non_conformity_id: actionForm.non_conformity_id, action_type: actionForm.action_type,
-      description: actionForm.description, responsible_id: actionForm.responsible_id,
-      due_date: actionForm.due_date, status: actionForm.status,
-    }).select("id").single();
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    if (actionForm.file) {
-      const user = (await supabase.auth.getUser()).data.user;
-      const { data: pData2 } = await supabase.from("profiles").select("company_id").eq("user_id", user?.id ?? "").maybeSingle();
-      const tp = pData2?.company_id ?? "unknown";
-      const ext = actionForm.file.name.split(".").pop();
-      const filePath = `${tp}/actions/${data.id}/${crypto.randomUUID()}.${ext}`;
-      const upload = await supabase.storage.from("documents").upload(filePath, actionForm.file, { upsert: false });
-      if (!upload.error) {
-        await (supabase as any).from("action_attachments").insert({ action_id: data.id, bucket_id: "documents", object_path: filePath });
-      }
-    }
-    toast({ title: "Acción creada" });
-    logAction({ action: "create", entity_type: "capa_action", entity_id: data?.id, entity_title: actionForm.description, details: { action_type: actionForm.action_type, responsible_id: actionForm.responsible_id } });
-    setNewActionOpen(false);
-    setActionForm({ non_conformity_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open", file: null });
-    await loadData();
-  };
-
-  const updateAction = async () => {
-    if (!editingAction) return;
-    if (!actionForm.responsible_id || !actionForm.due_date) {
-      toast({ title: "Error", description: "El responsable y la fecha límite son obligatorios.", variant: "destructive" }); return;
-    }
-    const { error } = await (supabase as any).from("actions").update({
-      action_type: actionForm.action_type, description: actionForm.description,
-      responsible_id: actionForm.responsible_id, due_date: actionForm.due_date, status: actionForm.status,
-    }).eq("id", editingAction.id);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Acción actualizada" });
-    logAction({ action: "update", entity_type: "capa_action", entity_id: editingAction.id, entity_title: actionForm.description, details: { action_type: actionForm.action_type, status: actionForm.status } });
-    setEditActionOpen(false); setEditingAction(null);
-    await loadData();
-  };
-
-  const openEditNc = (nc: NonConformity) => {
-    setEditingNc(nc);
-    setNcForm({ title: nc.title, description: nc.description ?? "", severity: nc.severity ?? "", root_cause: nc.root_cause ?? "", status: nc.status, deadline: nc.deadline ?? "", responsible_id: nc.responsible_id ?? "" });
-    setEditNcOpen(true);
-  };
-
-  const openEditAction = (action: ActionItem) => {
-    setEditingAction(action);
-    setActionForm({
-      non_conformity_id: action.non_conformity_id, action_type: action.action_type,
-      description: action.description, responsible_id: action.responsible_id ?? "",
-      due_date: action.due_date ?? "", status: action.status, file: null,
-    });
-    setEditActionOpen(true);
-  };
-
-  const getLinkedIncidencias = (capaId: string) => {
-    const linkedIds = capaIncidenciaLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.incidencia_id);
-    return incidencias.filter((i) => linkedIds.includes(i.id));
-  };
-
-  const getUnlinkedIncidencias = (capaId: string) => {
-    const linkedIds = capaIncidenciaLinks.filter((l) => l.capa_plan_id === capaId).map((l) => l.incidencia_id);
-    return incidencias.filter((i) => !linkedIds.includes(i.id));
-  };
-
-  const linkIncidencia = async (capaId: string, incidenciaId: string) => {
-    const userId = (await supabase.auth.getUser()).data.user?.id;
-    const { error } = await (supabase as any).from("incidencia_capa_plans").insert({
-      incidencia_id: incidenciaId, capa_plan_id: capaId, created_by: userId,
-    });
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Incidencia vinculada" });
-    await loadData();
-  };
-
-  const unlinkIncidencia = async (capaId: string, incidenciaId: string) => {
-    const { error } = await (supabase as any).from("incidencia_capa_plans")
-      .delete().eq("capa_plan_id", capaId).eq("incidencia_id", incidenciaId);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Incidencia desvinculada" });
-    await loadData();
-  };
-
-  const openEditCapa = (capa: CapaPlan) => {
-    setEditingCapa(capa);
-    setCapaForm({ title: capa.title ?? "", description: capa.description ?? "", responsible_id: capa.responsible_id ?? "" });
-    setEditCapaOpen(true);
+  const statusLabel = (s: string) => {
+    const map: Record<string, string> = { open: "Abierta", in_progress: "En proceso", closed: "Cerrada" };
+    return map[s] ?? s;
   };
 
   // --- Audit form fields ---
-  type RenderAuditFieldsOptions = { readOnly?: boolean };
-
-  const renderAuditFields = ({ readOnly = false }: RenderAuditFieldsOptions = {}) => (
-    <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+  const renderAuditFields = ({ readOnly }: { readOnly: boolean }) => (
+    <div className="grid gap-3 max-h-[60vh] overflow-y-auto pr-2">
       <div>
         <Label>Título *</Label>
         <Input disabled={readOnly} value={auditForm.title} onChange={(e) => setAuditForm((p) => ({ ...p, title: e.target.value }))} />
       </div>
       <div>
-        <Label>Fecha</Label>
-        <Input disabled={readOnly} type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} />
-      </div>
-      <div>
-        <Label>Tipo de auditoría</Label>
-        <Select
-          disabled={readOnly}
-          value={auditForm.audit_type}
-          onValueChange={(v: "interna" | "externa") => setAuditForm((p) => ({ ...p, audit_type: v, external_entity_id: v === "interna" ? "" : p.external_entity_id }))}
-        >
+        <Label>Tipo de auditoría *</Label>
+        <Select disabled={readOnly} value={auditForm.audit_type} onValueChange={(v: "interna" | "externa") => setAuditForm((p) => ({ ...p, audit_type: v }))}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="interna">Interna</SelectItem>
@@ -645,15 +415,14 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       </div>
       {auditForm.audit_type === "externa" && (
         <div>
-          <Label>Identificación del cliente / proveedor *</Label>
-          <Input
-            disabled={readOnly}
-            value={auditForm.external_entity_id}
-            onChange={(e) => setAuditForm((p) => ({ ...p, external_entity_id: e.target.value }))}
-            placeholder="Nombre o código del cliente/proveedor externo"
-          />
+          <Label>Cliente/Proveedor *</Label>
+          <Input disabled={readOnly} value={auditForm.external_entity_id} onChange={(e) => setAuditForm((p) => ({ ...p, external_entity_id: e.target.value }))} placeholder="Nombre o identificador" />
         </div>
       )}
+      <div>
+        <Label>Fecha de auditoría</Label>
+        <Input disabled={readOnly} type="date" value={auditForm.audit_date} onChange={(e) => setAuditForm((p) => ({ ...p, audit_date: e.target.value }))} />
+      </div>
       <div>
         <Label>Auditor *</Label>
         <Select disabled={readOnly} value={auditForm.auditor_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, auditor_id: v }))}>
@@ -662,7 +431,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
         </Select>
       </div>
       <div>
-        <Label>Responsable de la auditoría *</Label>
+        <Label>Responsable *</Label>
         <Select disabled={readOnly} value={auditForm.responsible_id} onValueChange={(v) => setAuditForm((p) => ({ ...p, responsible_id: v }))}>
           <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
           <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
@@ -670,32 +439,28 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       </div>
       <div>
         <Label>Empleados asignados</Label>
-        <div className="flex flex-wrap gap-1 mb-2">
-          {auditForm.participant_ids.map((uid) => (
-            <span key={uid} className="inline-flex items-center gap-1 text-xs bg-secondary text-secondary-foreground rounded-full px-2 py-1">
-              {getUserName(uid) ?? uid}
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== uid) }))}
-                  className="hover:text-destructive"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </span>
-          ))}
+        <div className="flex flex-wrap gap-1 mt-1">
+          {users.map((u) => {
+            const isSelected = auditForm.participant_ids.includes(u.id);
+            return (
+              <button
+                key={u.id}
+                type="button"
+                disabled={readOnly}
+                onClick={() => {
+                  if (isSelected) {
+                    setAuditForm((p) => ({ ...p, participant_ids: p.participant_ids.filter((id) => id !== u.id) }));
+                  } else {
+                    setAuditForm((p) => ({ ...p, participant_ids: [...p.participant_ids, u.id] }));
+                  }
+                }}
+                className={`text-xs px-2 py-1 rounded-full border transition-colors ${isSelected ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border hover:bg-muted/80"}`}
+              >
+                {u.full_name ?? u.email ?? u.id}
+              </button>
+            );
+          })}
         </div>
-        <Select
-          disabled={readOnly}
-          value=""
-          onValueChange={(v) => {
-            if (v && !auditForm.participant_ids.includes(v)) setAuditForm((p) => ({ ...p, participant_ids: [...p.participant_ids, v] }));
-          }}
-        >
-          <SelectTrigger><SelectValue placeholder="Añadir empleado" /></SelectTrigger>
-          <SelectContent>{users.filter((u) => !auditForm.participant_ids.includes(u.id)).map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
-        </Select>
       </div>
       <div>
         <Label>Estado</Label>
@@ -733,97 +498,6 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
       </div>
     </div>
   );
-
-  // --- NC form fields ---
-  const renderNcFields = () => (
-    <div className="space-y-3">
-      <div><Label>Título</Label><Input value={ncForm.title} onChange={(e) => setNcForm((p) => ({ ...p, title: e.target.value }))} /></div>
-      <div><Label>Descripción</Label><Textarea value={ncForm.description} onChange={(e) => setNcForm((p) => ({ ...p, description: e.target.value }))} /></div>
-      <div><Label>Severidad</Label><Input value={ncForm.severity} onChange={(e) => setNcForm((p) => ({ ...p, severity: e.target.value }))} /></div>
-      <div><Label>Causa raíz</Label><Textarea value={ncForm.root_cause} onChange={(e) => setNcForm((p) => ({ ...p, root_cause: e.target.value }))} /></div>
-      <div>
-        <Label>Responsable *</Label>
-        <Select value={ncForm.responsible_id} onValueChange={(v) => setNcForm((p) => ({ ...p, responsible_id: v }))}>
-          <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
-          <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <div><Label>Fecha límite *</Label><Input type="date" value={ncForm.deadline} onChange={(e) => setNcForm((p) => ({ ...p, deadline: e.target.value }))} /></div>
-      <div>
-        <Label>Estado</Label>
-        <Select value={ncForm.status} onValueChange={(v) => setNcForm((p) => ({ ...p, status: v }))}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-    </div>
-  );
-
-  // --- Action form fields ---
-  const renderActionFields = (showNcSelect: boolean) => (
-    <div className="space-y-3">
-      {showNcSelect && (
-        <div>
-          <Label>No conformidad</Label>
-          <Select value={actionForm.non_conformity_id} onValueChange={(v) => setActionForm((p) => ({ ...p, non_conformity_id: v }))}>
-            <SelectTrigger><SelectValue placeholder="Selecciona NC" /></SelectTrigger>
-            <SelectContent>{filteredNcs.map((nc) => <SelectItem key={nc.id} value={nc.id}>{nc.title}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-      )}
-      <div>
-        <Label>Tipo</Label>
-        <Select value={actionForm.action_type} onValueChange={(v: "corrective" | "preventive" | "immediate") => setActionForm((p) => ({ ...p, action_type: v }))}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>{actionTypes.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <div><Label>Descripción</Label><Textarea value={actionForm.description} onChange={(e) => setActionForm((p) => ({ ...p, description: e.target.value }))} /></div>
-      <div>
-        <Label>Responsable *</Label>
-        <Select value={actionForm.responsible_id} onValueChange={(v) => setActionForm((p) => ({ ...p, responsible_id: v }))}>
-          <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
-          <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <div><Label>Fecha vencimiento *</Label><Input type="date" value={actionForm.due_date} onChange={(e) => setActionForm((p) => ({ ...p, due_date: e.target.value }))} /></div>
-      <div>
-        <Label>Estado</Label>
-        <Select value={actionForm.status} onValueChange={(v) => setActionForm((p) => ({ ...p, status: v }))}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>{actionStatus.map((s) => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      {showNcSelect && (
-        <div>
-          <Label>Adjunto</Label>
-          <Input type="file" onChange={(e) => setActionForm((p) => ({ ...p, file: e.target.files?.[0] ?? null }))} />
-          {actionForm.file && <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1"><Paperclip className="h-3 w-3" />{actionForm.file.name}</p>}
-        </div>
-      )}
-    </div>
-  );
-
-  // --- CAPA form fields ---
-  const renderCapaFields = () => (
-    <div className="space-y-3">
-      <div><Label>Nombre del plan</Label><Input value={capaForm.title} onChange={(e) => setCapaForm((p) => ({ ...p, title: e.target.value }))} placeholder="Ej: Plan CAPA principal" /></div>
-      <div><Label>Descripción</Label><Textarea value={capaForm.description} onChange={(e) => setCapaForm((p) => ({ ...p, description: e.target.value }))} rows={4} /></div>
-      <div>
-        <Label>Responsable</Label>
-        <Select value={capaForm.responsible_id} onValueChange={(v) => setCapaForm((p) => ({ ...p, responsible_id: v }))}>
-          <SelectTrigger><SelectValue placeholder="Selecciona responsable" /></SelectTrigger>
-          <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email ?? u.id}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-    </div>
-  );
-
-  const actionTypeLabel = (t: string) => actionTypes.find((at) => at.value === t)?.label ?? t;
-  const statusLabel = (s: string) => {
-    const map: Record<string, string> = { open: "Abierta", in_progress: "En proceso", closed: "Cerrada" };
-    return map[s] ?? s;
-  };
 
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
@@ -889,27 +563,14 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                     variant="destructive"
                     onClick={async () => {
                       setDeletingAuditId(selectedAudit.id);
-                      // Check linked records
                       const links: string[] = [];
-                      const auditCapas = capaPlans.filter(c => c.audit_id === selectedAudit.id);
-                      const auditNcs = nonConformities.filter(nc => auditCapas.some(c => c.id === nc.capa_plan_id));
-                      const auditActions = actions.filter(a => auditNcs.some(nc => nc.id === a.non_conformity_id));
                       const auditAtts = auditAttachments.filter(a => a.audit_id === selectedAudit.id);
                       const auditParts = auditParticipants.filter(p => p.audit_id === selectedAudit.id);
-                      const linkedIncidencias = capaIncidenciaLinks.filter(l => auditCapas.some(c => c.id === l.capa_plan_id));
-                      // Check incidencias directly linked to audit
-                      const { data: directIncidencias } = await supabase
-                        .from("incidencias")
-                        .select("id")
-                        .eq("audit_id", selectedAudit.id);
+                      const { data: directIncidencias } = await supabase.from("incidencias").select("id").eq("audit_id", selectedAudit.id);
                       const directIncCount = directIncidencias?.length ?? 0;
 
-                      if (auditCapas.length > 0) links.push(`${auditCapas.length} plan(es) CAPA`);
-                      if (auditNcs.length > 0) links.push(`${auditNcs.length} no conformidad(es)`);
-                      if (auditActions.length > 0) links.push(`${auditActions.length} acción(es)`);
                       if (auditAtts.length > 0) links.push(`${auditAtts.length} adjunto(s)`);
                       if (auditParts.length > 0) links.push(`${auditParts.length} participante(s)`);
-                      if (linkedIncidencias.length > 0) links.push(`${linkedIncidencias.length} incidencia(s) vinculada(s) vía CAPA`);
                       if (directIncCount > 0) links.push(`${directIncCount} incidencia(s) directa(s) (se desvinculará(n))`);
 
                       setAuditLinkedInfo(links);
@@ -984,140 +645,6 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
             ) : <p className="text-sm text-muted-foreground">Selecciona una auditoría.</p>}
           </CardContent>
         </Card>
-
-        {/* CAPA Plans */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Planes CAPA</CardTitle>
-            {canEditContent && selectedAuditId && (
-              <Button size="sm" onClick={() => { setCapaForm({ title: "", description: "", responsible_id: "" }); setNewCapaOpen(true); }}>
-                <Plus className="mr-1 h-4 w-4" />Nuevo plan
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {auditCapaPlans.length === 0 && <p className="text-sm text-muted-foreground">No hay planes CAPA para esta auditoría.</p>}
-            {auditCapaPlans.map((capa) => {
-              const ncCount = nonConformities.filter((nc) => nc.capa_plan_id === capa.id).length;
-              const actCount = actions.filter((a) => nonConformities.some((nc) => nc.capa_plan_id === capa.id && nc.id === a.non_conformity_id)).length;
-              const linkedIncs = getLinkedIncidencias(capa.id);
-              return (
-                <div key={capa.id} onClick={() => setSelectedCapaPlanId(capa.id)} className={`rounded border p-3 cursor-pointer ${selectedCapaPlanId === capa.id ? "border-primary bg-primary/5" : "border-border"}`}>
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{capa.title || "Plan CAPA"}</p>
-                    <div className="flex items-center gap-1">
-                      {canEditContent && (
-                        <button onClick={(e) => { e.stopPropagation(); setLinkingCapaPlanId(capa.id); setLinkIncidenciaOpen(true); }} className="text-muted-foreground hover:text-foreground" title="Vincular incidencias">
-                          <AlertCircle className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      {canEditContent && (
-                        <button onClick={(e) => { e.stopPropagation(); openEditCapa(capa); }} className="text-muted-foreground hover:text-foreground">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {capa.responsible_id && <p className="text-xs text-muted-foreground">Responsable: {getUserName(capa.responsible_id)}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">{ncCount} NC · {actCount} acciones · {linkedIncs.length} incidencias</p>
-                  {linkedIncs.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {linkedIncs.map((inc) => (
-                        <span key={inc.id} className="inline-flex items-center gap-1 text-xs bg-destructive/10 text-destructive rounded-full px-1.5 py-0.5">
-                          {inc.title}
-                          {canEditContent && (
-                            <button type="button" onClick={(e) => { e.stopPropagation(); unlinkIncidencia(capa.id, inc.id); }} className="hover:text-foreground">
-                              <X className="h-3 w-3" />
-                            </button>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {capa.description && <p className="text-xs text-muted-foreground mt-1 truncate">{capa.description}</p>}
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        {/* Non-conformities */}
-        {selectedCapaPlanId && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>No conformidades</CardTitle>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setNcForm({ title: "", description: "", severity: "", root_cause: "", status: "open", deadline: "", responsible_id: "" }); setNewNcOpen(true); }}>Añadir NC</Button>
-                <Button size="sm" onClick={() => { setActionForm({ non_conformity_id: "", action_type: "corrective", description: "", responsible_id: "", due_date: "", status: "open", file: null }); setNewActionOpen(true); }}>Añadir acción</Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {filteredNcs.map((nc) => (
-                <div key={nc.id} className="rounded border p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{nc.title}</p>
-                      {canEditContent && <button onClick={() => openEditNc(nc)} className="text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {nc.deadline && (
-                        <span className={nc.status !== "closed" && new Date(nc.deadline) < new Date() ? "text-destructive font-medium" : ""}>
-                          Límite: {nc.deadline}
-                        </span>
-                      )}
-                      <span className="px-1.5 py-0.5 rounded bg-muted">{statusLabel(nc.status)}</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">{nc.description ?? "Sin descripción"}</p>
-                  {nc.severity && <p className="text-xs text-muted-foreground mt-1">Severidad: {nc.severity}</p>}
-                  {nc.responsible_id && <p className="text-xs text-muted-foreground mt-1">Responsable NC: {getUserName(nc.responsible_id)}</p>}
-                  
-                  {/* Actions summary */}
-                  {(() => {
-                    const ncActions = actions.filter((a) => a.non_conformity_id === nc.id);
-                    if (ncActions.length === 0) return null;
-                    const today = new Date();
-                    return (
-                      <div className="mt-3 border-t border-border pt-2">
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">Acciones correctivas ({ncActions.length})</p>
-                        <div className="space-y-1.5">
-                          {ncActions.map((action) => {
-                            const isOverdue = action.status !== "closed" && action.due_date && new Date(action.due_date) < today;
-                            return (
-                              <div key={action.id} className="rounded bg-muted/40 p-2 text-sm cursor-pointer hover:bg-muted/60 transition-colors" onClick={() => openEditAction(action)}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-medium">{actionTypeLabel(action.action_type)}</p>
-                                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted">{statusLabel(action.status)}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs">
-                                    {action.due_date && (
-                                      <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
-                                        {action.due_date}
-                                      </span>
-                                    )}
-                                    {canEditContent && <Pencil className="h-3 w-3 text-muted-foreground" />}
-                                  </div>
-                                </div>
-                                <p className="text-muted-foreground">{action.description}</p>
-                                {action.responsible_id && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    Responsable: {getUserName(action.responsible_id) ?? action.responsible_id}
-                                  </p>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              ))}
-              {filteredNcs.length === 0 && <p className="text-sm text-muted-foreground">No hay no conformidades en este plan CAPA.</p>}
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* New Audit Dialog */}
@@ -1201,7 +728,7 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
                     <li key={i}>{info}</li>
                   ))}
                 </ul>
-                <p className="text-xs text-muted-foreground mt-1">Todos estos registros serán eliminados junto con la auditoría.</p>
+                <p className="text-xs text-muted-foreground mt-1">Todos estos registros serán eliminados o desvinculados.</p>
               </div>
             )}
             <div className="mt-4 space-y-2">
@@ -1229,96 +756,6 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* New CAPA Plan Dialog */}
-      <Dialog open={newCapaOpen} onOpenChange={setNewCapaOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Nuevo plan CAPA</DialogTitle></DialogHeader>
-          {renderCapaFields()}
-          <DialogFooter><Button onClick={createCapaPlan}>Crear</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit CAPA Dialog */}
-      <Dialog open={editCapaOpen} onOpenChange={(o) => { setEditCapaOpen(o); if (!o) setEditingCapa(null); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Editar plan CAPA</DialogTitle></DialogHeader>
-          {renderCapaFields()}
-          <DialogFooter>
-            {canEditContent ? <Button onClick={updateCapaPlan}>Guardar cambios</Button> : <p className="text-sm text-muted-foreground">Solo lectura</p>}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* New NC Dialog */}
-      <Dialog open={newNcOpen} onOpenChange={setNewNcOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Nueva no conformidad</DialogTitle></DialogHeader>
-          {renderNcFields()}
-          <DialogFooter><Button onClick={createNonConformity}>Crear</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit NC Dialog */}
-      <Dialog open={editNcOpen} onOpenChange={(o) => { setEditNcOpen(o); if (!o) setEditingNc(null); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Editar no conformidad</DialogTitle></DialogHeader>
-          {renderNcFields()}
-          <DialogFooter>
-            {canEditContent ? <Button onClick={updateNonConformity}>Guardar cambios</Button> : <p className="text-sm text-muted-foreground">Solo lectura</p>}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* New Action Dialog */}
-      <Dialog open={newActionOpen} onOpenChange={setNewActionOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Nueva acción</DialogTitle></DialogHeader>
-          {renderActionFields(true)}
-          <DialogFooter><Button onClick={createAction}>Guardar acción</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Action Dialog */}
-      <Dialog open={editActionOpen} onOpenChange={(o) => { setEditActionOpen(o); if (!o) setEditingAction(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar acción</DialogTitle>
-            {editingAction && <DialogDescription>Vinculada a NC: {nonConformities.find((nc) => nc.id === editingAction.non_conformity_id)?.title ?? "—"}</DialogDescription>}
-          </DialogHeader>
-          {renderActionFields(false)}
-          <DialogFooter>
-            {canEditContent ? <Button onClick={updateAction}>Guardar cambios</Button> : <p className="text-sm text-muted-foreground">Solo lectura</p>}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Link Incidencia Dialog */}
-      <Dialog open={linkIncidenciaOpen} onOpenChange={(o) => { setLinkIncidenciaOpen(o); if (!o) setLinkingCapaPlanId(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Vincular incidencias</DialogTitle>
-            <DialogDescription>Selecciona incidencias para asociar a este plan CAPA.</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-60 overflow-y-auto space-y-1">
-            {linkingCapaPlanId && getUnlinkedIncidencias(linkingCapaPlanId).length === 0 && (
-              <p className="text-sm text-muted-foreground py-4 text-center">No hay incidencias disponibles para vincular.</p>
-            )}
-            {linkingCapaPlanId && getUnlinkedIncidencias(linkingCapaPlanId).map((inc) => (
-              <div key={inc.id} className="flex items-center justify-between rounded border p-2 hover:bg-muted/50">
-                <div>
-                  <p className="text-sm font-medium">{inc.title}</p>
-                  <p className="text-xs text-muted-foreground">{inc.status}</p>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => { if (linkingCapaPlanId) linkIncidencia(linkingCapaPlanId, inc.id); }}>Vincular</Button>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLinkIncidenciaOpen(false)}>Cerrar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
