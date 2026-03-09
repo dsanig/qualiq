@@ -193,21 +193,78 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   // --- CRUD ---
   const createAudit = async () => {
-    const user = (await supabase.auth.getUser()).data.user;
-    const { data: profileData } = await supabase.from("profiles").select("company_id").eq("user_id", user?.id ?? "").maybeSingle();
-    const { data, error } = await (supabase as any).from("audits").insert({
-      title: auditForm.title, description: auditForm.description || null,
-      audit_date: auditForm.audit_date || null, auditor_id: auditForm.auditor_id || null,
-      responsible_id: auditForm.responsible_id || null,
-      observations: auditForm.observations || null, findings: auditForm.findings || null,
-      conclusions: auditForm.conclusions || null, status: auditForm.status,
-      audit_type: auditForm.audit_type,
-      external_entity_id: auditForm.audit_type === "externa" ? (auditForm.external_entity_id || null) : null,
-      company_id: profileData?.company_id, created_by: user?.id,
-    }).select("id").single();
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData.user;
+
+    if (userError || !user) {
+      toast({ title: "Error", description: "Debes iniciar sesión para crear una auditoría.", variant: "destructive" });
+      return;
+    }
+
+    if (!auditForm.auditor_id || !auditForm.responsible_id) {
+      toast({ title: "Error", description: "Auditor y responsable son obligatorios.", variant: "destructive" });
+      return;
+    }
+
+    if (auditForm.audit_type === "externa" && !auditForm.external_entity_id.trim()) {
+      toast({ title: "Error", description: "La identificación del cliente/proveedor es obligatoria.", variant: "destructive" });
+      return;
+    }
+
+    const callerIsAssignee = user.id === auditForm.auditor_id || user.id === auditForm.responsible_id;
+
+    if ((auditFiles?.length ?? 0) > 0 && !callerIsAssignee) {
+      toast({
+        title: "Sin permisos",
+        description: "Solo el auditor o el responsable pueden adjuntar documentos a la auditoría.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (auditForm.participant_ids.length > 0 && !callerIsAssignee) {
+      toast({
+        title: "Sin permisos",
+        description: "Solo el auditor o el responsable pueden gestionar los participantes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("company_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const { data, error } = await (supabase as any)
+      .from("audits")
+      .insert({
+        title: auditForm.title,
+        description: auditForm.description || null,
+        audit_date: auditForm.audit_date || null,
+        auditor_id: auditForm.auditor_id,
+        responsible_id: auditForm.responsible_id,
+        observations: auditForm.observations || null,
+        findings: auditForm.findings || null,
+        conclusions: auditForm.conclusions || null,
+        status: auditForm.status,
+        audit_type: auditForm.audit_type,
+        external_entity_id: auditForm.audit_type === "externa" ? auditForm.external_entity_id.trim() : null,
+        company_id: profileData?.company_id,
+        created_by: user.id,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
     if (auditFiles) await uploadAuditAttachments(data.id, auditFiles);
     await syncParticipants(data.id, auditForm.participant_ids);
+
     toast({ title: "Auditoría creada" });
     logAction({ action: "create", entity_type: "audit", entity_id: data?.id, entity_title: auditForm.title, details: { status: auditForm.status } });
     setNewAuditOpen(false);
@@ -217,18 +274,77 @@ export function AuditManagementView({ searchQuery = "" }: AuditManagementViewPro
 
   const updateAudit = async () => {
     if (!editingAudit) return;
-    const { error } = await (supabase as any).from("audits").update({
-      title: auditForm.title, description: auditForm.description || null,
-      audit_date: auditForm.audit_date || null, auditor_id: auditForm.auditor_id || null,
-      responsible_id: auditForm.responsible_id || null,
-      observations: auditForm.observations || null, findings: auditForm.findings || null,
-      conclusions: auditForm.conclusions || null, status: auditForm.status,
-      audit_type: auditForm.audit_type,
-      external_entity_id: auditForm.audit_type === "externa" ? (auditForm.external_entity_id || null) : null,
-    }).eq("id", editingAudit.id);
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData.user;
+
+    if (userError || !user) {
+      toast({ title: "Error", description: "Debes iniciar sesión para actualizar una auditoría.", variant: "destructive" });
+      return;
+    }
+
+    if (!auditForm.auditor_id || !auditForm.responsible_id) {
+      toast({ title: "Error", description: "Auditor y responsable son obligatorios.", variant: "destructive" });
+      return;
+    }
+
+    if (auditForm.audit_type === "externa" && !auditForm.external_entity_id.trim()) {
+      toast({ title: "Error", description: "La identificación del cliente/proveedor es obligatoria.", variant: "destructive" });
+      return;
+    }
+
+    const callerIsAssigneeAfter = user.id === auditForm.auditor_id || user.id === auditForm.responsible_id;
+
+    const existingParticipantIds = auditParticipants
+      .filter((p) => p.audit_id === editingAudit.id)
+      .map((p) => p.user_id)
+      .sort();
+    const nextParticipantIds = [...auditForm.participant_ids].sort();
+    const participantsChanged = existingParticipantIds.join(",") !== nextParticipantIds.join(",");
+
+    if ((auditFiles?.length ?? 0) > 0 && !callerIsAssigneeAfter) {
+      toast({
+        title: "Sin permisos",
+        description: "Solo el auditor o el responsable pueden adjuntar documentos a la auditoría.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (participantsChanged && !callerIsAssigneeAfter) {
+      toast({
+        title: "Sin permisos",
+        description: "Solo el auditor o el responsable pueden gestionar los participantes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await (supabase as any)
+      .from("audits")
+      .update({
+        title: auditForm.title,
+        description: auditForm.description || null,
+        audit_date: auditForm.audit_date || null,
+        auditor_id: auditForm.auditor_id,
+        responsible_id: auditForm.responsible_id,
+        observations: auditForm.observations || null,
+        findings: auditForm.findings || null,
+        conclusions: auditForm.conclusions || null,
+        status: auditForm.status,
+        audit_type: auditForm.audit_type,
+        external_entity_id: auditForm.audit_type === "externa" ? auditForm.external_entity_id.trim() : null,
+      })
+      .eq("id", editingAudit.id);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
     if (auditFiles) await uploadAuditAttachments(editingAudit.id, auditFiles);
-    await syncParticipants(editingAudit.id, auditForm.participant_ids);
+    if (participantsChanged) await syncParticipants(editingAudit.id, auditForm.participant_ids);
+
     toast({ title: "Auditoría actualizada" });
     logAction({ action: "update", entity_type: "audit", entity_id: editingAudit.id, entity_title: auditForm.title, details: { status: auditForm.status } });
     setEditAuditOpen(false);
