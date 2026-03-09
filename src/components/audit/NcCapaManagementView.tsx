@@ -977,7 +977,7 @@ export function NcCapaManagementView({ searchQuery = "" }: NcCapaManagementViewP
                         {selectedCapaPlan.audit_id && (
                           <div>
                             <p className="text-sm text-muted-foreground">Auditoría vinculada</p>
-                            <p className="text-blue-600 dark:text-blue-400">{getAuditTitle(selectedCapaPlan.audit_id)}</p>
+                            <p className="text-primary">{getAuditTitle(selectedCapaPlan.audit_id)}</p>
                           </div>
                         )}
                       </div>
