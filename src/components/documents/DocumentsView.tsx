@@ -101,6 +101,13 @@ interface VersionRecord {
   creatorName?: string;
 }
 
+interface DocumentReadReceiptRow {
+  userId: string;
+  fullName: string;
+  email: string;
+  readAt: string | null;
+}
+
 // Build AutoFirma invocation URL using afirma:// protocol
 function buildAutoFirmaUrl(fileB64: string, fileName: string): string {
   const params = new URLSearchParams({
@@ -417,6 +424,11 @@ export function DocumentsView({
   const [newRespAction, setNewRespAction] = useState("revision");
   const [newRespDueDate, setNewRespDueDate] = useState("");
   const [companyUsers, setCompanyUsers] = useState<{ user_id: string; full_name: string | null; email: string }[]>([]);
+  const [currentDocumentVersionId, setCurrentDocumentVersionId] = useState<string | null>(null);
+  const [isLoadingReadReceipts, setIsLoadingReadReceipts] = useState(false);
+  const [readReceiptRows, setReadReceiptRows] = useState<DocumentReadReceiptRow[]>([]);
+  const [isMarkReadOpen, setIsMarkReadOpen] = useState(false);
+  const [isMarkingAsRead, setIsMarkingAsRead] = useState(false);
 
    // Real documents from database
   const [dbDocuments, setDbDocuments] = useState<Document[]>([]);
@@ -1653,6 +1665,113 @@ export function DocumentsView({
     setIsPreviewOpen(true);
   };
 
+  const fetchReadReceiptsForDocument = useCallback(async (doc: Document) => {
+    if (!effectiveCompanyId) return;
+
+    setIsLoadingReadReceipts(true);
+    try {
+      const { data: versionRows, error: versionError } = await supabase
+        .from("document_versions")
+        .select("id, version, created_at")
+        .eq("document_id", doc.id)
+        .order("created_at", { ascending: false });
+
+      if (versionError) throw versionError;
+
+      const rows = (versionRows || []) as Array<{ id: string; version: number | string | null; created_at: string }>;
+      const matchingVersion =
+        rows.find((row) => String(row.version) === doc.version) ||
+        rows.find((row) => String(row.version) === String(doc.versionMajor)) ||
+        rows[0];
+
+      if (!matchingVersion?.id) {
+        setCurrentDocumentVersionId(null);
+        setReadReceiptRows(
+          companyUsers.map((companyUser) => ({
+            userId: companyUser.user_id,
+            fullName: companyUser.full_name?.trim() || companyUser.email || companyUser.user_id,
+            email: companyUser.email,
+            readAt: null,
+          }))
+        );
+        return;
+      }
+
+      setCurrentDocumentVersionId(matchingVersion.id);
+
+      const { data: receipts, error: receiptsError } = await (supabase as any)
+        .from("document_read_receipts")
+        .select("user_id, read_at")
+        .eq("document_version_id", matchingVersion.id);
+
+      if (receiptsError) throw receiptsError;
+
+      const readAtByUser = new Map<string, string | null>(
+        ((receipts || []) as Array<{ user_id: string; read_at: string | null }>).map((receipt) => [receipt.user_id, receipt.read_at || null])
+      );
+
+      setReadReceiptRows(
+        companyUsers.map((companyUser) => ({
+          userId: companyUser.user_id,
+          fullName: companyUser.full_name?.trim() || companyUser.email || companyUser.user_id,
+          email: companyUser.email,
+          readAt: readAtByUser.get(companyUser.user_id) ?? null,
+        }))
+      );
+    } catch (error: any) {
+      console.error("[documents] error fetching read receipts", error);
+      toast({
+        title: "Error al cargar registro de lectura",
+        description: error?.message || "No se pudo obtener el registro de lectura de esta versión.",
+        variant: "destructive",
+      });
+      setCurrentDocumentVersionId(null);
+      setReadReceiptRows([]);
+    } finally {
+      setIsLoadingReadReceipts(false);
+    }
+  }, [companyUsers, effectiveCompanyId, toast]);
+
+  const handleMarkAsRead = useCallback(async () => {
+    if (!currentDocumentVersionId || !user) return;
+    setIsMarkingAsRead(true);
+    try {
+      const { error } = await (supabase as any)
+        .from("document_read_receipts")
+        .upsert(
+          {
+            document_version_id: currentDocumentVersionId,
+            user_id: user.id,
+            read_at: new Date().toISOString(),
+          },
+          { onConflict: "document_version_id,user_id" }
+        );
+
+      if (error) throw error;
+
+      if (selectedDocument) {
+        await fetchReadReceiptsForDocument(selectedDocument);
+      }
+
+      toast({ title: "Lectura registrada", description: "Tu lectura quedó registrada para esta versión." });
+      setIsMarkReadOpen(false);
+    } catch (error: any) {
+      console.error("[documents] error marking receipt as read", error);
+      toast({
+        title: "No se pudo marcar como leído",
+        description: error?.message || "Inténtalo de nuevo en unos segundos.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMarkingAsRead(false);
+    }
+  }, [currentDocumentVersionId, fetchReadReceiptsForDocument, selectedDocument, toast, user]);
+
+  useEffect(() => {
+    if (!isPreviewOpen || !selectedDocument || companyUsers.length === 0) return;
+    void fetchReadReceiptsForDocument(selectedDocument);
+  }, [companyUsers, fetchReadReceiptsForDocument, isPreviewOpen, selectedDocument]);
+
   const handleToggleSummary = async (docId: string) => {
     const isExpanding = expandedDocumentId !== docId;
     setExpandedDocumentId((prev) => (prev === docId ? null : docId));
@@ -2284,6 +2403,63 @@ export function DocumentsView({
               {selectedDocument.format === "pdf" && selectedDocument.fileUrl && !selectedDocument.fileUrl.startsWith("/docs/") && (
                 <PdfEmbed fileUrl={selectedDocument.fileUrl} />
               )}
+
+              <div className="space-y-3 border border-border rounded-lg p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-foreground">Registro de Lectura</p>
+                    <p className="text-xs text-muted-foreground">Trazabilidad de lectura para la versión actual del documento.</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Usuarios: {readReceiptRows.length}</p>
+                </div>
+
+                <div className="max-h-64 overflow-auto rounded-md border border-border">
+                  <table className="w-full min-w-[520px] text-sm">
+                    <thead className="bg-secondary/40 sticky top-0">
+                      <tr className="text-left">
+                        <th className="px-3 py-2 font-medium">Usuario</th>
+                        <th className="px-3 py-2 font-medium">Email</th>
+                        <th className="px-3 py-2 font-medium">Estado</th>
+                        <th className="px-3 py-2 font-medium">Fecha lectura</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {isLoadingReadReceipts ? (
+                        <tr>
+                          <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">Cargando registro de lectura...</td>
+                        </tr>
+                      ) : readReceiptRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">No hay usuarios para mostrar.</td>
+                        </tr>
+                      ) : (
+                        readReceiptRows.map((receiptUser) => (
+                          <tr key={receiptUser.userId} className="border-t border-border">
+                            <td className="px-3 py-2">{receiptUser.fullName}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{receiptUser.email}</td>
+                            <td className="px-3 py-2">
+                              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium", receiptUser.readAt ? "bg-success/20 text-success" : "bg-muted text-muted-foreground")}>
+                                {receiptUser.readAt ? "Leído" : "No leído"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-muted-foreground">{receiptUser.readAt ? new Date(receiptUser.readAt).toLocaleString("es-ES") : "—"}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsMarkReadOpen(true)}
+                    disabled={!currentDocumentVersionId || isLoadingReadReceipts || !user}
+                  >
+                    Marcar como leído
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -2319,6 +2495,23 @@ export function DocumentsView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ActionConfirmDialog
+        open={isMarkReadOpen}
+        onOpenChange={(open) => {
+          if (isMarkingAsRead) return;
+          setIsMarkReadOpen(open);
+        }}
+        title="Marcar documento como leído"
+        description="Para confirmar que has leído esta versión del documento, escribe exactamente LEIDO."
+        confirmWord="LEIDO"
+        strictConfirm
+        onConfirm={handleMarkAsRead}
+        isLoading={isMarkingAsRead}
+        loadingText="Registrando lectura..."
+        confirmText="Confirmar lectura"
+        icon={<UserCheck className="w-5 h-5 text-accent" />}
+      />
 
       <ActionConfirmDialog
         open={isDeleteConfirmOpen}
